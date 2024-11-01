@@ -1,0 +1,12 @@
+[package]
+name = "wasmi_benches_reverse_complement"
+version.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+crate-type = ["cdylib"]

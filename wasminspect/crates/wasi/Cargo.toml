@@ -1,0 +1,16 @@
+[package]
+name = "wasminspect-wasi"
+version = "0.2.0"
+authors = ["Yuta Saito <kateinoigakukun@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+wasi-common = "0.25.0"
+wiggle = "0.25.0"
+wasi-cap-std-sync = "0.25.0"
+log = "0.4"
+wasminspect-vm = { path = "../vm" }
+wasminspect-wasi-macro = { path = "./macro" }
+wasmparser = "0.95.0"
+cap-std = "0.13.0"
+anyhow = "1.0.0"

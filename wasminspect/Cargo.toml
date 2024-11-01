@@ -1,0 +1,46 @@
+[package]
+name = "wasminspect"
+version = "0.2.0"
+authors = ["Yuta Saito <kateinoigakukun@gmail.com>"]
+edition = "2018"
+description = "An Interactive Debugger for WebAssembly"
+license-file = "LICENSE"
+repository = "https://github.com/kateinoigakukun/wasminspect"
+documentation = "https://github.com/kateinoigakukun/wasminspect/blob/main/docs/tutorial.md"
+
+[[bin]]
+name = "wasminspect"
+path = "src/bin/wasminspect.rs"
+
+[[bin]]
+name = "wasminspect-server"
+path = "src/bin/wasminspect_server.rs"
+required-features = ["remote-api"]
+
+[dependencies]
+wasminspect-debugger = { path = "crates/debugger" }
+wasminspect-vm = { path = "crates/vm" }
+wasminspect-debugger-server = { path = "crates/debugger-server", optional = true }
+wast-spec = { path = "crates/wast-spec" }
+clap = "2.33.0"
+structopt = "0.3"
+env_logger = "0.7.1"
+anyhow = "1.0.26"
+tokio = { version = "1", features = ["full"], optional = true }
+
+[workspace]
+members = [
+  "crates/debugger",
+  "crates/vm",
+  "crates/wast-spec",
+  "crates/wasi",
+  "crates/swift-runtime",
+]
+[features]
+default = []
+swift-extension = ["wasminspect-debugger/swift-extension"]
+remote-api = [
+  "wasminspect-debugger-server",
+  "wasminspect-debugger/remote-api",
+  "tokio",
+]

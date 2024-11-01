@@ -1,0 +1,23 @@
+name: Check
+on: [push, pull_request]
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+          git submodule sync --recursive
+          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
+      - name: Install wabt and fixtures
+        run: make .wabt fixtures
+      - uses: cachix/install-nix-action@v13
+        with:
+          nix_path: nixpkgs=channel:nixos-21.05
+      - name: Run cargo build
+        run: nix-shell --pure --run "cargo build"
+      - name: Run cargo test 
+        run: nix-shell --pure --run "cargo test"

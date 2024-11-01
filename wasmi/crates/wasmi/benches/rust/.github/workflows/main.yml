@@ -1,0 +1,67 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# disable running jobs on earlier commits
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+    check:
+        name: Build Cases
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+          - uses: dtolnay/rust-toolchain@stable
+            with:
+              targets: wasm32-unknown-unknown, x86_64-unknown-none
+          - name: Set up Rust cache
+            uses: Swatinem/rust-cache@v2
+          - name: Build (default features)
+            run: cargo run --package build_benches --locked --verbose
+
+    fmt:
+        name: Formatting
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+          - uses: dtolnay/rust-toolchain@nightly
+            with:
+              components: rustfmt
+          - name: Foramtting
+            run: cargo fmt --all -- --check
+
+    doc:
+        name: Documentation
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+          - uses: dtolnay/rust-toolchain@stable
+            with:
+              components: rust-docs, rust-src
+          - name: Set up Rust cache
+            uses: Swatinem/rust-cache@v2
+          - name: Check Docs
+            env:
+              RUSTDOCFLAGS: "-D warnings"
+            run: cargo doc --workspace --locked --all-features --no-deps --document-private-items
+
+    clippy:
+        name: Clippy
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+          - uses: dtolnay/rust-toolchain@nightly
+            with:
+              components: clippy
+          - name: Set up Rust cache
+            uses: Swatinem/rust-cache@v2
+          - name: Checkout Submodules
+            run: git submodule update --init --recursive
+          - name: Clippy (default features)
+            run: cargo clippy --workspace --locked -- -D warnings

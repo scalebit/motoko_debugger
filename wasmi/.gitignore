@@ -1,0 +1,9 @@
+
+/target/
+**/*.rs.bk
+spec/target
+
+**/fuzz/corpus/
+**/fuzz/target/
+**/fuzz/artifacts/
+**/fuzz/Cargo.lock
