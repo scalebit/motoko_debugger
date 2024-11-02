@@ -1,8 +1,6 @@
 [workspace]
 members = [
     "crates/collections",
-    "crates/c_api/artifact",
-    "crates/c_api/macro",
     "crates/cli",
     "crates/core",
     "crates/wasmi",
@@ -30,8 +28,6 @@ wasmi_wasi = { version = "0.38.0", path = "crates/wasi", default-features = fals
 wasmi_core = { version = "0.38.0", path = "crates/core", default-features = false }
 wasmi_ir = { version = "0.38.0", path = "crates/ir", default-features = false }
 wasmi_collections = { version = "0.38.0", path = "crates/collections", default-features = false }
-wasmi_c_api_impl = { version = "0.38.0", path = "crates/c_api" }
-wasmi_c_api_macros = { version = "0.38.0", path = "crates/c_api/macro" }
 num-traits = { version = "0.2.8", default-features = false }
 
 [profile.bench]

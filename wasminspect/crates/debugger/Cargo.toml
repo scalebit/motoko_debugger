@@ -6,8 +6,6 @@ edition = "2018"
 
 [dependencies]
 wasminspect-vm = { path = "../vm" }
-wasminspect-wasi = { path = "../wasi" }
-wasminspect-swift-runtime = { path = "../swift-runtime", optional = true }
 linefeed = "0.6.0"
 clap = "2.33.0"
 structopt = "0.3"
@@ -18,10 +16,9 @@ gimli = "0.21.0"
 log = "0.4.8"
 num-bigint = "0.4"
 shell-words = "1.0.0"
-cap-std = "0.13.0"
+cap-std = "3.2.0"
 signal-hook = "0.3.0"
 
 [features]
 default = []
-swift-extension = ["wasminspect-swift-runtime"]
 remote-api = []

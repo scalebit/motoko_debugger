@@ -1176,29 +1176,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasmi_c_api"
-version = "0.38.0"
-dependencies = [
- "wasmi_c_api_impl",
-]
-
-[[package]]
-name = "wasmi_c_api_impl"
-version = "0.38.0"
-dependencies = [
- "wasmi",
- "wasmi_c_api_macros",
-]
-
-[[package]]
-name = "wasmi_c_api_macros"
-version = "0.38.0"
-dependencies = [
- "proc-macro2",
- "quote",
-]
-
-[[package]]
 name = "wasmi_cli"
 version = "0.38.0"
 dependencies = [

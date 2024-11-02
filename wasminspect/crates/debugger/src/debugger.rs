@@ -10,7 +10,8 @@ use wasminspect_vm::{
     CallFrame, DefinedModuleInstance, Executor, FuncAddr, FunctionInstance, InstIndex, Instruction,
     Interceptor, MemoryAddr, ModuleIndex, ProgramCounter, Signal, Store, Trap, WasmValue,
 };
-use wasminspect_wasi::instantiate_wasi;
+// use wasminspect_wasi::instantiate_wasi;
+use cap_std::ambient_authority;
 use wasmparser::WasmFeatures;
 
 type RawModule = Vec<u8>;
@@ -418,25 +419,25 @@ impl debugger::Debugger for MainDebugger {
                 preopen_dirs
                     .iter()
                     .map(|(guest, host)| {
-                        let dir = unsafe { cap_std::fs::Dir::open_ambient_dir(host) }?;
+                        let dir = unsafe { cap_std::fs::Dir::open_ambient_dir(host, ambient_authority()) }?;
                         Ok((guest.clone(), dir))
                     })
                     .collect::<anyhow::Result<Vec<_>>>()
             }
 
-            let (ctx, wasi_snapshot_preview) = instantiate_wasi(
-                &wasi_args,
-                collect_preopen_dirs(&self.preopen_dirs)?,
-                &self.envs,
-            )?;
-            let (_, wasi_unstable) = instantiate_wasi(
-                &wasi_args,
-                collect_preopen_dirs(&self.preopen_dirs)?,
-                &self.envs,
-            )?;
-            store.add_embed_context(Box::new(ctx));
-            store.load_host_module("wasi_snapshot_preview1".to_string(), wasi_snapshot_preview);
-            store.load_host_module("wasi_unstable".to_string(), wasi_unstable);
+            // let (ctx, wasi_snapshot_preview) = instantiate_wasi(
+            //     &wasi_args,
+            //     collect_preopen_dirs(&self.preopen_dirs)?,
+            //     &self.envs,
+            // )?;
+            // let (_, wasi_unstable) = instantiate_wasi(
+            //     &wasi_args,
+            //     collect_preopen_dirs(&self.preopen_dirs)?,
+            //     &self.envs,
+            // )?;
+            // store.add_embed_context(Box::new(ctx));
+            // store.load_host_module("wasi_snapshot_preview1".to_string(), wasi_snapshot_preview);
+            // store.load_host_module("wasi_unstable".to_string(), wasi_unstable);
         }
 
         let main_module_index = store.load_module(None, main_module)?;

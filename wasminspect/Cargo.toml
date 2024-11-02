@@ -33,7 +33,6 @@ members = [
   "crates/debugger",
   "crates/vm",
   "crates/wast-spec",
-  "crates/wasi",
 ]
 [features]
 default = []
