@@ -29,8 +29,17 @@ fn test_load_and_execute() -> anyhow::Result<()> {
         .load_main_module(&bytes, String::from("calc.wasm"))?;
     process.debugger.instantiate(host_modules, Some(&args))?;
     process.debugger.set_breakpoint(wasminspect_debugger::commands::debugger::Breakpoint::Instruction{ inst_offset: 3});
-    process
+    let run_result = process
         .debugger
         .run(Some("add"), vec![WasmValue::I32(1), WasmValue::I32(2)])?;
+    
+    match run_result {
+        RunResult::Finish(finied_vec) => {
+            eprintln!("finied_vec = {:?}", finied_vec);
+        },
+        RunResult::Breakpoint => {
+            eprintln!("Breakpoint");
+        }
+    }
     Ok(())
 }
