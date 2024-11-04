@@ -1,7 +1,7 @@
 pub use self::call::{dispatch_host_func, ResumableHostError};
 use super::{cache::CachedInstance, InstructionPtr, Stack};
 use crate::{
-    core::{hint, TrapCode, UntypedVal},
+    core::{hint, Trap, TrapCode, UntypedVal},
     engine::{
         code_map::CodeMap,
         executor::stack::{CallFrame, FrameRegisters, ValueStack},
@@ -21,6 +21,8 @@ use crate::{
     Store,
     Table,
 };
+
+// use std::hash::Hash;
 
 #[cfg(doc)]
 use crate::Instance;
@@ -64,9 +66,20 @@ pub fn execute_instrs<'engine, T>(
     Executor::new(stack, code_map, cache).execute(store)
 }
 
+pub enum Signal {
+    Next,
+    Breakpoint,
+    End,
+}
+
+pub type ExecResult<T> = Result<T, Trap>;
+
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+pub struct ModuleIndex(pub u32);
+
 /// An execution context for executing a Wasmi function frame.
 #[derive(Debug)]
-struct Executor<'engine> {
+pub struct Executor<'engine> {
     /// Stores the value stack of live values on the Wasm stack.
     sp: FrameRegisters,
     /// The pointer to the currently executed instruction.
@@ -1382,7 +1395,30 @@ impl<'engine> Executor<'engine> {
                 | Instr::CallIndirectParamsImm16 { .. } => self.invalid_instruction_word()?,
             }
         }
+    }   
+
+    pub fn execute_for_debug<T, I: Interceptor>(mut self, store: &mut Store<T>, interceptor: &I) -> ExecResult<Signal> {
+        // let func = store.func_global(self.pc.exec_addr()).defined().unwrap();
+        // let module_index = func.module_index();
+        // let inst = match func.inst(self.pc.inst_index()) {
+        //     Some(inst) => inst,
+        //     None => return Err(Trap::NoMoreInstruction),
+        // };
+
+        // let signal = interceptor.execute_inst(inst)?;
+        // let result = self.execute_inst(inst, module_index, store, interceptor, config)?;
+        // Ok(match (signal, result) {
+        //     (_, Signal::End) => Signal::End,
+        //     (signal, Signal::Next) => signal,
+        //     (_, other) => other,
+        // })
+        Ok(Signal::End)
     }
+}
+
+pub trait Interceptor {
+    fn invoke_func(&self, fn_name: &str) -> ExecResult<Signal>;
+    fn execute_inst(&self, inst: &Instruction) -> ExecResult<Signal>;
 }
 
 macro_rules! get_entity {

@@ -6,6 +6,7 @@ members = [
     "crates/wasmi",
     "crates/wasi",
     "crates/ir",
+    "crates/debugger",
 ]
 exclude = []
 resolver = "2"
@@ -29,6 +30,8 @@ wasmi_core = { version = "0.38.0", path = "crates/core", default-features = fals
 wasmi_ir = { version = "0.38.0", path = "crates/ir", default-features = false }
 wasmi_collections = { version = "0.38.0", path = "crates/collections", default-features = false }
 num-traits = { version = "0.2.8", default-features = false }
+wasmi_debugger = { version = "0.2.0", path = "crates/debugger", default-features = false }
+
 
 [profile.bench]
 lto = "fat"

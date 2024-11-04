@@ -87,19 +87,19 @@ extern crate std;
 #[macro_use]
 mod foreach_tuple;
 
-mod engine;
+pub mod engine;
 mod error;
 mod externref;
 mod func;
 mod global;
-mod instance;
+pub mod instance;
 mod limits;
 mod linker;
 mod memory;
-mod module;
-mod store;
+pub mod module;
+pub mod store;
 mod table;
-mod value;
+pub mod value;
 
 /// Definitions from the `wasmi_core` crate.
 #[doc(inline)]

@@ -24,8 +24,7 @@ use super::code_map::CodeMap;
 
 mod cache;
 mod instr_ptr;
-mod instrs;
-mod instrs_monitor;
+pub mod instrs;
 mod stack;
 
 impl EngineInner {
