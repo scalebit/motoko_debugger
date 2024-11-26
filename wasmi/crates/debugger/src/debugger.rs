@@ -29,6 +29,13 @@ use wasmi_wasi::WasiCtx;
 type RawModule = Vec<u8>;
 
 use wasmi::{CompilationMode, Config, ExternType, Func, FuncType, Instance, Module, Store};
+use wasmi::engine::{
+    code_map::CodeMap,
+    executor::stack::{CallFrame, FrameRegisters, ValueStack},
+    utils::unreachable_unchecked,
+    DedupFuncType,
+    EngineFunc,
+};
 
 pub struct MainDebugger {
     pub instance: Option<Instance>,
@@ -104,18 +111,6 @@ impl MainDebugger {
         })
     }
 
-    pub fn main_module(&self) -> Result<&DefinedModuleInstance> {
-        if let Some(ref instance) = self.instance {
-            let module = match instance.store.module(instance.main_module_index).defined() {
-                Some(module) => module,
-                None => return Err(anyhow::anyhow!("Main module is not loaded correctly")),
-            };
-            Ok(module)
-        } else {
-            Err(anyhow::anyhow!("No instance"))
-        }
-    }
-
     fn executor(&self) -> Result<Rc<RefCell<Executor>>> {
         let instance = self.instance()?;
         if let Some(ref executor) = instance.executor {
@@ -133,19 +128,12 @@ impl MainDebugger {
         }
     }
 
-    pub fn with_module<T, F: FnOnce(&DefinedModuleInstance) -> Result<T>>(
-        &self,
-        f: F,
-    ) -> Result<T> {
-        let module = self.main_module()?;
-        f(module)
-    }
 
     pub fn lookup_func(&self, store: impl AsContextMut, name: &str) -> Func {
         self.instance.unwrap().get_func(&store, "").unwrap()
     }
 
-    fn selected_frame(&self) -> Result<ProgramCounter> {
+    fn selected_frame(&self) -> Result<CallFrame> {
         let executor = self.executor()?;
         let executor = executor.borrow();
         if let Some(frame_index) = self.selected_frame {
@@ -271,45 +259,47 @@ impl debugger::Debugger for MainDebugger {
         fn frame_depth(executor: &Executor) -> usize {
             executor.stack.peek_frames().len()
         }
-        match style {
-            InstIn => {
-                return Ok(executor
-                    .borrow_mut()
-                    .execute_step(store)?)
-            }
-            InstOver => {
-                let initial_frame_depth = frame_depth(&executor.borrow());
-                let mut last_signal =
-                    executor
-                        .borrow_mut()
-                        .execute_step(store)?;
-                while initial_frame_depth < frame_depth(&executor.borrow()) {
-                    last_signal = executor
-                        .borrow_mut()
-                        .execute_step(store)?;
-                    if let Signal::Breakpoint = last_signal {
-                        return Ok(last_signal);
-                    }
-                }
-                Ok(last_signal)
-            }
-            Out => {
-                let initial_frame_depth = frame_depth(&executor.borrow());
-                let mut last_signal =
-                    executor
-                        .borrow_mut()
-                        .execute_step(store)?;
-                while initial_frame_depth <= frame_depth(&executor.borrow()) {
-                    last_signal = executor
-                        .borrow_mut()
-                        .execute_step(store)?;
-                    if let Signal::Breakpoint = last_signal {
-                        return Ok(last_signal);
-                    }
-                }
-                Ok(last_signal)
-            }
-        }
+        // match style {
+        //     InstIn => {
+        //         return Ok(executor
+        //             .borrow_mut()
+        //             .execute_step(store)?)
+        //     }
+        //     InstOver => {
+        //         let initial_frame_depth = frame_depth(&executor.borrow());
+        //         let mut last_signal =
+        //             executor
+        //                 .borrow_mut()
+        //                 .execute_step(store)?;
+        //         while initial_frame_depth < frame_depth(&executor.borrow()) {
+        //             last_signal = executor
+        //                 .borrow_mut()
+        //                 .execute_step(store)?;
+        //             if let Signal::Breakpoint = last_signal {
+        //                 return Ok(last_signal);
+        //             }
+        //         }
+        //         Ok(last_signal)
+        //     }
+        //     Out => {
+        //         let initial_frame_depth = frame_depth(&executor.borrow());
+        //         let mut last_signal =
+        //             executor
+        //                 .borrow_mut()
+        //                 .execute_step(store)?;
+        //         while initial_frame_depth <= frame_depth(&executor.borrow()) {
+        //             last_signal = executor
+        //                 .borrow_mut()
+        //                 .execute_step(store)?;
+        //             if let Signal::Breakpoint = last_signal {
+        //                 return Ok(last_signal);
+        //             }
+        //         }
+        //         Ok(last_signal)
+        //     }
+        // }
+
+        Ok(Signal::Next)
     }
 
     fn process(&mut self) -> Result<RunResult> {
@@ -319,7 +309,7 @@ impl debugger::Debugger for MainDebugger {
         loop {
             let result = executor
                 .borrow_mut()
-                .execute_step(store);
+                .execute_for_debug(store);
             match result {
                 Ok(Signal::Next) => continue,
                 Ok(Signal::Breakpoint) => return Ok(RunResult::Breakpoint),

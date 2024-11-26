@@ -21,7 +21,7 @@ use core::{fmt, marker::PhantomData, mem::replace, ops::Deref};
 /// must provide all the information necessary to be properly converted into
 /// either user facing types.
 #[derive(Debug)]
-pub(crate) enum ResumableCallBase<T> {
+pub enum ResumableCallBase<T> {
     /// The resumable call has finished properly and returned a result.
     Finished(T),
     /// The resumable call encountered a host error and can be resumed.
@@ -39,7 +39,7 @@ pub enum ResumableCall {
 
 impl ResumableCall {
     /// Creates a [`ResumableCall`] from the [`Engine`]'s base [`ResumableCallBase`].
-    pub(crate) fn new(call: ResumableCallBase<()>) -> Self {
+    pub fn new(call: ResumableCallBase<()>) -> Self {
         match call {
             ResumableCallBase::Finished(()) => Self::Finished,
             ResumableCallBase::Resumable(invocation) => Self::Resumable(invocation),
@@ -188,7 +188,7 @@ impl ResumableInvocation {
     /// # Note
     ///
     /// This is `Some` only for [`ResumableInvocation`] originating from the register-machine Wasmi engine.
-    pub(crate) fn caller_results(&self) -> RegSpan {
+    pub fn caller_results(&self) -> RegSpan {
         self.caller_results
     }
 
@@ -244,7 +244,7 @@ pub enum TypedResumableCall<T> {
 
 impl<Results> TypedResumableCall<Results> {
     /// Creates a [`TypedResumableCall`] from the [`Engine`]'s base [`ResumableCallBase`].
-    pub(crate) fn new(call: ResumableCallBase<Results>) -> Self {
+    pub fn new(call: ResumableCallBase<Results>) -> Self {
         match call {
             ResumableCallBase::Finished(results) => Self::Finished(results),
             ResumableCallBase::Resumable(invocation) => {
@@ -265,7 +265,7 @@ pub struct TypedResumableInvocation<Results> {
 
 impl<Results> TypedResumableInvocation<Results> {
     /// Creates a [`TypedResumableInvocation`] wrapper for the given [`ResumableInvocation`].
-    pub(crate) fn new(invocation: ResumableInvocation) -> Self {
+    pub fn new(invocation: ResumableInvocation) -> Self {
         Self {
             invocation,
             results: PhantomData,

@@ -15,7 +15,7 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use self::{
+pub use self::{
     block_type::BlockType,
     config::FuelCosts,
     executor::Stack,
@@ -203,7 +203,7 @@ impl Engine {
     ///
     /// - If function translation fails.
     /// - If function validation fails.
-    pub(crate) fn translate_func(
+    pub fn translate_func(
         &self,
         func_index: FuncIdx,
         engine_func: EngineFunc,
@@ -223,22 +223,22 @@ impl Engine {
     }
 
     /// Returns reusable [`FuncTranslatorAllocations`] from the [`Engine`].
-    pub(crate) fn get_translation_allocs(&self) -> FuncTranslatorAllocations {
+    pub fn get_translation_allocs(&self) -> FuncTranslatorAllocations {
         self.inner.get_translation_allocs()
     }
 
     /// Returns reusable [`FuncTranslatorAllocations`] and [`FuncValidatorAllocations`] from the [`Engine`].
-    pub(crate) fn get_allocs(&self) -> (FuncTranslatorAllocations, FuncValidatorAllocations) {
+    pub fn get_allocs(&self) -> (FuncTranslatorAllocations, FuncValidatorAllocations) {
         self.inner.get_allocs()
     }
 
     /// Recycles the given [`FuncTranslatorAllocations`] in the [`Engine`].
-    pub(crate) fn recycle_translation_allocs(&self, allocs: FuncTranslatorAllocations) {
+    pub fn recycle_translation_allocs(&self, allocs: FuncTranslatorAllocations) {
         self.inner.recycle_translation_allocs(allocs)
     }
 
     /// Recycles the given [`FuncTranslatorAllocations`] and [`FuncValidatorAllocations`] in the [`Engine`].
-    pub(crate) fn recycle_allocs(
+    pub fn recycle_allocs(
         &self,
         translation: FuncTranslatorAllocations,
         validation: FuncValidatorAllocations,
@@ -289,7 +289,7 @@ impl Engine {
     ///
     /// [`TypedFunc`]: [`crate::TypedFunc`]
     #[inline]
-    pub(crate) fn execute_func<T, Results>(
+    pub fn execute_func<T, Results>(
         &self,
         ctx: StoreContextMut<T>,
         func: &Func,
@@ -325,7 +325,7 @@ impl Engine {
     ///
     /// [`TypedFunc`]: [`crate::TypedFunc`]
     #[inline]
-    pub(crate) fn execute_func_resumable<T, Results>(
+    pub fn execute_func_resumable<T, Results>(
         &self,
         ctx: StoreContextMut<T>,
         func: &Func,
@@ -362,7 +362,7 @@ impl Engine {
     ///
     /// [`TypedFunc`]: [`crate::TypedFunc`]
     #[inline]
-    pub(crate) fn resume_func<T, Results>(
+    pub fn resume_func<T, Results>(
         &self,
         ctx: StoreContextMut<T>,
         invocation: ResumableInvocation,
@@ -376,7 +376,7 @@ impl Engine {
     }
 
     /// Recycles the given [`Stack`] for reuse in the [`Engine`].
-    pub(crate) fn recycle_stack(&self, stack: Stack) {
+    pub fn recycle_stack(&self, stack: Stack) {
         self.inner.recycle_stack(stack)
     }
 }

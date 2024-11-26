@@ -1,5 +1,5 @@
 pub use self::instrs::ResumableHostError;
-pub(crate) use self::stack::Stack;
+pub use self::stack::Stack;
 use self::{
     instr_ptr::InstructionPtr,
     instrs::{dispatch_host_func, execute_instrs},
@@ -22,10 +22,10 @@ use crate::engine::StackLimits;
 
 use super::code_map::CodeMap;
 
-mod cache;
-mod instr_ptr;
+pub mod cache;
+pub mod instr_ptr;
 pub mod instrs;
-mod stack;
+pub mod stack;
 
 impl EngineInner {
     /// Executes the given [`Func`] with the given `params` and returns the `results`.

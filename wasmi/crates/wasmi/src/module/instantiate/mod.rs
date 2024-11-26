@@ -45,7 +45,7 @@ impl Module {
     ///
     /// [`Linker`]: struct.Linker.html
     /// [`Func`]: [`crate::Func`]
-    pub(crate) fn instantiate<I>(
+    pub fn instantiate<I>(
         &self,
         mut context: impl AsContextMut,
         externals: I,
