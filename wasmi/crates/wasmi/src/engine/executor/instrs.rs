@@ -81,17 +81,17 @@ pub struct ModuleIndex(pub u32);
 #[derive(Debug)]
 pub struct Executor<'engine> {
     /// Stores the value stack of live values on the Wasm stack.
-    sp: FrameRegisters,
+    pub sp: FrameRegisters,
     /// The pointer to the currently executed instruction.
-    ip: InstructionPtr,
+    pub ip: InstructionPtr,
     /// The cached instance and instance related data.
-    cache: CachedInstance,
+    pub cache: CachedInstance,
     /// The value and call stacks.
-    stack: &'engine mut Stack,
+    pub stack: &'engine mut Stack,
     /// The static resources of an [`Engine`].
     ///
     /// [`Engine`]: crate::Engine
-    code_map: &'engine CodeMap,
+    pub code_map: &'engine CodeMap,
 }
 
 impl<'engine> Executor<'engine> {
