@@ -252,12 +252,13 @@ impl debugger::Debugger for MainDebugger {
     }
 
     fn step(&self, style: debugger::StepStyle) -> Result<Signal> {
-        let store = self.store()?;
+        let store = self.store;
         let executor = self.executor()?;
         use debugger::StepStyle::*;
 
         fn frame_depth(executor: &Executor) -> usize {
-            executor.stack.peek_frames().len()
+            // executor.stack.peek_frames().len()
+            1
         }
         // match style {
         //     InstIn => {
@@ -304,22 +305,24 @@ impl debugger::Debugger for MainDebugger {
 
     fn process(&mut self) -> Result<RunResult> {
         self.selected_frame = None;
-        let store = self.store()?;
-        let executor = self.executor()?;
+        let mut store = &self.store;
+        let mut executor = self.executor()?;
         loop {
             let result = executor
                 .borrow_mut()
-                .execute_for_debug(store);
+                .execute_for_debug(store, self);
             match result {
                 Ok(Signal::Next) => continue,
                 Ok(Signal::Breakpoint) => return Ok(RunResult::Breakpoint),
                 Ok(Signal::End) => {
-                    let pc = executor.borrow().pc;
-                    let func = store.func_global(pc.exec_addr());
-                    let results = executor
-                        .borrow_mut()
-                        .pop_result(func.ty().results().to_vec())?;
-                    return Ok(RunResult::Finish(results));
+                    // let pc = executor.borrow().pc;
+                    // let func = store.func_global(pc.exec_addr());
+                    // let results = executor
+                    //     .borrow_mut()
+                    //     .pop_result(func.ty().results().to_vec())?;
+                    // return Ok(RunResult::Finish(results));
+                    return Ok(RunResult::Finish(vec![]));
+                    
                 }
                 Err(err) => return Err(anyhow!("Function exec failure {}", err)),
             }

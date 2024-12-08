@@ -1,16 +1,16 @@
 //! The Wasmi interpreter.
 
-mod block_type;
-mod code_map;
-mod config;
+pub mod block_type;
+pub mod code_map;
+pub mod config;
 pub mod executor;
-mod func_args;
-mod func_types;
-mod limits;
-mod resumable;
-mod traits;
-mod translator;
-mod utils;
+pub mod func_args;
+pub mod func_types;
+pub mod limits;
+pub mod resumable;
+pub mod traits;
+pub mod translator;
+pub mod utils;
 
 #[cfg(test)]
 mod tests;

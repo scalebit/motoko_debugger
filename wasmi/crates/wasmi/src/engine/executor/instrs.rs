@@ -1397,7 +1397,7 @@ impl<'engine> Executor<'engine> {
         }
     }   
 
-    pub fn execute_for_debug<T, I: Interceptor>(mut self, store: &mut Store<T>, interceptor: &I) -> ExecResult<Signal> {
+    pub fn execute_for_debug<T, I: Interceptor>(mut self, store: &Store<T>, interceptor: &I) -> ExecResult<Signal> {
         // let func = store.func_global(self.pc.exec_addr()).defined().unwrap();
         // let module_index = func.module_index();
         // let inst = match func.inst(self.pc.inst_index()) {
