@@ -32,7 +32,6 @@ use wasmi::{CompilationMode, Config, ExternType, Func, FuncType, Instance, Modul
 use wasmi::engine::{
     code_map::CodeMap,
     executor::stack::{CallFrame, FrameRegisters, ValueStack},
-    utils::unreachable_unchecked,
     DedupFuncType,
     EngineFunc,
 };
@@ -42,10 +41,10 @@ pub struct MainDebugger {
 
     main_module: Option<(RawModule, String)>,
 
-    /// The given Wasm module.
-    module: Module,
-    /// The used Wasm store.
-    store: Store<WasiCtx>,
+    // /// The given Wasm module.
+    // module: Module,
+    // /// The used Wasm store.
+    // store: Store<WasiCtx>,
     
     opts: DebuggerOpts,
     preopen_dirs: Vec<(String, String)>,
@@ -71,7 +70,8 @@ impl Breakpoints {
     }
 
     fn should_break_inst(&self, inst: &Instruction) -> bool {
-        self.inst_map.contains_key(&inst.offset)
+        // self.inst_map.contains_key(&inst.offset)
+        true
     }
 
     fn insert(&mut self, breakpoint: debugger::Breakpoint) {
@@ -101,7 +101,7 @@ impl MainDebugger {
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
-            main_module: None,
+            main_module: None,           
             opts: DebuggerOpts::default(),
             breakpoints: Default::default(),
             is_interrupted,
@@ -111,14 +111,14 @@ impl MainDebugger {
         })
     }
 
-    fn executor(&self) -> Result<Rc<RefCell<Executor>>> {
-        let instance = self.instance()?;
-        if let Some(ref executor) = instance.executor {
-            Ok(executor.clone())
-        } else {
-            Err(anyhow::anyhow!("No execution context"))
-        }
-    }
+    // fn executor(&self) -> Result<Rc<RefCell<Executor>>> {
+    //     let instance = self.instance()?;
+    //     if let Some(ref executor) = instance.executor {
+    //         Ok(executor.clone())
+    //     } else {
+    //         Err(anyhow::anyhow!("No execution context"))
+    //     }
+    // }
 
     fn instance(&self) -> Result<&Instance> {
         if let Some(ref instance) = self.instance {
@@ -133,24 +133,24 @@ impl MainDebugger {
         self.instance.unwrap().get_func(&store, "").unwrap()
     }
 
-    fn selected_frame(&self) -> Result<CallFrame> {
-        let executor = self.executor()?;
-        let executor = executor.borrow();
-        if let Some(frame_index) = self.selected_frame {
-            if frame_index != 0 {
-                let frame = executor.stack.frame_at(frame_index - 1).map_err(|_| {
-                    anyhow!("Frame index {} is out of range", frame_index - 1)
-                })?;
-                match frame.ret_pc {
-                    Some(pc) => return Ok(pc),
-                    None => {
-                        return Err(anyhow!("No return address, maybe main or host function?"));
-                    }
-                };
-            }
-        }
-        Ok(executor.pc)
-    }
+    // fn selected_frame(&self) -> Result<CallFrame> {
+    //     // let executor = self.executor()?;
+    //     // let executor = executor.borrow();
+    //     // if let Some(frame_index) = self.selected_frame {
+    //         // if frame_index != 0 {
+    //         //     let frame = executor.stack.frame_at(frame_index - 1).map_err(|_| {
+    //         //         anyhow!("Frame index {} is out of range", frame_index - 1)
+    //         //     })?;
+    //         //     match frame.ret_pc {
+    //         //         Some(pc) => return Ok(pc),
+    //         //         None => {
+    //         //             return Err(anyhow!("No return address, maybe main or host function?"));
+    //         //         }
+    //         //     };
+    //         // }
+    //     }
+    //     Ok(executor.stack.calls.frames[0])
+    // }
 }
 
 impl debugger::Debugger for MainDebugger {
@@ -166,47 +166,47 @@ impl debugger::Debugger for MainDebugger {
         Ok(())
     }
 
-    fn selected_instructions(&self) -> Result<(&[Instruction], usize)> {
-        let pc = self.selected_frame()?;
-        let func = self.store()?.func_global(pc.exec_addr());
-        let func = func.defined().ok_or(anyhow!("Function not found"))?;
-        let insts = func.instructions();
-        Ok((insts, pc.inst_index().0 as usize))
-    }
+    // fn selected_instructions(&self) -> Result<(&[Instruction], usize)> {
+    //     let pc = self.selected_frame()?;
+    //     let func = self.store()?.func_global(pc.exec_addr());
+    //     let func = func.defined().ok_or(anyhow!("Function not found"))?;
+    //     let insts = func.instructions();
+    //     Ok((insts, pc.inst_index().0 as usize))
+    // }
 
     fn set_breakpoint(&mut self, breakpoint: debugger::Breakpoint) {
         self.breakpoints.insert(breakpoint)
     }
 
-    fn stack_values(&self) -> Vec<Val> {
-        if let Ok(ref executor) = self.executor() {
-            let executor = executor.borrow();
-            let values = executor.stack.peek_values();
-            let mut new_values = Vec::<Val>::new();
-            for v in values {
-                new_values.push(*v);
-            }
-            new_values
-        } else {
-            Vec::new()
-        }
-    }
+    // fn stack_values(&self) -> Vec<Val> {
+    //     if let Ok(ref executor) = self.executor() {
+    //         let executor = executor.borrow();
+    //         let values = executor.stack.peek_values();
+    //         let mut new_values = Vec::<Val>::new();
+    //         for v in values {
+    //             new_values.push(*v);
+    //         }
+    //         new_values
+    //     } else {
+    //         Vec::new()
+    //     }
+    // }
 
     // fn store(&self) -> Result<&Store> {
     //     let instance = self.instance()?;
     //     Ok(&instance.store)
     // }
 
-    fn locals(&self) -> Vec<Val> {
-        if let Ok(ref executor) = self.executor() {
-            let executor = executor.borrow();
-            let frame_index = self.selected_frame.unwrap_or(0);
-            if let Ok(frame) = executor.stack.frame_at(frame_index) {
-                return frame.locals.clone()
-            }
-        }
-        vec![]
-    }
+    // fn locals(&self) -> Vec<Val> {
+    //     if let Ok(ref executor) = self.executor() {
+    //         let executor = executor.borrow();
+    //         let frame_index = self.selected_frame.unwrap_or(0);
+    //         if let Ok(frame) = executor.stack.frame_at(frame_index) {
+    //             return frame.locals.clone()
+    //         }
+    //     }
+    //     vec![]
+    // }
     // fn current_frame(&self) -> Option<debugger::FunctionFrame> {
     //     let frame = self.selected_frame().ok()?;
     //     let func = match self.store() {
@@ -219,24 +219,24 @@ impl debugger::Debugger for MainDebugger {
     //         argument_count: func.ty().params().len(),
     //     })
     // }
-    fn frame(&self) -> Vec<String> {
-        let instance = if let Ok(instance) = self.instance() {
-            instance
-        } else {
-            return vec![];
-        };
-        let executor = if let Some(executor) = instance.executor.clone() {
-            executor
-        } else {
-            return vec![];
-        };
-        let executor = executor.borrow();
-        let frames = executor.stack.peek_frames();
-        return frames
-            .iter()
-            .map(|frame| instance.store.func_global(frame.exec_addr).name().clone())
-            .collect();
-    }
+    // fn frame(&self) -> Vec<String> {
+    //     let instance = if let Ok(instance) = self.instance() {
+    //         instance
+    //     } else {
+    //         return vec![];
+    //     };
+    //     let executor = if let Some(executor) = instance.executor.clone() {
+    //         executor
+    //     } else {
+    //         return vec![];
+    //     };
+    //     let executor = executor.borrow();
+    //     let frames = executor.stack.peek_frames();
+    //     return frames
+    //         .iter()
+    //         .map(|frame| instance.store.func_global(frame.exec_addr).name().clone())
+    //         .collect();
+    // }
     // fn memory(&self) -> Result<Vec<u8>> {
     //     let instance = self.instance()?;
     //     let store = &instance.store;
@@ -248,18 +248,19 @@ impl debugger::Debugger for MainDebugger {
     // }
 
     fn is_running(&self) -> bool {
-        self.executor().is_ok()
+        // self.executor().is_ok()
+        true
     }
 
     fn step(&self, style: debugger::StepStyle) -> Result<Signal> {
-        let store = self.store;
-        let executor = self.executor()?;
-        use debugger::StepStyle::*;
+        // let store = self.store;
+        // let executor = self.executor()?;
+        // use debugger::StepStyle::*;
 
-        fn frame_depth(executor: &Executor) -> usize {
-            // executor.stack.peek_frames().len()
-            1
-        }
+        // fn frame_depth(executor: &Executor) -> usize {
+        //     // executor.stack.peek_frames().len()
+        //     1
+        // }
         // match style {
         //     InstIn => {
         //         return Ok(executor
@@ -305,28 +306,29 @@ impl debugger::Debugger for MainDebugger {
 
     fn process(&mut self) -> Result<RunResult> {
         self.selected_frame = None;
-        let mut store = &self.store;
-        let mut executor = self.executor()?;
-        loop {
-            let result = executor
-                .borrow_mut()
-                .execute_for_debug(store, self);
-            match result {
-                Ok(Signal::Next) => continue,
-                Ok(Signal::Breakpoint) => return Ok(RunResult::Breakpoint),
-                Ok(Signal::End) => {
-                    // let pc = executor.borrow().pc;
-                    // let func = store.func_global(pc.exec_addr());
-                    // let results = executor
-                    //     .borrow_mut()
-                    //     .pop_result(func.ty().results().to_vec())?;
-                    // return Ok(RunResult::Finish(results));
-                    return Ok(RunResult::Finish(vec![]));
+        // let mut store = &self.store;
+        // let mut executor = self.executor()?;
+        // loop {
+        //     let result = executor
+        //         .borrow_mut()
+        //         .execute_for_debug(store, self);
+        //     match result {
+        //         Ok(Signal::Next) => continue,
+        //         Ok(Signal::Breakpoint) => return Ok(RunResult::Breakpoint),
+        //         Ok(Signal::End) => {
+        //             // let pc = executor.borrow().pc;
+        //             // let func = store.func_global(pc.exec_addr());
+        //             // let results = executor
+        //             //     .borrow_mut()
+        //             //     .pop_result(func.ty().results().to_vec())?;
+        //             // return Ok(RunResult::Finish(results));
+        //             return Ok(RunResult::Finish(vec![]));
                     
-                }
-                Err(err) => return Err(anyhow!("Function exec failure {}", err)),
-            }
-        }
+        //         }
+        //         Err(err) => return Err(anyhow!("Function exec failure {}", err)),
+        //     }
+        // }
+        return Ok(RunResult::Finish(vec![]));
     }
 
     // fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<debugger::RunResult> {
@@ -377,7 +379,7 @@ impl debugger::Debugger for MainDebugger {
             .instantiate(&mut store, &module)
             .and_then(|pre| pre.start(&mut store))
             .map_err(|error| anyhow!("failed to instantiate and start the Wasm module: {error}"))?;
-        self.store = store;
+        // self.store = store;
         self.instance = Some(instance);
         Ok(1)
     }

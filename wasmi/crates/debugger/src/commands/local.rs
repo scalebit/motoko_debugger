@@ -37,22 +37,22 @@ impl<D: Debugger> Command<D> for LocalCommand {
         args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
         let opts = Opts::from_iter_safe(args)?;
-        match opts {
-            Opts::Read { index: None } => {
-                for (index, value) in debugger.locals().iter().enumerate() {
-                    let output = format!("{: <3}: {:?}", index, value);
-                    context.printer.println(&output);
-                }
-            }
-            Opts::Read { index: Some(index) } => {
-                let locals = debugger.locals();
-                if index >= locals.len() {
-                    return Err(anyhow::anyhow!("{:?} is out of range, locals length is {:?}", index, locals.len()));
-                }
-                let output = format!("{:?}", locals[index]);
-                context.printer.println(&output);
-            }
-        }
+        // match opts {
+        //     Opts::Read { index: None } => {
+        //         for (index, value) in debugger.locals().iter().enumerate() {
+        //             let output = format!("{: <3}: {:?}", index, value);
+        //             context.printer.println(&output);
+        //         }
+        //     }
+        //     Opts::Read { index: Some(index) } => {
+        //         let locals = debugger.locals();
+        //         if index >= locals.len() {
+        //             return Err(anyhow::anyhow!("{:?} is out of range, locals length is {:?}", index, locals.len()));
+        //         }
+        //         let output = format!("{:?}", locals[index]);
+        //         context.printer.println(&output);
+        //     }
+        // }
         Ok(None)
     }
 }

@@ -23,15 +23,15 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct CallStack {
     /// The stack of nested function call frames.
-    frames: Vec<CallFrame>,
+    pub frames: Vec<CallFrame>,
     /// The [`Instance`] used at certain frame stack heights.
-    instances: HeadVec<Instance>,
+    pub instances: HeadVec<Instance>,
     /// The maximum allowed recursion depth.
     ///
     /// # Note
     ///
     /// A [`TrapCode::StackOverflow`] is raised if the recursion limit is exceeded.
-    recursion_limit: usize,
+    pub recursion_limit: usize,
 }
 
 impl CallStack {

@@ -9,7 +9,7 @@ pub mod breakpoint;
 pub mod frame;
 pub mod list;
 pub mod local;
-pub mod memory;
+// pub mod memory;
 pub mod process;
 pub mod run;
 pub mod settings;

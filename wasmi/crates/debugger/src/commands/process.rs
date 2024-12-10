@@ -82,22 +82,22 @@ impl ProcessCommand {
                 return Ok(None);
             }
         }
-        debugger.instantiate(std::collections::HashMap::new(), Some(&wasi_args))?;
+        // debugger.instantiate(std::collections::HashMap::new(), Some(&wasi_args))?;
 
-        match debugger.run(start.as_deref(), vec![]) {
-            Ok(RunResult::Finish(values)) => {
-                let output = format!("{:?}", values);
-                context.printer.println(&output);
-                return Ok(Some(CommandResult::ProcessFinish(values)));
-            }
-            Ok(RunResult::Breakpoint) => {
-                context.printer.println("Hit breakpoint");
-            }
-            Err(msg) => {
-                let output = format!("{}", msg);
-                context.printer.eprintln(&output);
-            }
-        }
+        // match debugger.run(start.as_deref(), vec![]) {
+        //     Ok(RunResult::Finish(values)) => {
+        //         let output = format!("{:?}", values);
+        //         context.printer.println(&output);
+        //         return Ok(Some(CommandResult::ProcessFinish(values)));
+        //     }
+        //     Ok(RunResult::Breakpoint) => {
+        //         context.printer.println("Hit breakpoint");
+        //     }
+        //     Err(msg) => {
+        //         let output = format!("{}", msg);
+        //         context.printer.eprintln(&output);
+        //     }
+        // }
         Ok(None)
     }
 }

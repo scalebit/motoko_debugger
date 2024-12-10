@@ -25,10 +25,10 @@ impl<D: Debugger> Command<D> for StackCommand {
         context: &CommandContext,
         _args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
-        for (index, value) in debugger.stack_values().iter().enumerate() {
-            let output = format!("{}: {:?}", index, value);
-            context.printer.println(&output);
-        }
+        // for (index, value) in debugger.stack_values().iter().enumerate() {
+        //     let output = format!("{}: {:?}", index, value);
+        //     context.printer.println(&output);
+        // }
         Ok(None)
     }
 }

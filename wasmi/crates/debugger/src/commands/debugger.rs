@@ -61,14 +61,14 @@ pub trait Debugger {
 
     // fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
     fn is_running(&self) -> bool;
-    fn frame(&self) -> Vec<String>;
+    // fn frame(&self) -> Vec<String>;
     // fn current_frame(&self) -> Option<FunctionFrame>;
-    fn locals(&self) -> Vec<Val>;
+    // fn locals(&self) -> Vec<Val>;
     // fn memory(&self) -> Result<Vec<u8>>;
     // fn store(&self) -> Result<&Store>;
     fn set_breakpoint(&mut self, breakpoint: Breakpoint);
-    fn stack_values(&self) -> Vec<Val>;
-    fn selected_instructions(&self) -> Result<(&[Instruction], usize)>;
+    // fn stack_values(&self) -> Vec<Val>;
+    // fn selected_instructions(&self) -> Result<(&[Instruction], usize)>;
     fn step(&self, style: StepStyle) -> Result<Signal>;
     fn process(&mut self) -> Result<RunResult>;
     fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()>;
