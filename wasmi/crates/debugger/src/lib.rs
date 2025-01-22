@@ -100,3 +100,174 @@ pub fn run_loop(
     while let CommandResult::ProcessFinish(_) = interactive.run_loop(&context, process.clone())? {}
     Ok(())
 }
+
+use std::{collections::HashMap, io::Read};
+use std::{fs::File, io::Read as _};
+use wasmi::{Config, StackLimits};
+
+fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
+    let mut f = ::std::fs::File::open(filename)?;
+    let mut buffer = Vec::new();
+    f.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
+
+/// Returns the Wasm binary at the given `file_name` as `Vec<u8>`.
+///
+/// # Note
+///
+/// This includes validation and compilation to Wasmi bytecode.
+///
+/// # Panics
+///
+/// If the benchmark Wasm file could not be opened, read or parsed.
+#[track_caller]
+pub fn load_wasm_from_file(file_name: &str) -> Vec<u8> {
+    let mut file = File::open(file_name)
+        .unwrap_or_else(|error| panic!("could not open benchmark file {}: {}", file_name, error));
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).unwrap_or_else(|error| {
+        panic!("could not read file at {} to buffer: {}", file_name, error)
+    });
+    buffer
+}
+
+/// Returns a [`Config`] useful for benchmarking.
+pub fn bench_config() -> Config {
+    let mut config = Config::default();
+    config.wasm_tail_call(true);
+    config.set_stack_limits(StackLimits::new(1024, 1024 * 1024, 64 * 1024).unwrap());
+    config
+}
+
+/// Parses the Wasm binary at the given `file_name` into a Wasmi module.
+///
+/// # Note
+///
+/// This includes validation and compilation to Wasmi bytecode.
+///
+/// # Panics
+///
+/// If the benchmark Wasm file could not be opened, read or parsed.
+pub fn load_module_from_file(file_name: &str) -> wasmi::Module {
+    let wasm: Vec<u8> = load_wasm_from_file(file_name);
+    let engine = wasmi::Engine::new(&bench_config());
+    wasmi::Module::new(&engine, &wasm[..]).unwrap_or_else(|error| {
+        panic!(
+            "could not parse Wasm module from file {}: {}",
+            file_name, error
+        )
+    })
+}
+
+/// Parses the Wasm binary from the given `file_name` into a Wasmi module.
+///
+/// # Note
+///
+/// This includes validation and compilation to Wasmi bytecode.
+///
+/// # Panics
+///
+/// If the benchmark Wasm file could not be opened, read or parsed.
+pub fn load_instance_from_file(file_name: &str) -> (wasmi::Store<()>, wasmi::Instance) {
+    let module = load_module_from_file(file_name);
+    let linker = <wasmi::Linker<()>>::new(module.engine());
+    let mut store = wasmi::Store::new(module.engine(), ());
+    let instance = linker
+        .instantiate(&mut store, &module)
+        .unwrap()
+        .start(&mut store)
+        .unwrap();
+    (store, instance)
+}
+
+/// Converts the `.wat` encoded `bytes` into `.wasm` encoded bytes.
+pub fn wat2wasm(bytes: &[u8]) -> Vec<u8> {
+    wat::parse_bytes(bytes).unwrap().into_owned()
+}
+
+/// Parses the Wasm source from the given `.wat` bytes into a Wasmi module.
+///
+/// # Note
+///
+/// This includes validation and compilation to Wasmi bytecode.
+///
+/// # Panics
+///
+/// If the benchmark Wasm file could not be opened, read or parsed.
+pub fn load_instance_from_wat(wat_bytes: &[u8]) -> (wasmi::Store<()>, wasmi::Instance) {
+    let wasm = wat2wasm(wat_bytes);
+    let engine = wasmi::Engine::new(&bench_config());
+    let module = wasmi::Module::new(&engine, &wasm[..]).unwrap();
+    let linker = <wasmi::Linker<()>>::new(&engine);
+    let mut store = wasmi::Store::new(&engine, ());
+    let instance = linker
+        .instantiate(&mut store, &module)
+        .unwrap()
+        .start(&mut store)
+        .unwrap();
+    (store, instance)
+}
+
+use wasmi::{
+    core::{TrapCode, ValType, F32, F64},
+    CompilationMode,
+    Engine,
+    Func,
+    FuncType,
+    Instance,
+    Linker,
+    Memory,
+    Module,
+    Store,
+    TypedFunc,
+    Val,
+};
+
+#[test]
+fn test_load_and_execute() -> anyhow::Result<()> {
+    let (mut process, _) = start_debugger(None, vec![], vec![])?;
+    let example_dir = std::path::Path::new(file!())
+        .parent()
+        .unwrap()
+        .join("/Users/edy/workspace/scalebit/motoko_debugger/wasminspect/tests/simple-example");
+    let bytes = load_file(example_dir.join("calc.wasm").to_str().unwrap())?;
+    process
+        .debugger
+        .load_main_module(&bytes, String::from("calc.wasm"))?;
+    // process.debugger.instantiate(host_modules, Some(&args))?;
+
+    fn bench_with(wasm: &[u8], n: usize) {
+        /// How often the host functions are called per benchmark run.
+        const ITERATIONS: i64 = 5_000;
+
+        let (mut store, instance) = load_instance_from_wat(wasm);
+        let func_name = format!("run/{n}");
+        let run = instance
+            .get_typed_func::<i64, i64>(&store, &func_name)
+            .unwrap();
+        eprintln!("run = {:?}", run);
+        let result = run.call(&mut store, ITERATIONS).unwrap();
+        eprintln!("result = {}", result);
+    }
+
+    let bytes2 = load_file(example_dir.join("/Users/edy/workspace/scalebit/motoko_debugger/wasmi/crates/wasmi/benches/wat/nested_calls.wat").to_str().unwrap())?;
+    for n in [1, 8, 16] {
+        bench_with(&bytes2, n);
+    }
+    // process.debugger.set_breakpoint(debugger::Breakpoint::Instruction{ inst_offset: 3});
+    // let run_result = process
+    //     .debugger
+    //     .run(Some("add"), vec![WasmValue::I32(1), WasmValue::I32(2)])?;
+    
+    // match run_result {
+    //     RunResult::Finish(finied_vec) => {
+    //         eprintln!("finied_vec = {:?}", finied_vec);
+    //     },
+    //     RunResult::Breakpoint => {
+    //         eprintln!("Breakpoint");
+    //     }
+    // }
+    Ok(())
+}
