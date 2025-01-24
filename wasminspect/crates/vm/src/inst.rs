@@ -46,6 +46,7 @@ pub fn transform_inst(
 ) -> anyhow::Result<Instruction> {
     let (op, offset) = reader.read_with_offset()?;
     let kind = TryFrom::try_from(op)?;
+    Instruction
     Ok(Instruction {
         kind,
         offset: offset - base_offset,

@@ -18,7 +18,7 @@ use crate::{
     TableType,
 };
 use core::ops::Range;
-use std::boxed::Box;
+use std::{boxed::Box, println};
 use wasmparser::{
     CustomSectionReader,
     DataSectionReader,
@@ -292,6 +292,7 @@ impl ModuleParser {
         }
         let exports = section.into_iter().map(|export| {
             let export = export?;
+            println!("process_exports {}",  export.name);
             let field: Box<str> = export.name.into();
             let idx = ExternIdx::new(export.kind, export.index)?;
             Ok((field, idx))

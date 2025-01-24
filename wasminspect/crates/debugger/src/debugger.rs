@@ -191,9 +191,10 @@ impl MainDebugger {
         let executor = executor.borrow();
         if let Some(frame_index) = self.selected_frame {
             if frame_index != 0 {
-                let frame = executor.stack.frame_at(frame_index - 1).map_err(|_| {
-                    anyhow!("Frame index {} is out of range", frame_index - 1)
-                })?;
+                let frame = executor
+                    .stack
+                    .frame_at(frame_index - 1)
+                    .map_err(|_| anyhow!("Frame index {} is out of range", frame_index - 1))?;
                 match frame.ret_pc {
                     Some(pc) => return Ok(pc),
                     None => {
@@ -255,7 +256,7 @@ impl debugger::Debugger for MainDebugger {
             let executor = executor.borrow();
             let frame_index = self.selected_frame.unwrap_or(0);
             if let Ok(frame) = executor.stack.frame_at(frame_index) {
-                return frame.locals.clone()
+                return frame.locals.clone();
             }
         }
         vec![]
@@ -389,8 +390,7 @@ impl debugger::Debugger for MainDebugger {
                 self.lookup_func("_start")?
             }
         };
-
-        self.execute_func(func_addr, args)
+        self.execute_func(func_addr , args)
     }
 
     fn instantiate(
@@ -419,25 +419,13 @@ impl debugger::Debugger for MainDebugger {
                 preopen_dirs
                     .iter()
                     .map(|(guest, host)| {
-                        let dir = unsafe { cap_std::fs::Dir::open_ambient_dir(host, ambient_authority()) }?;
+                        let dir = unsafe {
+                            cap_std::fs::Dir::open_ambient_dir(host, ambient_authority())
+                        }?;
                         Ok((guest.clone(), dir))
                     })
                     .collect::<anyhow::Result<Vec<_>>>()
             }
-
-            // let (ctx, wasi_snapshot_preview) = instantiate_wasi(
-            //     &wasi_args,
-            //     collect_preopen_dirs(&self.preopen_dirs)?,
-            //     &self.envs,
-            // )?;
-            // let (_, wasi_unstable) = instantiate_wasi(
-            //     &wasi_args,
-            //     collect_preopen_dirs(&self.preopen_dirs)?,
-            //     &self.envs,
-            // )?;
-            // store.add_embed_context(Box::new(ctx));
-            // store.load_host_module("wasi_snapshot_preview1".to_string(), wasi_snapshot_preview);
-            // store.load_host_module("wasi_unstable".to_string(), wasi_unstable);
         }
 
         let main_module_index = store.load_module(None, main_module)?;

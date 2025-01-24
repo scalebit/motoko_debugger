@@ -1,6 +1,6 @@
 use crate::{core::TrapCode, for_each_op, index::*, *};
 use ::core::num::{NonZeroI32, NonZeroI64, NonZeroU32, NonZeroU64};
-
+use ::std::vec::Vec;
 macro_rules! define_enum {
     (
         $(
@@ -78,6 +78,63 @@ macro_rules! define_enum {
     };
 }
 for_each_op::for_each_op!(define_enum);
+
+use wasmi_inst_macro::*;
+use wasmparser::{for_each_operator, BrTable, OperatorsReader};
+
+
+pub struct ZaxInstruction {
+    pub kind: InstructionKind,
+    pub offset: usize,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct BrTableData {
+    pub table: Vec<u32>,
+    pub default: u32,
+}
+
+trait WasmInstPayloadFrom<T>: Sized {
+    type Error;
+    fn from_payload(_: T) -> Result<Self, Self::Error>;
+}
+
+impl<T, U> WasmInstPayloadFrom<T> for U
+where
+    U: From<T>,
+{
+    type Error = wasmparser::BinaryReaderError;
+    fn from_payload(from: T) -> Result<U, Self::Error> {
+        Ok(From::<T>::from(from))
+    }
+}
+
+impl WasmInstPayloadFrom<BrTable<'_>> for BrTableData {
+    type Error = wasmparser::BinaryReaderError;
+    fn from_payload(table: BrTable) -> Result<Self, Self::Error> {
+        Ok(BrTableData {
+            table: table.targets().collect::<Result<Vec<_>, _>>()?,
+            default: table.default(),
+        })
+    }
+}
+
+for_each_operator!(define_instr_kind);
+
+pub fn transform_inst(
+    reader: &mut OperatorsReader,
+    base_offset: usize,
+) -> anyhow::Result<ZaxInstruction> {
+    let (op, offset) = reader.read_with_offset()?;
+    let kind = TryFrom::try_from(op)?;
+    Ok(ZaxInstruction {
+        kind,
+        offset: offset - base_offset,
+    })
+}
+
+
 
 impl Instruction {
     /// Creates a new [`Instruction::ReturnReg2`] for the given [`Reg`] indices.

@@ -4,6 +4,8 @@ mod pre;
 #[cfg(test)]
 mod tests;
 
+use std::println;
+
 pub use self::{error::InstantiationError, pre::InstancePre};
 use super::{element::ElementSegmentKind, export, ConstExpr, InitDataSegment, Module};
 use crate::{
@@ -11,20 +13,8 @@ use crate::{
     func::WasmFuncEntity,
     memory::{DataSegment, MemoryError},
     value::WithType,
-    AsContext,
-    AsContextMut,
-    ElementSegment,
-    Error,
-    Extern,
-    ExternType,
-    FuncRef,
-    Global,
-    Instance,
-    InstanceEntity,
-    InstanceEntityBuilder,
-    Memory,
-    Table,
-    Val,
+    AsContext, AsContextMut, ElementSegment, Error, Extern, ExternType, FuncRef, Global, Instance,
+    InstanceEntity, InstanceEntityBuilder, Memory, Table, Val,
 };
 
 impl Module {
@@ -247,6 +237,7 @@ impl Module {
     /// Extracts the Wasm exports from the module and registers them into the [`Instance`].
     fn extract_exports(&self, builder: &mut InstanceEntityBuilder) {
         for (field, idx) in &self.module_header().exports {
+            println!("extract_exports filed: {:?}", field);
             let external = match idx {
                 export::ExternIdx::Func(func_index) => {
                     let func_index = func_index.into_u32();

@@ -45,12 +45,7 @@ pub use self::{
     translator::{Instr, TranslationError},
 };
 use crate::{
-    collections::arena::{ArenaIndex, GuardedEntity},
-    module::{FuncIdx, ModuleHeader},
-    Error,
-    Func,
-    FuncType,
-    StoreContextMut,
+    collections::arena::{ArenaIndex, GuardedEntity}, module::{FuncIdx, ModuleHeader}, AsContextMut, Error, Func, FuncType, StoreContextMut
 };
 use core::sync::atomic::{AtomicU32, Ordering};
 use spin::{Mutex, RwLock};
@@ -300,6 +295,20 @@ impl Engine {
         Results: CallResults,
     {
         self.inner.execute_func(ctx, func, params, results)
+    }
+
+    #[inline]
+    pub fn execute_func_dbg<T, Results>(
+        &self,
+        mut ctx: impl AsContextMut<Data = T>,
+        func: &Func,
+        params: impl CallParams,
+        results: Results,
+    ) -> Result<i32, Error>
+    where
+        Results: CallResults,
+    {
+        self.inner.execute_func_dbg(ctx.as_context_mut(), func, params, results)
     }
 
     /// Executes the given [`Func`] resumably with parameters `params` and returns.

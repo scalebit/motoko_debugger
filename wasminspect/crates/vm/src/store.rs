@@ -344,10 +344,12 @@ impl Store {
                     start_func = Some(FuncAddr::new_unsafe(module_index, func as usize));
                 }
                 Payload::CustomSection(section) => {
+                    println!("Payload::CustomSection: {:?}", section);
                     if section.name() == "name" {
                         let section =
                             NameSectionReader::new(section.data(), section.data_offset())?;
                         func_names = read_name_section(section)?;
+                        println!("func_names = {:?}", func_names.len());
                     }
                 }
                 Payload::ModuleSection { .. } => {
@@ -390,6 +392,7 @@ impl Store {
 
         Ok(module_index)
     }
+    
     pub fn load_module(&mut self, name: Option<String>, reader: &[u8]) -> Result<ModuleIndex> {
         let module_index = ModuleIndex(self.modules.len() as u32);
 
@@ -652,6 +655,7 @@ impl Store {
                 "<module #{} defined func #{}>",
                 module_index.0, index
             ));
+            println!("load_functions name = {}", name);
             let defined =
                 DefinedFunctionInstance::new(name, func_type, module_index, body, base_offset)?;
             let instance = FunctionInstance::Defined(defined);

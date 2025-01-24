@@ -6,7 +6,7 @@ extern crate alloc as std;
 #[cfg(feature = "std")]
 extern crate std;
 
-mod r#enum;
+pub mod r#enum;
 mod error;
 mod for_each_op;
 mod immeditate;
@@ -15,6 +15,8 @@ mod primitive;
 mod sequence;
 mod span;
 mod visit_regs;
+
+pub use r#enum::ZaxInstruction;
 
 #[cfg(test)]
 mod tests;

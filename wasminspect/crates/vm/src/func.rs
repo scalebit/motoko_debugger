@@ -48,7 +48,7 @@ impl FunctionInstance {
 }
 
 pub struct DefinedFunctionInstance {
-    name: String,
+name: String,
     ty: FuncType,
     module_index: ModuleIndex,
     instructions: Vec<Instruction>,

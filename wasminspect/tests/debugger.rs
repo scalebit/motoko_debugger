@@ -15,11 +15,8 @@ fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
 #[test]
 fn test_load_and_execute() -> anyhow::Result<()> {
     let (mut process, _) = start_debugger(None, vec![], vec![])?;
-    let example_dir = std::path::Path::new(file!())
-        .parent()
-        .unwrap()
-        .join("simple-example");
-    let bytes = load_file(example_dir.join("calc.wasm").to_str().unwrap())?;
+    let wasm_file_path = std::path::Path::new("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/calc.wasm");
+    let bytes = load_file(wasm_file_path.to_str().unwrap())?;
     let spectest = instantiate_spectest();
     let mut host_modules = HashMap::new();
     let args = vec![];
@@ -28,15 +25,17 @@ fn test_load_and_execute() -> anyhow::Result<()> {
         .debugger
         .load_main_module(&bytes, String::from("calc.wasm"))?;
     process.debugger.instantiate(host_modules, Some(&args))?;
-    process.debugger.set_breakpoint(wasminspect_debugger::commands::debugger::Breakpoint::Instruction{ inst_offset: 3});
+    process.debugger.set_breakpoint(
+        wasminspect_debugger::commands::debugger::Breakpoint::Instruction { inst_offset: 3 },
+    );
     let run_result = process
         .debugger
-        .run(Some("add"), vec![WasmValue::I32(1), WasmValue::I32(2)])?;
-    
+        .run(Some("addTwo"), vec![WasmValue::I32(1), WasmValue::I32(2)])?;
+
     match run_result {
         RunResult::Finish(finied_vec) => {
             eprintln!("finied_vec = {:?}", finied_vec);
-        },
+        }
         RunResult::Breakpoint => {
             eprintln!("Breakpoint");
         }

@@ -1,20 +1,23 @@
+use crate::commands::backtrace;
 // use crate::commands::debugger::{self, Debugger, DebuggerOpts, RawHostModule, RunResult};
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
-use anyhow::{anyhow, Context, Result, Error};
-use std::path::Path;
+use crate::func_instance::DefinedFunctionInstance;
+use anyhow::{anyhow, Context, Error, Result};
 use log::{trace, warn};
+use wasmi_core::ValType;
 use std::collections::HashMap;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{cell::RefCell, usize};
-// use wasminspect_vm::{
-//     CallFrame, DefinedModuleInstance, Executor, FuncAddr, FunctionInstance, InstIndex, Instruction,
-//     Interceptor, MemoryAddr, ModuleIndex, ProgramCounter, Signal, Store, Trap, WasmValue,
-// };
-// use wasminspect_wasi::instantiate_wasi;
-use wasmi::{Val, engine::executor::instrs::{Signal, ExecResult, ModuleIndex, Executor, Interceptor}};
-use wasmi_ir::{Instruction};
+use wasmparser::NameSectionReader;
+
+use wasmi::{
+    engine::executor::instrs::{ExecResult, Executor, Interceptor, ModuleIndex, Signal},
+    Val,
+};
+use wasmi_ir::Instruction;
 // use cap_std::ambient_authority;
 // use wasmparser::WasmFeatures;
 use wasmi::{
@@ -28,13 +31,15 @@ use wasmi_wasi::WasiCtx;
 
 type RawModule = Vec<u8>;
 
-use wasmi::{CompilationMode, Config, ExternType, Func, FuncType, Instance, Module, Store};
 use wasmi::engine::{
     code_map::CodeMap,
     executor::stack::{CallFrame, FrameRegisters, ValueStack},
-    DedupFuncType,
-    EngineFunc,
+    DedupFuncType, EngineFunc,
 };
+use wasmi::{CompilationMode, Config, Extern, ExternType, Func, FuncType, Instance, Module, Store};
+
+
+
 
 pub struct MainDebugger {
     pub instance: Option<Instance>,
@@ -45,11 +50,10 @@ pub struct MainDebugger {
     // module: Module,
     // /// The used Wasm store.
     // store: Store<WasiCtx>,
-    
     opts: DebuggerOpts,
     preopen_dirs: Vec<(String, String)>,
     envs: Vec<(String, String)>,
-    
+
     breakpoints: Breakpoints,
     is_interrupted: Arc<AtomicBool>,
     selected_frame: Option<usize>,
@@ -101,7 +105,7 @@ impl MainDebugger {
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
-            main_module: None,           
+            main_module: None,
             opts: DebuggerOpts::default(),
             breakpoints: Default::default(),
             is_interrupted,
@@ -127,7 +131,6 @@ impl MainDebugger {
             Err(anyhow::anyhow!("No instance"))
         }
     }
-
 
     pub fn lookup_func(&self, store: impl AsContextMut, name: &str) -> Func {
         self.instance.unwrap().get_func(&store, "").unwrap()
@@ -323,7 +326,7 @@ impl debugger::Debugger for MainDebugger {
         //             //     .pop_result(func.ty().results().to_vec())?;
         //             // return Ok(RunResult::Finish(results));
         //             return Ok(RunResult::Finish(vec![]));
-                    
+
         //         }
         //         Err(err) => return Err(anyhow!("Function exec failure {}", err)),
         //     }
@@ -349,7 +352,7 @@ impl debugger::Debugger for MainDebugger {
     // }
 
     fn instantiate(
-        &mut self, 
+        &mut self,
         wasm_file: &Path,
         wasi_ctx: WasiCtx,
         fuel: Option<u64>,
@@ -381,19 +384,32 @@ impl debugger::Debugger for MainDebugger {
             .map_err(|error| anyhow!("failed to instantiate and start the Wasm module: {error}"))?;
         // self.store = store;
         self.instance = Some(instance);
+        match instance.get_export(&store, "result").unwrap() {
+            Extern::Global(a) => println!("Extern::Global {:?}", a.get(&store)),
+            _ => {}
+        }
+        
+        let addTwoFunc = instance.get_func(&store, "AddTwo").unwrap();
+        let mut res: [Val;1] = [Val::I32(0)];
+        addTwoFunc.call(&mut store, &[wasmi::Val::I32(1),wasmi::Val::I32(1)], &mut res)?;
+        
+        
+        let input: &[Val] = &[wasmi::Val::I32(1),wasmi::Val::I32(1)];
+
+        let mut res2: [Val;1] = [Val::I32(0)];
+        let res2_slice: &mut [Val] = &mut res2;
+
+        let dbg_ret = addTwoFunc.call_dbg(&mut store, &[wasmi::Val::I32(2),wasmi::Val::I32(2)], &mut res)?;
+        println!("res = {:?}", dbg_ret);
+        // self.instance.
+        // DefinedFunctionInstance::new();
+
         Ok(1)
     }
-
-
-
-
 }
 
 impl Interceptor for MainDebugger {
-    fn invoke_func(
-        &self,
-        name: &str
-    ) -> ExecResult<Signal> {
+    fn invoke_func(&self, name: &str) -> ExecResult<Signal> {
         trace!("Invoke function '{}'", name);
         if self.breakpoints.should_break_func(name) {
             Ok(Signal::Breakpoint)

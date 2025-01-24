@@ -2,6 +2,7 @@ pub mod commands;
 mod debugger;
 mod dwarf;
 mod process;
+mod func_instance;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -71,12 +72,12 @@ pub fn start_debugger(
         debugger,
         vec![
             Box::new(commands::thread::ThreadCommand::new()),
-            // Box::new(commands::list::ListCommand::new()),
+            Box::new(commands::list::ListCommand::new()),
             // Box::new(commands::memory::MemoryCommand::new()),
             Box::new(commands::stack::StackCommand::new()),
             Box::new(commands::breakpoint::BreakpointCommand::new()),
-            // Box::new(commands::local::LocalCommand::new()),
-            // Box::new(commands::frame::FrameCommand::new()),
+            Box::new(commands::local::LocalCommand::new()),
+            Box::new(commands::frame::FrameCommand::new()),
             Box::new(commands::settings::SettingsCommand::new()),
             Box::new(commands::process::ProcessCommand::new()),
         ],

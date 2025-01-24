@@ -27,9 +27,7 @@ use core::{
     marker::PhantomData,
 };
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
-    sync::Arc,
-    vec::Vec,
+    collections::{btree_map::Entry, BTreeMap}, println, sync::Arc, vec::Vec
 };
 
 /// An error that may occur upon operating with [`Linker`] instances.
@@ -501,6 +499,7 @@ impl<T> Linker<T> {
         module: &str,
         name: &str,
     ) -> Option<&Definition<T>> {
+        println!("get_definition:{}, {}", module, name);
         assert!(Engine::same(
             context.as_context().store.engine(),
             self.engine()
@@ -531,10 +530,12 @@ impl<T> Linker<T> {
         assert!(Engine::same(self.engine(), context.as_context().engine()));
         // TODO: possibly add further resource limtation here on number of externals.
         // Not clear that user can't import the same external lots of times to inflate this.
+        println!("111111");
         let externals = module
             .imports()
             .map(|import| self.process_import(&mut context, import))
             .collect::<Result<Vec<Extern>, Error>>()?;
+        println!("2222");
         module.instantiate(context, externals)
     }
 
@@ -556,9 +557,11 @@ impl<T> Linker<T> {
         let import_name = import.import_name();
         let module_name = import.module();
         let field_name = import.name();
+        println!("--------1111111---------");
         let resolved = self
             .get_definition(context.as_context(), module_name, field_name)
             .ok_or_else(|| LinkerError::missing_definition(&import))?;
+        println!("--------1111111---------");
         let invalid_type = || LinkerError::invalid_type_definition(&import, &resolved.ty(&context));
         match import.ty() {
             ExternType::Func(expected_type) => {

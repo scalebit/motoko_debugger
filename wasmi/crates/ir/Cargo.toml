@@ -20,6 +20,9 @@ exclude = [
 
 [dependencies]
 wasmi_core = { workspace = true }
+wasmi_inst_macro = { workspace = true }
+wasmparser = { version = "0.100.2", package = "wasmparser-nostd", default-features = false }
+anyhow = "1.0.26"
 
 [features]
 default = ["std"]
