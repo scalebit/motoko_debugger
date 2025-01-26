@@ -36,7 +36,7 @@ impl EngineInner {
         Results: CallResults,
     {
         let mut stack = self.stacks.lock().reuse_or_new();
-        let results = EngineExecutor::new(&self.code_map, &mut stack)
+        let results = EngineExecutor_debugger::new(&self.code_map, &mut stack)
             .execute_root_func_dbg(ctx.store, func, params, results)
             .map_err(|error| match error.into_resumable() {
                 Ok(error) => error.into_error(),
@@ -64,7 +64,7 @@ impl EngineInner {
         Results: CallResults,
     {
         let mut stack = self.stacks.lock().reuse_or_new();
-        let results = EngineExecutor::new(&self.code_map, &mut stack)
+        let results = EngineExecutor_debugger::new(&self.code_map, &mut stack)
             .execute_root_func(ctx.store, func, params, results)
             .map_err(|error| match error.into_resumable() {
                 Ok(error) => error.into_error(),
@@ -93,7 +93,7 @@ impl EngineInner {
     {
         let store = ctx.store;
         let mut stack = self.stacks.lock().reuse_or_new();
-        let results = EngineExecutor::new(&self.code_map, &mut stack)
+        let results = EngineExecutor_debugger::new(&self.code_map, &mut stack)
             .execute_root_func(store, func, params, results);
         match results {
             Ok(results) => {
@@ -141,13 +141,8 @@ impl EngineInner {
     {
         let host_func = invocation.host_func();
         let caller_results = invocation.caller_results();
-        let results = EngineExecutor::new(&self.code_map, &mut invocation.stack).resume_func(
-            ctx.store,
-            host_func,
-            params,
-            caller_results,
-            results,
-        );
+        let results = EngineExecutor_debugger::new(&self.code_map, &mut invocation.stack)
+            .resume_func(ctx.store, host_func, params, caller_results, results);
         match results {
             Ok(results) => {
                 self.stacks.lock().recycle(invocation.take_stack());
@@ -171,7 +166,7 @@ impl EngineInner {
 
 /// The internal state of the Wasmi engine.
 #[derive(Debug)]
-pub struct EngineExecutor<'engine> {
+pub struct EngineExecutor_debugger<'engine> {
     /// Shared and reusable generic engine resources.
     code_map: &'engine CodeMap,
     /// The value and call stacks.
@@ -182,8 +177,8 @@ pub struct EngineExecutor<'engine> {
 #[inline]
 fn do_nothing<T>(_: &mut T) {}
 
-impl<'engine> EngineExecutor<'engine> {
-    /// Creates a new [`EngineExecutor`] with the given [`StackLimits`].
+impl<'engine> EngineExecutor_debugger<'engine> {
+    /// Creates a new [`EngineExecutor_debugger`] with the given [`StackLimits`].
     fn new(code_map: &'engine CodeMap, stack: &'engine mut Stack) -> Self {
         Self { code_map, stack }
     }
@@ -228,7 +223,6 @@ impl<'engine> EngineExecutor<'engine> {
                 store.invoke_call_hook(CallHook::CallingWasm)?;
                 let ret = self.execute_func_dbg(store);
                 store.invoke_call_hook(CallHook::ReturningFromWasm)?;
-                let results = self.write_results_back(results);
                 return ret;
             }
             FuncEntity::Host(host_func) => {
@@ -251,7 +245,7 @@ impl<'engine> EngineExecutor<'engine> {
             }
         };
         let results = self.write_results_back(results);
-        Ok(Signal::Next)
+        Ok(0)
     }
 
     /// Executes the given [`Func`] using the given `params`.

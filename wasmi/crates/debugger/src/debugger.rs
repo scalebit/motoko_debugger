@@ -1,16 +1,16 @@
-use crate::commands::backtrace;
+use crate::commands::{backtrace, breakpoint};
 // use crate::commands::debugger::{self, Debugger, DebuggerOpts, RawHostModule, RunResult};
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
 use crate::func_instance::DefinedFunctionInstance;
 use anyhow::{anyhow, Context, Error, Result};
 use log::{trace, warn};
-use wasmi_core::ValType;
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{cell::RefCell, usize};
+use wasmi_core::ValType;
 use wasmparser::NameSectionReader;
 
 use wasmi::{
@@ -38,9 +38,6 @@ use wasmi::engine::{
 };
 use wasmi::{CompilationMode, Config, Extern, ExternType, Func, FuncType, Instance, Module, Store};
 
-
-
-
 pub struct MainDebugger {
     pub instance: Option<Instance>,
 
@@ -48,8 +45,8 @@ pub struct MainDebugger {
 
     // /// The given Wasm module.
     // module: Module,
-    // /// The used Wasm store.
-    // store: Store<WasiCtx>,
+    /// The used Wasm store.
+    store: Option<Store<WasiCtx>>,
     opts: DebuggerOpts,
     preopen_dirs: Vec<(String, String)>,
     envs: Vec<(String, String)>,
@@ -105,6 +102,7 @@ impl MainDebugger {
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
+            store: None,
             main_module: None,
             opts: DebuggerOpts::default(),
             breakpoints: Default::default(),
@@ -334,22 +332,43 @@ impl debugger::Debugger for MainDebugger {
         return Ok(RunResult::Finish(vec![]));
     }
 
-    // fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<debugger::RunResult> {
-    //     let main_module = self.main_module()?;
-    //     let start_func_addr = *main_module.start_func_addr();
-    //     let func = {
-    //         if let Some(name) = name {
-    //             self.lookup_func(self.store, name)
-    //         } else {
-    //             self.lookup_func(self.store, "_start")
-    //         }
-    //     };
+    fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<debugger::RunResult, Error> {
+        if let Some(instance) = self.instance {
+            if let Some(func_name) = name {
+                // let mut res2: [Val; 1] = [Val::I32(0)];
+                // let res2_slice: &mut [Val] = &mut res2;
 
-    //     let inputs = [Val::I32(1)];
-    //     let mut results = [0_i32; 4].map(Val::from);
-    //     let expected = [1_i32; 4];
-    //     func.call(&mut self.store, &inputs[..], &mut results[..]);
-    // }
+                let mut res2: [Val; 0] = [];
+                let res2_slice: &mut [Val] = &mut res2;
+                let export_func = instance
+                    .get_func(&self.store.as_ref().unwrap(), func_name)
+                    .unwrap();
+                let call_signal =
+                    export_func.call_dbg(&mut self.store.as_mut().unwrap(), &args, res2_slice)?;
+                return match call_signal {
+                    Signal::Breakpoint => {
+                        println!("get breakpoint");
+                        match instance
+                            .get_export(&self.store.as_ref().unwrap(), "result")
+                            .unwrap()
+                        {
+                            Extern::Global(a) => {
+                                println!(
+                                    "Extern::Global {:?}",
+                                    a.get(&self.store.as_ref().unwrap())
+                                )
+                            }
+                            _ => {}
+                        }
+                        Ok(debugger::RunResult::Breakpoint)
+                    }
+                    Signal::Next => Ok(debugger::RunResult::Breakpoint),
+                    Signal::End => Ok(debugger::RunResult::Finish(res2_slice.to_vec())),
+                };
+            }
+        }
+        Err(anyhow::anyhow!("No instance"))
+    }
 
     fn instantiate(
         &mut self,
@@ -382,25 +401,39 @@ impl debugger::Debugger for MainDebugger {
             .instantiate(&mut store, &module)
             .and_then(|pre| pre.start(&mut store))
             .map_err(|error| anyhow!("failed to instantiate and start the Wasm module: {error}"))?;
-        // self.store = store;
+        self.store = Some(store);
         self.instance = Some(instance);
-        match instance.get_export(&store, "result").unwrap() {
-            Extern::Global(a) => println!("Extern::Global {:?}", a.get(&store)),
-            _ => {}
-        }
-        
-        let addTwoFunc = instance.get_func(&store, "AddTwo").unwrap();
-        let mut res: [Val;1] = [Val::I32(0)];
-        addTwoFunc.call(&mut store, &[wasmi::Val::I32(1),wasmi::Val::I32(1)], &mut res)?;
-        
-        
-        let input: &[Val] = &[wasmi::Val::I32(1),wasmi::Val::I32(1)];
+        // match instance
+        //     .get_export(&self.store.as_ref().unwrap(), "result")
+        //     .unwrap()
+        // {
+        //     Extern::Global(a) => {
+        //         println!("Extern::Global {:?}", a.get(&self.store.as_ref().unwrap()))
+        //     }
+        //     _ => {}
+        // }
 
-        let mut res2: [Val;1] = [Val::I32(0)];
-        let res2_slice: &mut [Val] = &mut res2;
+        // let addTwoFunc = instance
+        //     .get_func(&self.store.as_ref().unwrap(), "AddTwo")
+        //     .unwrap();
+        // let mut res: [Val; 1] = [Val::I32(0)];
+        // addTwoFunc.call(
+        //     &mut self.store.as_mut().unwrap(),
+        //     &[wasmi::Val::I32(1), wasmi::Val::I32(1)],
+        //     &mut res,
+        // )?;
+        // println!("res = {:?}", res);
+        // let input: &[Val] = &[wasmi::Val::I32(1), wasmi::Val::I32(1)];
 
-        let dbg_ret = addTwoFunc.call_dbg(&mut store, &[wasmi::Val::I32(2),wasmi::Val::I32(2)], &mut res)?;
-        println!("res = {:?}", dbg_ret);
+        // let mut res2: [Val; 1] = [Val::I32(0)];
+        // let res2_slice: &mut [Val] = &mut res2;
+
+        // let dbg_ret = addTwoFunc.call_dbg(
+        //     &mut self.store,
+        //     &[wasmi::Val::I32(2), wasmi::Val::I32(2)],
+        //     &mut res,
+        // )?;
+        // println!("res = {:?}", dbg_ret);
         // self.instance.
         // DefinedFunctionInstance::new();
 

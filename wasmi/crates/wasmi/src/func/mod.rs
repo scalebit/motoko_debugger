@@ -16,13 +16,13 @@ pub use self::{
 };
 use super::{
     engine::{DedupFuncType, EngineFunc, FuncFinished, FuncParams},
-    AsContext,
-    AsContextMut,
-    Instance,
-    StoreContext,
-    Stored,
+    AsContext, AsContextMut, Instance, StoreContext, Stored,
 };
-use crate::{collections::arena::ArenaIndex, engine::ResumableCall, Engine, Error, Val};
+use crate::{
+    collections::arena::ArenaIndex,
+    engine::{executor::instrs::Signal, ResumableCall},
+    Engine, Error, Val,
+};
 use core::{fmt, fmt::Debug, num::NonZeroU32};
 use std::{boxed::Box, sync::Arc};
 
@@ -400,7 +400,7 @@ impl Func {
         mut ctx: impl AsContextMut<Data = T>,
         inputs: &[Val],
         outputs: &mut [Val],
-    ) -> Result<i32, Error> {
+    ) -> Result<Signal, Error> {
         self.verify_and_prepare_inputs_outputs(ctx.as_context(), inputs, outputs)?;
         // Note: Cloning an [`Engine`] is intentionally a cheap operation.
         ctx.as_context().store.engine().clone().execute_func_dbg(

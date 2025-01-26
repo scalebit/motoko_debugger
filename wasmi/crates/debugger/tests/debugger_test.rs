@@ -14,8 +14,8 @@ fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
 fn test_load_and_execute() -> anyhow::Result<()> {
     let (mut process, _) = start_debugger(None, vec![], vec![])?;
 
-    let bytes = load_file("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addTwoExportWithMain2.wasm")?;
-    let wasm_file_path = std::path::Path::new("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addTwoExportWithMain2.wasm");
+    let bytes = load_file("/home/zax/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addTwoExportWithMain4.wasm")?;
+    let wasm_file_path = std::path::Path::new("/home/zax/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addTwoExportWithMain4.wasm");
     let random = wasi_common::sync::random_ctx();
     let clocks = wasi_common::sync::clocks_ctx();
     let sched = wasi_common::sync::sched_ctx();
@@ -27,5 +27,6 @@ fn test_load_and_execute() -> anyhow::Result<()> {
     process
         .debugger
         .instantiate(wasm_file_path, ctx, None, CompilationMode::Eager)?;
+    process.debugger.run(Some("main"), [].to_vec())?;
     Ok(())
 }

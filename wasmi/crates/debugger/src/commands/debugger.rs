@@ -2,10 +2,13 @@ use anyhow::Result;
 use anyhow::{anyhow, Error};
 use std::path::Path;
 // use wasminspect_vm::{HostValue, Instruction, ModuleIndex, Signal, Store, WasmValue};
-use wasmi::{Val, engine::executor::instrs::{Signal, ModuleIndex}};
+use wasmi::{
+    engine::executor::instrs::{ModuleIndex, Signal},
+    Val,
+};
 // use wasmi::{Val, engine::executor::instrs::{Signal, ExecResult, ModuleIndex, Executor, Interceptor}};
-use wasmi_ir::{Instruction};
 use wasmi::{CompilationMode, Config, ExternType, Func, FuncType, Instance, Module, Store};
+use wasmi_ir::Instruction;
 use wasmi_wasi::WasiCtx;
 
 #[derive(Default, Clone)]
@@ -52,14 +55,14 @@ pub trait Debugger {
     /// - If parsing, validating, compiling or instantiating the Wasm module failed.
     /// - If adding WASI defintions to the linker failed.
     fn instantiate(
-        &mut self, 
+        &mut self,
         wasm_file: &Path,
         wasi_ctx: WasiCtx,
         fuel: Option<u64>,
         compilation_mode: CompilationMode,
     ) -> Result<u32, Error>;
 
-    // fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
+    fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
     fn is_running(&self) -> bool;
     // fn frame(&self) -> Vec<String>;
     // fn current_frame(&self) -> Option<FunctionFrame>;

@@ -22,12 +22,8 @@ pub use self::{
     func_args::{FuncFinished, FuncParams, FuncResults},
     func_types::DedupFuncType,
     translator::{
-        FuncTranslationDriver,
-        FuncTranslator,
-        FuncTranslatorAllocations,
-        LazyFuncTranslator,
-        ValidatingFuncTranslator,
-        WasmTranslator,
+        FuncTranslationDriver, FuncTranslator, FuncTranslatorAllocations, LazyFuncTranslator,
+        ValidatingFuncTranslator, WasmTranslator,
     },
 };
 use self::{
@@ -45,9 +41,12 @@ pub use self::{
     translator::{Instr, TranslationError},
 };
 use crate::{
-    collections::arena::{ArenaIndex, GuardedEntity}, module::{FuncIdx, ModuleHeader}, AsContextMut, Error, Func, FuncType, StoreContextMut
+    collections::arena::{ArenaIndex, GuardedEntity},
+    module::{FuncIdx, ModuleHeader},
+    AsContextMut, Error, Func, FuncType, StoreContextMut,
 };
 use core::sync::atomic::{AtomicU32, Ordering};
+use executor::instrs::Signal;
 use spin::{Mutex, RwLock};
 use std::{
     sync::{Arc, Weak},
@@ -304,11 +303,12 @@ impl Engine {
         func: &Func,
         params: impl CallParams,
         results: Results,
-    ) -> Result<i32, Error>
+    ) -> Result<Signal, Error>
     where
         Results: CallResults,
     {
-        self.inner.execute_func_dbg(ctx.as_context_mut(), func, params, results)
+        self.inner
+            .execute_func_dbg(ctx.as_context_mut(), func, params, results)
     }
 
     /// Executes the given [`Func`] resumably with parameters `params` and returns.
