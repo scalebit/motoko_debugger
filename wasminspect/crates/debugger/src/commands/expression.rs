@@ -82,6 +82,7 @@ impl<D: Debugger> Command<D> for ExpressionCommand {
             }
         };
         log::debug!("frame_base is {:?}", frame_base);
+        dbg!(&opts.symbol);
         context.subroutine.display_variable(
             current_inst.offset,
             frame_base,

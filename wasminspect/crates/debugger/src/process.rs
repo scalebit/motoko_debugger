@@ -74,11 +74,10 @@ pub struct Interactive {
 }
 
 fn history_file_path() -> String {
-    // format!(
-    //     "{}/.wasminspect-history",
-    //     std::env::var_os("HOME").unwrap().to_str().unwrap()
-    // )
-    format!("~/.wasminspect-history")
+    format!(
+        "{}/.wasminspect-history",
+        std::env::var_os("HOME").unwrap().to_str().unwrap()
+    )
 }
 
 impl Interactive {

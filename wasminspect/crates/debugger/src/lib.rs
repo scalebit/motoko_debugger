@@ -1,4 +1,4 @@
-pub mod commands;
+mod commands;
 mod debugger;
 mod dwarf;
 mod process;
@@ -99,27 +99,27 @@ pub fn run_loop(
 ) -> Result<()> {
     let (mut process, context) = start_debugger(module_input, preopen_dirs, envs)?;
 
-    // {
-    //     let is_default = init_source.is_none();
-    //     let lines = match {
-    //         let init_source = init_source.unwrap_or_else(|| "~/.wasminspect_init".to_string());
-    //         use std::fs::File;
-    //         use std::io::{BufRead, BufReader};
-    //         File::open(init_source).map(|file| BufReader::new(file).lines())
-    //     } {
-    //         Ok(lines) => lines.map(|l| l.unwrap()).collect::<Vec<String>>(),
-    //         Err(err) => {
-    //             if is_default {
-    //                 vec![]
-    //             } else {
-    //                 return Err(anyhow!("{}", err));
-    //             }
-    //         }
-    //     };
-    //     for line in lines {
-    //         process.dispatch_command(&line, &context)?;
-    //     }
-    // }
+    {
+        let is_default = init_source.is_none();
+        let lines = match {
+            let init_source = init_source.unwrap_or_else(|| "~/.wasminspect_init".to_string());
+            use std::fs::File;
+            use std::io::{BufRead, BufReader};
+            File::open(init_source).map(|file| BufReader::new(file).lines())
+        } {
+            Ok(lines) => lines.map(|l| l.unwrap()).collect::<Vec<String>>(),
+            Err(err) => {
+                if is_default {
+                    vec![]
+                } else {
+                    return Err(anyhow!("{}", err));
+                }
+            }
+        };
+        for line in lines {
+            process.dispatch_command(&line, &context)?;
+        }
+    }
     let mut interactive = Interactive::new_with_loading_history()?;
     let process = Rc::new(RefCell::new(process));
     while let CommandResult::ProcessFinish(_) = interactive.run_loop(&context, process.clone())? {}

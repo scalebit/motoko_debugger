@@ -2,6 +2,7 @@ use super::command::{Command, CommandContext, CommandResult};
 use super::debugger::{Debugger, StepStyle};
 use super::disassemble::display_asm;
 use super::list::{display_source, next_line_info};
+use super::symbol::demangle_symbol;
 
 pub struct ThreadCommand {}
 
@@ -76,7 +77,7 @@ impl<D: Debugger> Command<D> for ThreadCommand {
             }
             Opts::Backtrace => {
                 for (index, frame) in debugger.frame().iter().rev().enumerate() {
-                    let output = format!("{}: {}", index, frame);
+                    let output = format!("{}: {}", index, demangle_symbol(frame));
                     context.printer.println(&output);
                 }
             }
