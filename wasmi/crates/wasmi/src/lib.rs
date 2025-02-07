@@ -90,7 +90,7 @@ mod foreach_tuple;
 pub mod engine;
 mod error;
 mod externref;
-mod func;
+pub mod func;
 mod global;
 pub mod instance;
 mod limits;

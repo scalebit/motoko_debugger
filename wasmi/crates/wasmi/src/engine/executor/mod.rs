@@ -1,4 +1,4 @@
-use instrs::{execute_instrs_dbg, Signal};
+use instrs::{Signal};
 
 pub use self::instrs::ResumableHostError;
 pub use self::stack::Stack;
@@ -25,26 +25,26 @@ pub mod instrs;
 pub mod stack;
 
 impl EngineInner {
-    pub fn execute_func_dbg<T, Results>(
-        &self,
-        ctx: StoreContextMut<T>,
-        func: &Func,
-        params: impl CallParams,
-        results: Results,
-    ) -> Result<Signal, Error>
-    where
-        Results: CallResults,
-    {
-        let mut stack = self.stacks.lock().reuse_or_new();
-        let results = EngineExecutor::new(&self.code_map, &mut stack)
-            .execute_root_func_dbg(ctx.store, func, params, results)
-            .map_err(|error| match error.into_resumable() {
-                Ok(error) => error.into_error(),
-                Err(error) => error,
-            });
-        self.stacks.lock().recycle(stack);
-        results
-    }
+    // pub fn execute_func_dbg<T, Results>(
+    //     &self,
+    //     ctx: StoreContextMut<T>,
+    //     func: &Func,
+    //     params: impl CallParams,
+    //     results: Results,
+    // ) -> Result<Signal, Error>
+    // where
+    //     Results: CallResults,
+    // {
+    //     let mut stack = self.stacks.lock().reuse_or_new();
+    //     let results = EngineExecutor::new(&self.code_map, &mut stack)
+    //         .execute_root_func_dbg(ctx.store, func, params, results)
+    //         .map_err(|error| match error.into_resumable() {
+    //             Ok(error) => error.into_error(),
+    //             Err(error) => error,
+    //         });
+    //     self.stacks.lock().recycle(stack);
+    //     results
+    // }
 
     /// Executes the given [`Func`] with the given `params` and returns the `results`.
     ///
@@ -188,72 +188,6 @@ impl<'engine> EngineExecutor<'engine> {
         Self { code_map, stack }
     }
 
-    fn execute_root_func_dbg<T, Results>(
-        &mut self,
-        store: &mut Store<T>,
-        func: &Func,
-        params: impl CallParams,
-        results: Results,
-    ) -> Result<Signal, Error>
-    where
-        Results: CallResults,
-    {
-        self.stack.reset();
-        match store.inner.resolve_func(func) {
-            FuncEntity::Wasm(wasm_func) => {
-                // We reserve space on the stack to write the results of the root function execution.
-                let len_results = results.len_results();
-                self.stack.values.extend_by(len_results, do_nothing)?;
-                let instance = *wasm_func.instance();
-                let engine_func = wasm_func.func_body();
-                let compiled_func = self
-                    .code_map
-                    .get(Some(store.inner.fuel_mut()), engine_func)?;
-                let (mut uninit_params, offsets) = self
-                    .stack
-                    .values
-                    .alloc_call_frame(compiled_func, do_nothing)?;
-                for value in params.call_params() {
-                    unsafe { uninit_params.init_next(value) };
-                }
-                uninit_params.init_zeroes();
-                self.stack.calls.push(
-                    CallFrame::new(
-                        InstructionPtr::new(compiled_func.instrs().as_ptr()),
-                        offsets,
-                        RegSpan::new(Reg::from(0)),
-                    ),
-                    Some(instance),
-                )?;
-                store.invoke_call_hook(CallHook::CallingWasm)?;
-                let ret = self.execute_func_dbg(store);
-                store.invoke_call_hook(CallHook::ReturningFromWasm)?;
-                let results = self.write_results_back(results);
-                return ret;
-            }
-            FuncEntity::Host(host_func) => {
-                // The host function signature is required for properly
-                // adjusting, inspecting and manipulating the value stack.
-                // In case the host function returns more values than it takes
-                // we are required to extend the value stack.
-                let len_params = host_func.len_params();
-                let len_results = host_func.len_results();
-                let max_inout = len_params.max(len_results);
-                let uninit = self
-                    .stack
-                    .values
-                    .extend_by(usize::from(max_inout), do_nothing)?;
-                for (uninit, param) in uninit.iter_mut().zip(params.call_params()) {
-                    uninit.write(param);
-                }
-                let host_func = *host_func;
-                self.dispatch_host_func(store, host_func)?;
-            }
-        };
-        let results = self.write_results_back(results);
-        Ok(Signal::Next)
-    }
-
     /// Executes the given [`Func`] using the given `params`.
     ///
     /// Stores the execution result into `results` upon a successful execution.
@@ -363,10 +297,10 @@ impl<'engine> EngineExecutor<'engine> {
         Ok(results)
     }
 
-    #[inline(always)]
-    fn execute_func_dbg<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
-        execute_instrs_dbg(store, self.stack, self.code_map)
-    }
+    // #[inline(always)]
+    // fn execute_func_dbg<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
+    //     execute_instrs_dbg(store, self.stack, self.code_map)
+    // }
 
     /// Executes the top most Wasm function on the [`Stack`] until the [`Stack`] is empty.
     ///
@@ -407,3 +341,71 @@ impl<'engine> EngineExecutor<'engine> {
         results.call_results(&self.stack.values.as_slice()[..len_results])
     }
 }
+
+// impl<'engine> EngineExecutor<'engine> {
+//     fn execute_root_func_dbg<T, Results>(
+//         &mut self,
+//         store: &mut Store<T>,
+//         func: &Func,
+//         params: impl CallParams,
+//         results: Results,
+//     ) -> Result<Signal, Error>
+//     where
+//         Results: CallResults,
+//     {
+//         self.stack.reset();
+//         match store.inner.resolve_func(func) {
+//             FuncEntity::Wasm(wasm_func) => {
+//                 // We reserve space on the stack to write the results of the root function execution.
+//                 let len_results = results.len_results();
+//                 self.stack.values.extend_by(len_results, do_nothing)?;
+//                 let instance = *wasm_func.instance();
+//                 let engine_func = wasm_func.func_body();
+//                 let compiled_func = self
+//                     .code_map
+//                     .get(Some(store.inner.fuel_mut()), engine_func)?;
+//                 let (mut uninit_params, offsets) = self
+//                     .stack
+//                     .values  
+//                     .alloc_call_frame(compiled_func, do_nothing)?;
+//                 for value in params.call_params() {
+//                     unsafe { uninit_params.init_next(value) };
+//                 }
+//                 uninit_params.init_zeroes();
+//                 self.stack.calls.push(
+//                     CallFrame::new(
+//                         InstructionPtr::new(compiled_func.instrs().as_ptr()),
+//                         offsets,
+//                         RegSpan::new(Reg::from(0)),
+//                     ),
+//                     Some(instance),
+//                 )?;
+//                 store.invoke_call_hook(CallHook::CallingWasm)?;
+//                 let ret = self.execute_func_dbg(store);
+//                 store.invoke_call_hook(CallHook::ReturningFromWasm)?;
+//                 let results = self.write_results_back(results);
+//                 return ret;
+//             }
+//             FuncEntity::Host(host_func) => {
+//                 // The host function signature is required for properly
+//                 // adjusting, inspecting and manipulating the value stack.
+//                 // In case the host function returns more values than it takes
+//                 // we are required to extend the value stack.
+//                 let len_params = host_func.len_params();
+//                 let len_results = host_func.len_results();
+//                 let max_inout = len_params.max(len_results);
+//                 let uninit = self
+//                     .stack
+//                     .values
+//                     .extend_by(usize::from(max_inout), do_nothing)?;
+//                 for (uninit, param) in uninit.iter_mut().zip(params.call_params()) {
+//                     uninit.write(param);
+//                 }
+//                 let host_func = *host_func;
+//                 self.dispatch_host_func(store, host_func)?;
+//             }
+//         };
+//         let results = self.write_results_back(results);
+//         Ok(Signal::Next)
+//     }
+// }

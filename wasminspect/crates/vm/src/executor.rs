@@ -185,7 +185,7 @@ impl Executor {
             None => return Err(Trap::NoMoreInstruction),
         };
 
-        let signal = interceptor.execute_inst(inst)?;
+        let signal = interceptor.execute_inst(inst)?; // 暂时不看 打在指令的断点
         let result = self.execute_inst(inst, module_index, store, interceptor, config)?;
         Ok(match (signal, result) {
             (_, Signal::End) => Signal::End,

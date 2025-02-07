@@ -5,6 +5,7 @@ mod funcref;
 mod into_func;
 mod typed_func;
 
+
 pub(crate) use self::typed_func::CallResultsTuple;
 pub use self::{
     caller::Caller,
@@ -395,22 +396,6 @@ impl Func {
             .resolve_func_type(self.ty_dedup(&ctx))
     }
 
-    pub fn call_dbg<T>(
-        &self,
-        mut ctx: impl AsContextMut<Data = T>,
-        inputs: &[Val],
-        outputs: &mut [Val],
-    ) -> Result<Signal, Error> {
-        self.verify_and_prepare_inputs_outputs(ctx.as_context(), inputs, outputs)?;
-        // Note: Cloning an [`Engine`] is intentionally a cheap operation.
-        ctx.as_context().store.engine().clone().execute_func_dbg(
-            ctx.as_context_mut(),
-            self,
-            inputs,
-            outputs,
-        )
-    }
-
     /// Calls the Wasm or host function with the given inputs.
     ///
     /// The result is written back into the `outputs` buffer.
@@ -551,3 +536,21 @@ impl Func {
         TypedFunc::new(ctx, *self)
     }
 }
+
+// impl Func {
+//     pub fn call_dbg<T>(
+//         &self,
+//         mut ctx: impl AsContextMut<Data = T>,
+//         inputs: &[Val],
+//         outputs: &mut [Val],
+//     ) -> Result<Signal, Error> {
+//         self.verify_and_prepare_inputs_outputs(ctx.as_context(), inputs, outputs)?;
+//         // Note: Cloning an [`Engine`] is intentionally a cheap operation.
+//         ctx.as_context().store.engine().clone().execute_func_dbg(
+//             ctx.as_context_mut(),
+//             self,
+//             inputs,
+//             outputs,
+//         )
+//     }
+// }

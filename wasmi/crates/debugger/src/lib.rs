@@ -49,7 +49,7 @@ pub fn start_debugger(
     preopen_dirs: Vec<(String, String)>,
     envs: Vec<(String, String)>,
 ) -> Result<(
-    process::Process<debugger::MainDebugger>,
+    process::Process<debugger::MainDebugger<'static>>,
     command::CommandContext,
 )> {
     let mut debugger = debugger::MainDebugger::new(preopen_dirs, envs)?;

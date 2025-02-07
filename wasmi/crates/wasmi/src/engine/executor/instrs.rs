@@ -46,6 +46,7 @@ pub enum Signal {
 macro_rules! forward_return {
     ($expr:expr) => {{
         if hint::unlikely($expr.is_break()) {
+            println!("forward_return_dbg expr.is_break = true");
             return Ok(());
         }
     }};
@@ -54,7 +55,8 @@ macro_rules! forward_return {
 macro_rules! forward_return_dbg {
     ($expr:expr) => {{
         if hint::unlikely($expr.is_break()) {
-            return Ok(Signal::Next);
+            println!("forward_return_dbg expr.is_break = true");
+            return Ok(Signal::End);
         }
     }};
 }
@@ -75,16 +77,6 @@ pub fn execute_instrs<'engine, T>(
     Executor::new(stack, code_map, cache).execute(store)
 }
 
-#[inline(never)]
-pub fn execute_instrs_dbg<'engine, T>(
-    store: &mut Store<T>,
-    stack: &'engine mut Stack,
-    code_map: &'engine CodeMap,
-) -> Result<Signal, Error> {
-    let instance = stack.calls.instance_expect();
-    let cache = CachedInstance::new(&mut store.inner, instance);
-    Executor::new(stack, code_map, cache).execute_dbg(store)
-}
 
 pub type ExecResult<T> = Result<T, Trap>;
 
@@ -1411,68 +1403,45 @@ impl<'engine> Executor<'engine> {
             }
         }
     }
+}
 
+impl<'engine> Executor<'engine> { 
     #[inline(always)]
-    fn execute_dbg<T>(mut self, store: &mut Store<T>) -> Result<Signal, Error> {
+    pub fn execute_step<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
         use Instruction as Instr;
-        loop {
-            let singal = match *self.ip.get() {
-                Instr::Return => {
-                    forward_return_dbg!(self.execute_return(&mut store.inner));
-                    Ok::<Signal, Error>(Signal::Next)
-                }
-                Instr::ReturnReg { value } => {
-                    forward_return_dbg!(self.execute_return_reg(&mut store.inner, value));
-                    Ok(Signal::Next)
-                }
-                Instr::CallInternal { results, func } => {
-                    self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?;
-                    Ok(Signal::Breakpoint)
-                }
-                Instr::GlobalSetI32Imm16 { global, input } => {
-                    self.execute_global_set_i32imm16(&mut store.inner, global, input);
-                    Ok(Signal::Next)
-                }
-                Instr::GlobalSet { global, input } => {
-                    self.execute_global_set(&mut store.inner, global, input);
-                    Ok(Signal::Next)
-                }
-                Instr::I32Add { result, lhs, rhs } => {
-                    self.execute_i32_add(result, lhs, rhs);
-                    Ok(Signal::Next)
-                }
-                _ => Ok(Signal::Next),
-            };
-
-            match singal {
-                Ok(Signal::Breakpoint) => return singal,
-                _ => {
-                    println!("not func call");
-                }
+        
+        let singal = match *self.ip.get() {
+            Instr::Return => {
+                forward_return_dbg!(self.execute_return(&mut store.inner));
+                Ok::<Signal, Error>(Signal::Next)
             }
-        }
-    }
-
-    pub fn execute_for_debug<T, I: Interceptor>(
-        mut self,
-        store: &Store<T>,
-        interceptor: &I,
-    ) -> ExecResult<Signal> {
-        // let func = store.func_global(self.pc.exec_addr()).defined().unwrap();
-        // let module_index = func.module_index();
-        // let inst = match func.inst(self.pc.inst_index()) {
-        //     Some(inst) => inst,
-        //     None => return Err(Trap::NoMoreInstruction),
-        // };
-
-        // let signal = interceptor.execute_inst(inst)?;
-        // let result = self.execute_inst(inst, module_index, store, interceptor, config)?;
-        // Ok(match (signal, result) {
-        //     (_, Signal::End) => Signal::End,
-        //     (signal, Signal::Next) => signal,
-        //     (_, other) => other,
-        // })
-        Ok(Signal::End)
+            Instr::ReturnReg { value } => {
+                forward_return_dbg!(self.execute_return_reg(&mut store.inner, value));
+                Ok(Signal::Next)
+            }
+            Instr::CallInternal { results, func } => {
+                self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?;
+                Ok(Signal::Breakpoint)
+            }
+            Instr::GlobalSetI32Imm16 { global, input } => {
+                self.execute_global_set_i32imm16(&mut store.inner, global, input);
+                Ok(Signal::Next)
+            }
+            Instr::GlobalSet { global, input } => {
+                self.execute_global_set(&mut store.inner, global, input);
+                Ok(Signal::Next)
+            }
+            Instr::I32Add { result, lhs, rhs } => {
+                self.execute_i32_add(result, lhs, rhs);
+                Ok(Signal::Next)
+            }
+            Instr::I32AddImm16 { result, lhs, rhs } => {
+                self.execute_i32_add_imm16(result, lhs, rhs);
+                Ok(Signal::Next)
+            }
+            _ => Ok(Signal::Next),
+        };
+        return singal;
     }
 }
 

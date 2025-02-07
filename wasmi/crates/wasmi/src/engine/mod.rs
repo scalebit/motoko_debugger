@@ -145,6 +145,16 @@ impl Engine {
     }
 
     /// Returns a shared reference to the [`Config`] of the [`Engine`].
+    pub fn stacks(&self) -> &Mutex<EngineStacks> {
+        self.inner.stacks()
+    }
+
+    /// Returns a shared reference to the [`Config`] of the [`Engine`].
+    pub fn code_map(&self) -> &CodeMap {
+        self.inner.code_map()
+    }
+
+    /// Returns a shared reference to the [`Config`] of the [`Engine`].
     pub fn config(&self) -> &Config {
         self.inner.config()
     }
@@ -296,20 +306,20 @@ impl Engine {
         self.inner.execute_func(ctx, func, params, results)
     }
 
-    #[inline]
-    pub fn execute_func_dbg<T, Results>(
-        &self,
-        mut ctx: impl AsContextMut<Data = T>,
-        func: &Func,
-        params: impl CallParams,
-        results: Results,
-    ) -> Result<Signal, Error>
-    where
-        Results: CallResults,
-    {
-        self.inner
-            .execute_func_dbg(ctx.as_context_mut(), func, params, results)
-    }
+    // #[inline]
+    // pub fn execute_func_dbg<T, Results>(
+    //     &self,
+    //     mut ctx: impl AsContextMut<Data = T>,
+    //     func: &Func,
+    //     params: impl CallParams,
+    //     results: Results,
+    // ) -> Result<Signal, Error>
+    // where
+    //     Results: CallResults,
+    // {
+    //     self.inner
+    //         .execute_func_dbg(ctx.as_context_mut(), func, params, results)
+    // }
 
     /// Executes the given [`Func`] resumably with parameters `params` and returns.
     ///
@@ -526,6 +536,16 @@ impl EngineInner {
             allocs: Mutex::new(ReusableAllocationStack::default()),
             stacks: Mutex::new(EngineStacks::new(config)),
         }
+    }
+
+    /// Returns a shared reference to the [`stacks`] of the [`EngineInner`].
+    fn stacks(&self) -> &Mutex<EngineStacks> {
+        &self.stacks
+    }
+
+    /// Returns a shared reference to the [`stacks`] of the [`EngineInner`].
+    fn code_map(&self) -> &CodeMap {
+        &self.code_map
     }
 
     /// Returns a shared reference to the [`Config`] of the [`EngineInner`].

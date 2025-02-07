@@ -1,7 +1,7 @@
 use anyhow::Error;
 use gimli::ValueType;
 use wasmi::{engine::executor::instrs::ModuleIndex};
-use wasmi_ir::{r#enum::transform_inst, ZaxInstruction};
+use wasmi_ir::{r#enum::transform_inst, ZaxInstruction, Instr};
 use wasmparser::{FuncType, FunctionBody, OperatorsReader, ValType};
 use std::iter;
 // use wasmi_ir::Instruction:::

@@ -125,7 +125,7 @@ pub struct Store<T> {
     ///
     /// This is re-exported to the rest of the crate since
     /// it is used directly by the engine's executor.
-    pub(crate) inner: StoreInner,
+    pub inner: StoreInner,
     /// Stored host function trampolines.
     trampolines: Arena<TrampolineIdx, TrampolineEntity<T>>,
     /// User provided host data owned by the [`Store`].
@@ -166,7 +166,7 @@ pub struct StoreInner {
     /// The [`Engine`] in use by the [`Store`].
     ///
     /// Amongst others the [`Engine`] stores the Wasm function definitions.
-    engine: Engine,
+    pub engine: Engine,
     /// The fuel of the [`Store`].
     fuel: Fuel,
 }
@@ -369,7 +369,7 @@ impl StoreInner {
     /// Creates a new [`StoreInner`] for the given [`Engine`].
     pub fn new(engine: &Engine) -> Self {
         let fuel = Fuel::new(engine.config());
-        StoreInner {
+        StoreInner {         
             engine: engine.clone(),
             store_idx: StoreIdx::new(),
             funcs: Arena::new(),
@@ -387,6 +387,11 @@ impl StoreInner {
     /// Returns the [`Engine`] that this store is associated with.
     pub fn engine(&self) -> &Engine {
         &self.engine
+    }
+
+    /// Returns the [`Engine`] that this store is associated with.
+    pub fn engine_mut(&mut self) -> &mut Engine {
+        &mut self.engine
     }
 
     /// Returns an exclusive reference to the [`Fuel`] counters.
@@ -892,6 +897,11 @@ impl<T> Store<T> {
         self.inner.engine()
     }
 
+    /// Returns the [`Engine`] that this store is associated with.
+    pub fn engine_mut(&mut self) -> &mut Engine {
+        self.inner.engine_mut()
+    }
+
     /// Returns a shared reference to the user provided data owned by this [`Store`].
     pub fn data(&self) -> &T {
         &self.data
@@ -915,6 +925,13 @@ impl<T> Store<T> {
         limiter: impl FnMut(&mut T) -> &mut (dyn ResourceLimiter) + Send + Sync + 'static,
     ) {
         self.limiter = Some(ResourceLimiterQuery(Box::new(limiter)))
+    }
+
+    pub fn resolve_func(&mut self, func: &Func) -> &FuncEntity {
+        let entity_index = self.inner.unwrap_stored(func.as_inner());
+        self.inner.funcs.get(entity_index).unwrap_or_else(|| {
+            panic!("failed to resolve stored Wasm or host function: {entity_index:?}")
+        })
     }
 
     pub(crate) fn check_new_instances_limit(
@@ -977,6 +994,11 @@ impl<T> Store<T> {
     /// If fuel metering is disabled.
     pub fn get_fuel(&self) -> Result<u64, Error> {
         self.inner.fuel.get_fuel().map_err(Into::into)
+    }
+
+    /// Returns an exclusive reference to the [`Fuel`] counters.
+    pub fn get_fuel_mut(&mut self) -> &mut Fuel {
+        &mut self.inner.fuel
     }
 
     /// Sets the remaining fuel of the [`Store`] to `value` if fuel metering is enabled.
@@ -1057,7 +1079,7 @@ impl<T> Store<T> {
     /// - Returns the value returned by the call hook.
     /// - Returns `Ok(())` if no call hook exists.
     #[inline]
-    pub(crate) fn invoke_call_hook(&mut self, call_type: CallHook) -> Result<(), Error> {
+    pub(crate) fn  invoke_call_hook(&mut self, call_type: CallHook) -> Result<(), Error> {
         match self.call_hook.as_mut() {
             None => Ok(()),
             Some(call_hook) => Self::invoke_call_hook_impl(&mut self.data, call_type, call_hook),

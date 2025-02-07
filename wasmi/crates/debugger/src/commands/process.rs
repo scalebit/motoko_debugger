@@ -46,20 +46,20 @@ impl<D: Debugger> Command<D> for ProcessCommand {
         context: &CommandContext,
         args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
-        let opts = Opts::from_iter_safe(args)?;
-        match opts {
-            Opts::Continue => match debugger.process()? {
-                RunResult::Finish(result) => {
-                    return Ok(Some(CommandResult::ProcessFinish(result)));
-                }
-                RunResult::Breakpoint => {
-                    context.printer.println("Hit breakpoint");
-                }
-            },
-            Opts::Launch { start, args } => {
-                return self.start_debugger(debugger, context, start, args);
-            }
-        }
+        // let opts = Opts::from_iter_safe(args)?;
+        // match opts {
+        //     Opts::Continue => match debugger.process()? {
+        //         RunResult::Finish(result) => {
+        //             return Ok(Some(CommandResult::ProcessFinish(result)));
+        //         }
+        //         RunResult::Breakpoint => {
+        //             context.printer.println("Hit breakpoint");
+        //         }
+        //     },
+        //     Opts::Launch { start, args } => {
+        //         return self.start_debugger(debugger, context, start, args);
+        //     }
+        // }
         Ok(None)
     }
 }

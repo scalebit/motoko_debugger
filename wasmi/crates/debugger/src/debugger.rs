@@ -4,6 +4,9 @@ use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
 use crate::func_instance::DefinedFunctionInstance;
 use anyhow::{anyhow, Context, Error, Result};
 use log::{trace, warn};
+use wasmi::engine::executor::cache::CachedInstance;
+use wasmi::engine::executor::instr_ptr::InstructionPtr;
+use wasmi::engine::executor::EngineExecutor;
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
@@ -12,12 +15,13 @@ use std::sync::Arc;
 use std::{cell::RefCell, usize};
 use wasmi_core::ValType;
 use wasmparser::NameSectionReader;
-
+use wasmi::engine::{CallParams, CallResults, Stack};
 use wasmi::{
     engine::executor::instrs::{ExecResult, Executor, Interceptor, ModuleIndex, Signal},
     Val,
+    func::FuncEntity
 };
-use wasmi_ir::Instruction;
+use wasmi_ir::{Instruction, Reg, RegSpan};
 // use cap_std::ambient_authority;
 // use wasmparser::WasmFeatures;
 use wasmi::{
@@ -38,11 +42,13 @@ use wasmi::engine::{
 };
 use wasmi::{CompilationMode, Config, Extern, ExternType, Func, FuncType, Instance, Module, Store};
 
-pub struct MainDebugger {
+pub struct MainDebugger<'a> {
     pub instance: Option<Instance>,
 
     main_module: Option<(RawModule, String)>,
-
+    pub executor: Option<Rc<RefCell<Executor<'a>>>>,
+    // code_map: Option<Rc<RefCell<&'a CodeMap>>>,
+    // stack: Option<&'a Stack>,
     // /// The given Wasm module.
     // module: Module,
     /// The used Wasm store.
@@ -87,7 +93,7 @@ impl Breakpoints {
     }
 }
 
-impl MainDebugger {
+impl<'a> MainDebugger<'a>  {
     pub fn load_main_module(&mut self, module: &[u8], name: String) -> Result<()> {
         if let Err(err) = wasmparser::validate(module) {
             warn!("{}", err);
@@ -102,6 +108,7 @@ impl MainDebugger {
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
+            executor: None,
             store: None,
             main_module: None,
             opts: DebuggerOpts::default(),
@@ -154,7 +161,7 @@ impl MainDebugger {
     // }
 }
 
-impl debugger::Debugger for MainDebugger {
+impl<'a> debugger::Debugger for MainDebugger<'a> {
     fn get_opts(&self) -> DebuggerOpts {
         self.opts.clone()
     }
@@ -305,68 +312,139 @@ impl debugger::Debugger for MainDebugger {
         Ok(Signal::Next)
     }
 
-    fn process(&mut self) -> Result<RunResult> {
-        self.selected_frame = None;
-        // let mut store = &self.store;
-        // let mut executor = self.executor()?;
-        // loop {
-        //     let result = executor
-        //         .borrow_mut()
-        //         .execute_for_debug(store, self);
-        //     match result {
-        //         Ok(Signal::Next) => continue,
-        //         Ok(Signal::Breakpoint) => return Ok(RunResult::Breakpoint),
-        //         Ok(Signal::End) => {
-        //             // let pc = executor.borrow().pc;
-        //             // let func = store.func_global(pc.exec_addr());
-        //             // let results = executor
-        //             //     .borrow_mut()
-        //             //     .pop_result(func.ty().results().to_vec())?;
-        //             // return Ok(RunResult::Finish(results));
-        //             return Ok(RunResult::Finish(vec![]));
+    fn process(
+        &mut self, 
+        // store: &mut Store<WasiCtx>, 
+        func: Func, 
+        params: &[Val], 
+        stack: &mut Stack, 
+        code_map: &CodeMap
+    ) -> Result<RunResult> {
+        let store = self.store.as_mut().unwrap();
+        let ret_ty = func.ty(&store);
+        let ret_types = ret_ty.results();
+        let mut ret_slice: Vec<Val> = ret_types.iter().map(|x| Val::default(x.clone())).collect();
+        let res2_slice: &mut [Val] = &mut ret_slice;
+        match store.inner.resolve_func(&func) {
+            FuncEntity::Wasm(wasm_func) => {
+                // We reserve space on the stack to write the results of the root function execution.
+                let len_results = res2_slice.len_results();
+                let a = stack.values.extend_by(
+                    len_results, 
+                    |_self| {}
+                ).map_err(|e| anyhow::anyhow!(e))?;
 
-        //         }
-        //         Err(err) => return Err(anyhow!("Function exec failure {}", err)),
-        //     }
-        // }
-        return Ok(RunResult::Finish(vec![]));
+                let instance = *wasm_func.instance();
+                let engine_func = wasm_func.func_body();
+                let compiled_func = code_map.get(None, engine_func)?;
+                let (mut uninit_params, offsets) = stack
+                    .values  
+                    .alloc_call_frame(compiled_func, |_self| {})
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                for value in params.call_params() {
+                    unsafe { uninit_params.init_next(value) };
+                }
+                uninit_params.init_zeroes();
+                stack.calls.push(
+                    CallFrame::new(
+                        InstructionPtr::new(compiled_func.instrs().as_ptr()),
+                        offsets,
+                        RegSpan::new(Reg::from(0)),
+                    ),
+                    Some(instance),
+                ).map_err(|e| anyhow::anyhow!(e))?;
+                // store.invoke_call_hook(CallHook::CallingWasm)?;
+                let instance = stack.calls.instance_expect();
+                let cache = CachedInstance::new(&mut store.inner, instance);
+
+                let mut exec = Executor::new(stack, &code_map, cache);
+
+                loop {
+                    match exec.execute_step(store)? {
+                        Signal::Next => {},
+                        Signal::Breakpoint => {
+                            use std::io::Write;
+                            // 提示用户输入
+                            println!("Execution paused at breakpoint. Enter any key to continue, or type 'break' to exit.");
+
+                            // 读取用户输入
+                            let mut input = String::new();
+                            std::io::stdout().flush().unwrap();  // 刷新输出，确保提示立即显示
+                            std::io::stdin().read_line(&mut input).unwrap();
+                            let input = input.trim();  // 去除空格和换行符
+
+                            // 判断输入是否为 "break"
+                            if input.eq_ignore_ascii_case("break") {
+                                break;
+                            }
+                        }
+                        Signal::End => {
+                            res2_slice.call_results(&stack.values.as_slice()[..len_results]);
+                            println!("Signal::End: {:?}", res2_slice);
+                            break;
+                        }
+                    }
+                    
+                }
+            }
+            _ => {}
+        }
+        Err(anyhow::anyhow!("No instance"))
     }
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<debugger::RunResult, Error> {
-        if let Some(instance) = self.instance {
-            if let Some(func_name) = name {
-                // let mut res2: [Val; 1] = [Val::I32(0)];
-                // let res2_slice: &mut [Val] = &mut res2;
+        let instance = self
+            .instance
+            .as_mut()
+            .with_context(|| "No instance".to_string())?;
 
-                let mut res2: [Val; 0] = [];
-                let res2_slice: &mut [Val] = &mut res2;
-                let export_func = instance
-                    .get_func(&self.store.as_ref().unwrap(), func_name)
-                    .unwrap();
-                let call_signal =
-                    export_func.call_dbg(&mut self.store.as_mut().unwrap(), &args, res2_slice)?;
-                return match call_signal {
-                    Signal::Breakpoint => {
-                        println!("get breakpoint");
-                        match instance
-                            .get_export(&self.store.as_ref().unwrap(), "result")
-                            .unwrap()
-                        {
-                            Extern::Global(a) => {
-                                println!(
-                                    "Extern::Global {:?}",
-                                    a.get(&self.store.as_ref().unwrap())
-                                )
-                            }
-                            _ => {}
-                        }
-                        Ok(debugger::RunResult::Breakpoint)
-                    }
-                    Signal::Next => Ok(debugger::RunResult::Breakpoint),
-                    Signal::End => Ok(debugger::RunResult::Finish(res2_slice.to_vec())),
-                };
-            }
-        }
+        let func_name = name.unwrap_or("start");
+ 
+        let export_func = instance
+            .get_func(&self.store.as_ref().unwrap(), func_name)
+            .unwrap();
+        let params: &[Val] = &args;
+
+        // let ret_ty = export_func.ty(&self.store.as_ref().unwrap());
+        // let ret_types = ret_ty.results();
+        // let mut ret_slice: Vec<Val> = ret_types.iter().map(|x| Val::default(x.clone())).collect();
+        // let res2_slice: &mut [Val] = &mut ret_slice;
+        // export_func.call(self.store.as_mut().unwrap(), params, res2_slice)?;
+
+        
+        let engine = self.store.as_mut().unwrap().engine().clone();
+        let stacks = engine.stacks();
+        let mut stack = stacks.lock().reuse_or_new();
+        let code_map = engine.code_map();
+        stack.reset();
+        self.process(export_func,  params, &mut stack, code_map)?;
+        stacks.lock().recycle(stack);
+        // self.store = Some(store);
+        // let call_signal =
+            // export_func.call_dbg(&mut self.store.as_mut().unwrap(), &args, &mut res2_slice)?;
+
+        // return match call_signal {
+        //     Signal::Breakpoint => {
+        //         println!("get breakpoint");
+        //         match instance
+        //             .get_export(&self.store.as_ref().unwrap(), "result")
+        //             .unwrap()
+        //         {
+        //             Extern::Global(a) => {
+        //                 println!(
+        //                     "Extern::Global {:?}",
+        //                     a.get(&self.store.as_ref().unwrap())
+        //                 )
+        //             }
+        //             _ => {}
+        //         }
+        //         Ok(debugger::RunResult::Breakpoint)
+        //     }
+        //     Signal::Next => Ok(debugger::RunResult::Breakpoint),
+        //     Signal::End => Ok(debugger::RunResult::Finish(res2_slice.to_vec())),
+        // };
+    
+        // println!("res = {:?}", res2_slice);
         Err(anyhow::anyhow!("No instance"))
     }
 
@@ -401,8 +479,16 @@ impl debugger::Debugger for MainDebugger {
             .instantiate(&mut store, &module)
             .and_then(|pre| pre.start(&mut store))
             .map_err(|error| anyhow!("failed to instantiate and start the Wasm module: {error}"))?;
+
+        // let store_borrow = self.store.as_ref().unwrap().borrow(); 
+        // let code_map = store.engine().code_map().clone();
+        // self.code_map = Some(Rc::new(RefCell::new(code_map)));
+
         self.store = Some(store);
         self.instance = Some(instance);
+        
+        
+
         // match instance
         //     .get_export(&self.store.as_ref().unwrap(), "result")
         //     .unwrap()
@@ -441,7 +527,7 @@ impl debugger::Debugger for MainDebugger {
     }
 }
 
-impl Interceptor for MainDebugger {
+impl<'a> Interceptor for MainDebugger<'a> {
     fn invoke_func(&self, name: &str) -> ExecResult<Signal> {
         trace!("Invoke function '{}'", name);
         if self.breakpoints.should_break_func(name) {
