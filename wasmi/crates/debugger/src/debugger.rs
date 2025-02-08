@@ -364,16 +364,12 @@ impl<'a> debugger::Debugger for MainDebugger<'a> {
                         Signal::Next => {},
                         Signal::Breakpoint => {
                             use std::io::Write;
-                            // 提示用户输入
                             println!("Execution paused at breakpoint. Enter any key to continue, or type 'break' to exit.");
-
-                            // 读取用户输入
                             let mut input = String::new();
-                            std::io::stdout().flush().unwrap();  // 刷新输出，确保提示立即显示
+                            std::io::stdout().flush().unwrap(); 
                             std::io::stdin().read_line(&mut input).unwrap();
-                            let input = input.trim();  // 去除空格和换行符
+                            let input = input.trim(); 
 
-                            // 判断输入是否为 "break"
                             if input.eq_ignore_ascii_case("break") {
                                 break;
                             }
@@ -381,7 +377,7 @@ impl<'a> debugger::Debugger for MainDebugger<'a> {
                         Signal::End => {
                             res2_slice.call_results(&stack.values.as_slice()[..len_results]);
                             println!("Signal::End: {:?}", res2_slice);
-                            break;
+                            return Ok(RunResult::Finish(res2_slice.to_vec()))
                         }
                     }
                     
@@ -392,7 +388,7 @@ impl<'a> debugger::Debugger for MainDebugger<'a> {
         Err(anyhow::anyhow!("No instance"))
     }
 
-    fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<debugger::RunResult, Error> {
+    fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult, Error> {
         let instance = self
             .instance
             .as_mut()
@@ -405,47 +401,14 @@ impl<'a> debugger::Debugger for MainDebugger<'a> {
             .unwrap();
         let params: &[Val] = &args;
 
-        // let ret_ty = export_func.ty(&self.store.as_ref().unwrap());
-        // let ret_types = ret_ty.results();
-        // let mut ret_slice: Vec<Val> = ret_types.iter().map(|x| Val::default(x.clone())).collect();
-        // let res2_slice: &mut [Val] = &mut ret_slice;
-        // export_func.call(self.store.as_mut().unwrap(), params, res2_slice)?;
-
-        
         let engine = self.store.as_mut().unwrap().engine().clone();
         let stacks = engine.stacks();
         let mut stack = stacks.lock().reuse_or_new();
         let code_map = engine.code_map();
         stack.reset();
-        self.process(export_func,  params, &mut stack, code_map)?;
+        let signal = self.process(export_func,  params, &mut stack, code_map)?;
         stacks.lock().recycle(stack);
-        // self.store = Some(store);
-        // let call_signal =
-            // export_func.call_dbg(&mut self.store.as_mut().unwrap(), &args, &mut res2_slice)?;
-
-        // return match call_signal {
-        //     Signal::Breakpoint => {
-        //         println!("get breakpoint");
-        //         match instance
-        //             .get_export(&self.store.as_ref().unwrap(), "result")
-        //             .unwrap()
-        //         {
-        //             Extern::Global(a) => {
-        //                 println!(
-        //                     "Extern::Global {:?}",
-        //                     a.get(&self.store.as_ref().unwrap())
-        //                 )
-        //             }
-        //             _ => {}
-        //         }
-        //         Ok(debugger::RunResult::Breakpoint)
-        //     }
-        //     Signal::Next => Ok(debugger::RunResult::Breakpoint),
-        //     Signal::End => Ok(debugger::RunResult::Finish(res2_slice.to_vec())),
-        // };
-    
-        // println!("res = {:?}", res2_slice);
-        Err(anyhow::anyhow!("No instance"))
+        return Ok(signal);
     }
 
     fn instantiate(

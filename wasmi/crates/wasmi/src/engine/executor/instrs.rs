@@ -46,7 +46,6 @@ pub enum Signal {
 macro_rules! forward_return {
     ($expr:expr) => {{
         if hint::unlikely($expr.is_break()) {
-            println!("forward_return_dbg expr.is_break = true");
             return Ok(());
         }
     }};
@@ -55,7 +54,6 @@ macro_rules! forward_return {
 macro_rules! forward_return_dbg {
     ($expr:expr) => {{
         if hint::unlikely($expr.is_break()) {
-            println!("forward_return_dbg expr.is_break = true");
             return Ok(Signal::End);
         }
     }};

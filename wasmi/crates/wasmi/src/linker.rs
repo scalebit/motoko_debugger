@@ -530,12 +530,10 @@ impl<T> Linker<T> {
         assert!(Engine::same(self.engine(), context.as_context().engine()));
         // TODO: possibly add further resource limtation here on number of externals.
         // Not clear that user can't import the same external lots of times to inflate this.
-        println!("111111");
         let externals = module
             .imports()
             .map(|import| self.process_import(&mut context, import))
             .collect::<Result<Vec<Extern>, Error>>()?;
-        println!("2222");
         module.instantiate(context, externals)
     }
 

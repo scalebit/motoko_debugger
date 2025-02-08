@@ -31,7 +31,6 @@ wasmi_collections = { workspace = true }
 wasmi_ir = { workspace = true }
 wasmi_wasi = { workspace = true }
 
-
 [features]
 remote-api = []
 default = []

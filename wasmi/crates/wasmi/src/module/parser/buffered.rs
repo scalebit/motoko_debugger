@@ -58,9 +58,7 @@ impl ModuleParser {
         let mut custom_sections = CustomSectionsBuilder::default();
         let header = Self::parse_buffered_header(&mut self, &mut buffer, &mut custom_sections)?;
         let builder = Self::parse_buffered_code(&mut self, &mut buffer, header, custom_sections)?;
-        println!("parse_buffered_code end");
         let module = Self::parse_buffered_data(&mut self, &mut buffer, builder)?;
-        println!("parse_buffered_impl end");
         Ok(module)
     }
 
@@ -111,31 +109,25 @@ impl ModuleParser {
                     range,
                 } => self.process_version(num, encoding, range),
                 Payload::TypeSection(section) => {
-                    println!("Payload::TypeSection: {:?}", section);
                     self.process_types(section, &mut header)
                 }
                 Payload::ImportSection(section) => {
-                    println!("Payload::ImportSection: {:?}", section);
                     self.process_imports(section, &mut header)
                 }
                 Payload::FunctionSection(section) => {
-                    println!("Payload::FunctionSection: {:?}", section);
                     self.process_functions(section, &mut header)
                 }
                 Payload::TableSection(section) => {
-                    println!("Payload::TableSection: {:?}", section);
                     self.process_tables(section, &mut header)
                 }
                 Payload::MemorySection(section) => {
-                    println!("Payload::MemorySection: {:?}", section);
                     self.process_memories(section, &mut header)
                 }
                 Payload::GlobalSection(section) => {
-                    println!("Payload::GlobalSection: {:?}", section);
+
                     self.process_globals(section, &mut header)
                 }
                 Payload::ExportSection(section) => {
-                    println!("Payload::ExportSection: {:?}", section);
                     self.process_exports(section, &mut header)
                 }
                 Payload::StartSection { func, range } => {
@@ -143,25 +135,20 @@ impl ModuleParser {
                     self.process_start(func, range, &mut header)
                 }
                 Payload::ElementSection(section) => {
-                    println!("Payload::ElementSection: {:?}", section);
                     self.process_element(section, &mut header)
                 }
                 Payload::DataCountSection { count, range } => {
-                    println!("Payload::DataCountSection");
                     self.process_data_count(count, range)
                 }
                 Payload::CodeSectionStart { count, range, size } => {
-                    println!("Payload::CodeSectionStart");
                     self.process_code_start(count, range, size)?;
                     Self::consume_buffer(consumed, buffer);
                     break;
                 }
                 Payload::DataSection(_) => {
-                    println!("Payload::DataSection");
                     break;
                 }
                 Payload::End(_) => {
-                    println!("Payload::End");
                     break;
                 }
                 Payload::CustomSection(reader) => {
@@ -210,7 +197,6 @@ impl ModuleParser {
                     let remaining = func_body.get_binary_reader().bytes_remaining();
                     let start = consumed - remaining;
                     let bytes = &bytes[start..];
-                    println!("Payload::CodeSectionEntry: {:?}", func_body);
                     self.process_code_entry(func_body, bytes, &header)?;
                 }
                 _ => break,
