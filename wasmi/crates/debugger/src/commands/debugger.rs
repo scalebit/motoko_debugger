@@ -1,8 +1,8 @@
 use anyhow::Result;
 use anyhow::{anyhow, Error};
+use std::path::Path;
 use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::Stack;
-use std::path::Path;
 // use wasminspect_vm::{HostValue, Instruction, ModuleIndex, Signal, Store, WasmValue};
 use wasmi::{
     engine::executor::instrs::{ModuleIndex, Signal},
@@ -75,6 +75,6 @@ pub trait Debugger {
     // fn stack_values(&self) -> Vec<Val>;
     // fn selected_instructions(&self) -> Result<(&[Instruction], usize)>;
     fn step(&self, style: StepStyle) -> Result<Signal>;
-    fn process(&mut self,  func: Func, params: &[Val], stack: &mut Stack, code_map: &CodeMap) -> Result<RunResult>;
+    fn process(&mut self, func: Func, params: &[Val]) -> Result<RunResult>;
     fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()>;
 }

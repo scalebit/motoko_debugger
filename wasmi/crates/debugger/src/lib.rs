@@ -1,8 +1,8 @@
 pub mod commands;
 mod debugger;
 mod dwarf;
-mod process;
 mod func_instance;
+mod process;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -49,7 +49,7 @@ pub fn start_debugger(
     preopen_dirs: Vec<(String, String)>,
     envs: Vec<(String, String)>,
 ) -> Result<(
-    process::Process<debugger::MainDebugger<'static>>,
+    process::Process<debugger::MainDebugger>,
     command::CommandContext,
 )> {
     let mut debugger = debugger::MainDebugger::new(preopen_dirs, envs)?;

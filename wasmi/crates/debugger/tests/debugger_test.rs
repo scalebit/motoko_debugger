@@ -27,6 +27,9 @@ fn test_load_and_execute() -> anyhow::Result<()> {
     process
         .debugger
         .instantiate(wasm_file_path, ctx, None, CompilationMode::Eager)?;
-    process.debugger.run(Some("AddThree"), [wasmi::Val::I32(10), wasmi::Val::I32(1)].to_vec())?;
+    process.debugger.run(
+        Some("AddThree"),
+        [wasmi::Val::I32(10), wasmi::Val::I32(1)].to_vec(),
+    )?;
     Ok(())
 }
