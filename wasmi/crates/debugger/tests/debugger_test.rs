@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Read};
 use wasmi::CompilationMode;
-use wasmi_debugger::{start_debugger, Debugger};
+use wasmi_debugger::{start_debugger, Debugger, RunResult};
 use wasmi_wasi::wasi_common;
 
 fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
@@ -27,9 +27,17 @@ fn test_load_and_execute() -> anyhow::Result<()> {
     process
         .debugger
         .instantiate(wasm_file_path, ctx, None, CompilationMode::Eager)?;
-    process.debugger.run(
+    let run_result = process.debugger.run(
         Some("AddThree"),
         [wasmi::Val::I32(10), wasmi::Val::I32(1)].to_vec(),
     )?;
+    match run_result {
+        RunResult::Finish(finied_vec) => {
+            eprintln!("finied_vec = {:?}", finied_vec);
+        }
+        RunResult::Breakpoint => {
+            eprintln!("Breakpoint");
+        }
+    }
     Ok(())
 }

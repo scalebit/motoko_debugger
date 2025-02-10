@@ -13,7 +13,8 @@ use std::{cell::RefCell, usize};
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
 use wasmi::engine::executor::EngineExecutor;
-use wasmi::engine::{CallParams, CallResults, Stack};
+use wasmi::engine::CallResults;
+use wasmi::engine::{CallParams, Stack};
 use wasmi::{
     engine::executor::instrs::{ExecResult, Executor, Interceptor, ModuleIndex, Signal},
     func::FuncEntity,
@@ -140,9 +141,55 @@ impl MainDebugger {
         self.instance.unwrap().get_func(&store, "").unwrap()
     }
 
-    // pub fn execute_func(&mut self, func: Func, params: &[Val]) {
+    pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<RunResult> {
+        let store = self.store.as_mut().unwrap();
+        let stack = self.stack.as_mut().expect("no stack");
+        let code_map = self.engine.as_ref().expect("no engine").code_map();
+        let func_type = func.ty(&store);
 
-    // }
+        let wasm_func = match store.inner.resolve_func(&func) {
+            FuncEntity::Wasm(x) => x,
+            _ => {
+                return Err(anyhow!("not support host"));
+            }
+        };
+
+        // We reserve space on the stack to write the results of the root function execution.
+        stack
+            .values
+            .extend_by(func_type.len_results() as usize, |_self| {})
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        let instance = *wasm_func.instance();
+        let engine_func = wasm_func.func_body();
+        let compiled_func = code_map.get(None, engine_func)?;
+        let (mut uninit_params, offsets) = stack
+            .values
+            .alloc_call_frame(compiled_func, |_self| {})
+            .map_err(|e| anyhow::anyhow!(e))?;
+        for value in params.call_params() {
+            unsafe { uninit_params.init_next(value) };
+        }
+        uninit_params.init_zeroes();
+        stack
+            .calls
+            .push(
+                CallFrame::new(
+                    InstructionPtr::new(compiled_func.instrs().as_ptr()),
+                    offsets,
+                    RegSpan::new(Reg::from(0)),
+                ),
+                Some(instance),
+            )
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        let mut run_result: Vec<Val> = func_type
+            .results()
+            .iter()
+            .map(|x| Val::default(x.clone()))
+            .collect();
+        self.process(Some(&mut run_result))
+    }
 
     // fn selected_frame(&self) -> Result<CallFrame> {
     //     // let executor = self.executor()?;
@@ -307,79 +354,30 @@ impl debugger::Debugger for MainDebugger {
         Ok(Signal::Next)
     }
 
-    fn process(&mut self, func: Func, params: &[Val]) -> Result<RunResult> {
+    fn process(&mut self, results: Option<&mut [Val]>) -> Result<RunResult> {
         let store = self.store.as_mut().unwrap();
-        let ret_ty = func.ty(&store);
-        let ret_types = ret_ty.results();
-        let mut ret_slice: Vec<Val> = ret_types.iter().map(|x| Val::default(x.clone())).collect();
-        let res2_slice: &mut [Val] = &mut ret_slice;
+        // let ret_ty = func.ty(&store);
+        // let ret_types = ret_ty.results();
+        // let mut ret_slice: Vec<Val> = ret_types.iter().map(|x| Val::default(x.clone())).collect();
+        // let res2_slice: &mut [Val] = &mut ret_slice;
 
         let stack = self.stack.as_mut().expect("no stack");
         let code_map = self.engine.as_ref().expect("no engine").code_map();
+        let instance = stack.calls.instance_expect();
+        let cache = CachedInstance::new(&mut store.inner, instance);
+        let mut exec = Executor::new(stack, &code_map, cache);
 
-        match store.inner.resolve_func(&func) {
-            FuncEntity::Wasm(wasm_func) => {
-                // We reserve space on the stack to write the results of the root function execution.
-                let len_results = res2_slice.len_results();
-                let a = stack
-                    .values
-                    .extend_by(len_results, |_self| {})
-                    .map_err(|e| anyhow::anyhow!(e))?;
-
-                let instance = *wasm_func.instance();
-                let engine_func = wasm_func.func_body();
-                let compiled_func = code_map.get(None, engine_func)?;
-                let (mut uninit_params, offsets) = stack
-                    .values
-                    .alloc_call_frame(compiled_func, |_self| {})
-                    .map_err(|e| anyhow::anyhow!(e))?;
-                for value in params.call_params() {
-                    unsafe { uninit_params.init_next(value) };
-                }
-                uninit_params.init_zeroes();
-                stack
-                    .calls
-                    .push(
-                        CallFrame::new(
-                            InstructionPtr::new(compiled_func.instrs().as_ptr()),
-                            offsets,
-                            RegSpan::new(Reg::from(0)),
-                        ),
-                        Some(instance),
-                    )
-                    .map_err(|e| anyhow::anyhow!(e))?;
-                // store.invoke_call_hook(CallHook::CallingWasm)?;
-                let instance = stack.calls.instance_expect();
-                let cache = CachedInstance::new(&mut store.inner, instance);
-
-                let mut exec = Executor::new(stack, &code_map, cache);
-
-                loop {
-                    match exec.execute_step(store)? {
-                        Signal::Next => {}
-                        Signal::Breakpoint => {
-                            use std::io::Write;
-                            println!("Execution paused at breakpoint. Enter any key to continue, or type 'break' to exit.");
-                            let mut input = String::new();
-                            std::io::stdout().flush().unwrap();
-                            std::io::stdin().read_line(&mut input).unwrap();
-                            let input = input.trim();
-
-                            if input.eq_ignore_ascii_case("break") {
-                                break;
-                            }
-                        }
-                        Signal::End => {
-                            res2_slice.call_results(&stack.values.as_slice()[..len_results]);
-                            println!("Signal::End: {:?}", res2_slice);
-                            return Ok(RunResult::Finish(res2_slice.to_vec()));
-                        }
-                    }
+        loop {
+            match exec.execute_step(store)? {
+                Signal::Next => continue,
+                Signal::Breakpoint => return Ok(RunResult::Breakpoint),
+                Signal::End => {
+                    let results = results.expect("signal end but not got result array");
+                    results.call_results(&stack.values.as_slice()[..results.len_results()]);
+                    return Ok(RunResult::Finish(results.to_vec()));
                 }
             }
-            _ => {}
         }
-        Err(anyhow::anyhow!("No instance"))
     }
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult, Error> {
@@ -395,7 +393,7 @@ impl debugger::Debugger for MainDebugger {
             .unwrap();
         let params: &[Val] = &args;
 
-        let signal = self.process(export_func, params)?;
+        let signal = self.execute_func(export_func, params)?;
         // stacks.lock().recycle(stack);
         return Ok(signal);
     }

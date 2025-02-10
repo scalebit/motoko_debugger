@@ -5,7 +5,6 @@ mod funcref;
 mod into_func;
 mod typed_func;
 
-
 pub(crate) use self::typed_func::CallResultsTuple;
 pub use self::{
     caller::Caller,
