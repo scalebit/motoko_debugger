@@ -1,22 +1,13 @@
 use super::{err_stack_overflow, BaseValueStackOffset, FrameValueStackOffset};
 use crate::{
-    collections::HeadVec,
-    core::TrapCode,
-    engine::executor::InstructionPtr,
-    ir::RegSpan,
-    Instance,
+    collections::HeadVec, core::TrapCode, engine::executor::InstructionPtr, ir::RegSpan, Instance,
 };
 use std::vec::Vec;
 
 #[cfg(doc)]
 use crate::{
-    engine::executor::stack::ValueStack,
-    engine::EngineFunc,
-    ir::Instruction,
-    ir::Reg,
-    Global,
-    Memory,
-    Table,
+    engine::executor::stack::ValueStack, engine::EngineFunc, ir::Instruction, ir::Reg, Global,
+    Memory, Table,
 };
 
 /// The stack of nested function calls.

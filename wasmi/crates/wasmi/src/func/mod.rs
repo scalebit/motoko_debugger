@@ -494,7 +494,7 @@ impl Func {
     /// - If the `inputs` value types do not match the function input types.
     /// - If the number of `inputs` do not match the function input types.
     /// - If the number of `outputs` do not match the function output types.
-    fn verify_and_prepare_inputs_outputs(
+    pub fn verify_and_prepare_inputs_outputs(
         &self,
         ctx: impl AsContext,
         inputs: &[Val],

@@ -1404,7 +1404,7 @@ impl<'engine> Executor<'engine> {
 
 impl<'engine> Executor<'engine> {
     #[inline(always)]
-    pub fn execute_step<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
+    pub fn execute_instr<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
         use Instruction as Instr;
 
         match *self.ip.get() {

@@ -23,7 +23,7 @@ impl InstancePre {
     /// Returns the index of the `start` function if any.
     ///
     /// Returns `None` if the Wasm module does not have a `start` function.
-    fn start_fn(&self) -> Option<u32> {
+    pub fn start_fn(&self) -> Option<u32> {
         self.builder.get_start().map(FuncIdx::into_u32)
     }
 
@@ -77,5 +77,15 @@ impl InstancePre {
             .inner
             .initialize_instance(self.handle, self.builder.finish());
         Ok(self.handle)
+    }
+
+    /// Finishes instantiation but no call `start` function.
+    pub fn initialize_instance(self, mut context: impl AsContextMut) -> Instance {
+        context
+            .as_context_mut()
+            .store
+            .inner
+            .initialize_instance(self.handle, self.builder.finish());
+        self.handle
     }
 }

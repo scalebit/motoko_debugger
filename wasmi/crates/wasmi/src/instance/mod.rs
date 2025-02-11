@@ -1,26 +1,13 @@
 pub use self::builder::InstanceEntityBuilder;
 pub use self::exports::{Export, ExportsIter, Extern, ExternType};
 use super::{
-    engine::DedupFuncType,
-    AsContext,
-    Func,
-    Global,
-    Memory,
-    Module,
-    StoreContext,
-    Stored,
-    Table,
+    engine::DedupFuncType, AsContext, Func, Global, Memory, Module, StoreContext, Stored, Table,
 };
 use crate::{
     collections::{arena::ArenaIndex, Map},
     func::FuncError,
     memory::DataSegment,
-    AsContextMut,
-    ElementSegment,
-    Error,
-    TypedFunc,
-    WasmParams,
-    WasmResults,
+    AsContextMut, ElementSegment, Error, TypedFunc, WasmParams, WasmResults,
 };
 use std::{boxed::Box, sync::Arc};
 

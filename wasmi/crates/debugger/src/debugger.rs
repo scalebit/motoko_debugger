@@ -1,52 +1,33 @@
-use crate::commands::{backtrace, breakpoint};
+// use crate::commands::{backtrace, breakpoint};
 // use crate::commands::debugger::{self, Debugger, DebuggerOpts, RawHostModule, RunResult};
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
-use crate::func_instance::DefinedFunctionInstance;
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use log::{trace, warn};
 use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{cell::RefCell, usize};
+use std::usize;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
-use wasmi::engine::executor::EngineExecutor;
 use wasmi::engine::CallResults;
 use wasmi::engine::{CallParams, Stack};
 use wasmi::{
-    engine::executor::instrs::{ExecResult, Executor, Interceptor, ModuleIndex, Signal},
+    engine::executor::instrs::{ExecResult, Executor, Interceptor, Signal},
     func::FuncEntity,
     Val,
 };
-use wasmi_core::ValType;
 use wasmi_ir::{Instruction, Reg, RegSpan};
-use wasmparser::NameSectionReader;
-// use cap_std::ambient_authority;
-// use wasmparser::WasmFeatures;
-use wasmi::{
-    // collections::arena::ArenaIndex,
-    core::UntypedVal,
-    store::Stored,
-    AsContextMut,
-    StoreContext,
-};
 use wasmi_wasi::WasiCtx;
 
 type RawModule = Vec<u8>;
 
-use wasmi::engine::{
-    code_map::CodeMap,
-    executor::stack::{CallFrame, FrameRegisters, ValueStack},
-    DedupFuncType, EngineFunc,
-};
-use wasmi::{
-    CompilationMode, Config, Engine, Extern, ExternType, Func, FuncType, Instance, Module, Store,
-};
+use wasmi::engine::executor::stack::CallFrame;
+use wasmi::{CompilationMode, Config, Engine, Func, Instance, Store};
 
 pub struct MainDebugger {
     pub instance: Option<Instance>,
+    start_fn: Option<u32>,
 
     main_module: Option<(RawModule, String)>,
     store: Option<Store<WasiCtx>>,
@@ -107,6 +88,7 @@ impl MainDebugger {
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
+            start_fn: None,
             store: None,
             engine: None,
             stack: None,
@@ -137,8 +119,31 @@ impl MainDebugger {
         }
     }
 
-    pub fn lookup_func(&self, store: impl AsContextMut, name: &str) -> Func {
-        self.instance.unwrap().get_func(&store, "").unwrap()
+    pub fn lookup_func(&self, name: &str) -> Result<Func> {
+        let instance = self
+            .instance
+            .as_ref()
+            .expect("Wasm module not run start. Please run `start` function before run others");
+
+        if let Some(func) = instance.get_func(&self.store.as_ref().unwrap(), name) {
+            Ok(func)
+        } else {
+            Err(anyhow!("Entry function {} not found", name))
+        }
+    }
+
+    pub fn lookup_start_func(&self) -> Func {
+        let instance = self.instance.as_ref().expect("no instance");
+
+        let store = self.store.as_ref().expect("no store");
+
+        let start_idx = self
+            .start_fn
+            .unwrap_or_else(|| panic!("module do not have `_start` function"));
+
+        instance
+            .get_func_by_index(store, start_idx)
+            .unwrap_or_else(|| panic!("encountered invalid start function after validation"))
     }
 
     pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<RunResult> {
@@ -146,6 +151,12 @@ impl MainDebugger {
         let stack = self.stack.as_mut().expect("no stack");
         let code_map = self.engine.as_ref().expect("no engine").code_map();
         let func_type = func.ty(&store);
+        let mut run_result: Vec<Val> = func_type
+            .results()
+            .iter()
+            .map(|x| Val::default(x.clone()))
+            .collect();
+        func.verify_and_prepare_inputs_outputs(&store, params, &mut run_result)?;
 
         let wasm_func = match store.inner.resolve_func(&func) {
             FuncEntity::Wasm(x) => x,
@@ -183,12 +194,8 @@ impl MainDebugger {
             )
             .map_err(|e| anyhow::anyhow!(e))?;
 
-        let mut run_result: Vec<Val> = func_type
-            .results()
-            .iter()
-            .map(|x| Val::default(x.clone()))
-            .collect();
-        self.process(Some(&mut run_result))
+        let a = self.process(Some(&mut run_result));
+        return a;
     }
 
     // fn selected_frame(&self) -> Result<CallFrame> {
@@ -356,19 +363,14 @@ impl debugger::Debugger for MainDebugger {
 
     fn process(&mut self, results: Option<&mut [Val]>) -> Result<RunResult> {
         let store = self.store.as_mut().unwrap();
-        // let ret_ty = func.ty(&store);
-        // let ret_types = ret_ty.results();
-        // let mut ret_slice: Vec<Val> = ret_types.iter().map(|x| Val::default(x.clone())).collect();
-        // let res2_slice: &mut [Val] = &mut ret_slice;
-
         let stack = self.stack.as_mut().expect("no stack");
         let code_map = self.engine.as_ref().expect("no engine").code_map();
         let instance = stack.calls.instance_expect();
-        let cache = CachedInstance::new(&mut store.inner, instance);
+        let cache = CachedInstance::new(&mut store.inner, &instance);
         let mut exec = Executor::new(stack, &code_map, cache);
 
         loop {
-            match exec.execute_step(store)? {
+            match exec.execute_instr(store)? {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
                 Signal::End => {
@@ -381,20 +383,12 @@ impl debugger::Debugger for MainDebugger {
     }
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult, Error> {
-        let instance = self
-            .instance
-            .as_mut()
-            .with_context(|| "No instance".to_string())?;
-
-        let func_name = name.unwrap_or("start");
-
-        let export_func = instance
-            .get_func(&self.store.as_ref().unwrap(), func_name)
-            .unwrap();
-        let params: &[Val] = &args;
-
-        let signal = self.execute_func(export_func, params)?;
-        // stacks.lock().recycle(stack);
+        let func = if let Some(name) = name {
+            self.lookup_func(name)?
+        } else {
+            self.lookup_start_func()
+        };
+        let signal = self.execute_func(func, &args)?;
         return Ok(signal);
     }
 
@@ -425,17 +419,17 @@ impl debugger::Debugger for MainDebugger {
         let mut linker = <wasmi::Linker<WasiCtx>>::new(&engine);
         wasmi_wasi::add_to_linker(&mut linker, |ctx| ctx)
             .map_err(|error| anyhow!("failed to add WASI definitions to the linker: {error}"))?;
-        let instance = linker
-            .instantiate(&mut store, &module)
-            .and_then(|pre| pre.start(&mut store))
-            .map_err(|error| anyhow!("failed to instantiate and start the Wasm module: {error}"))?;
+
+        let instance = linker.instantiate(&mut store, &module).map(|pre| {
+            self.start_fn = pre.start_fn();
+            pre.initialize_instance(&mut store)
+        })?;
 
         let engine = store.engine().clone();
         self.stack = Some(engine.stacks().lock().reuse_or_new());
         self.engine = Some(engine);
         self.store = Some(store);
         self.instance = Some(instance);
-
         Ok(1)
     }
 }
