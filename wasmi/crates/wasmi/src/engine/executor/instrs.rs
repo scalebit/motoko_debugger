@@ -1403,6 +1403,24 @@ impl<'engine> Executor<'engine> {
 }
 
 impl<'engine> Executor<'engine> {
+    pub fn execute_step<T, I: Interceptor>(
+        &mut self,
+        store: &mut Store<T>,
+        interceptor: &I,
+    ) -> Result<Signal, Error> {
+        use std::format;
+        let signal = interceptor
+            .execute_inst(self.ip.get())
+            .map_err(|trap| Error::new(format!("{}", trap)))?;
+
+        let result = self.execute_instr(store)?;
+        Ok(match (signal, result) {
+            (_, Signal::End) => Signal::End,
+            (signal, Signal::Next) => signal,
+            (_, other) => other,
+        })
+    }
+
     #[inline(always)]
     pub fn execute_instr<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
         use Instruction as Instr;

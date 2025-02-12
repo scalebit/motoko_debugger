@@ -3,14 +3,17 @@
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
 use anyhow::{anyhow, Error, Result};
 use log::{trace, warn};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::usize;
+use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
-use wasmi::engine::CallResults;
+use wasmi::engine::{self, executor, CallResults};
 use wasmi::engine::{CallParams, Stack};
 use wasmi::{
     engine::executor::instrs::{ExecResult, Executor, Interceptor, Signal},
@@ -25,14 +28,15 @@ type RawModule = Vec<u8>;
 use wasmi::engine::executor::stack::CallFrame;
 use wasmi::{CompilationMode, Config, Engine, Func, Instance, Store};
 
-pub struct MainDebugger {
+static mut WASM_STORE: Option<Store<WasiCtx>> = None;
+static mut WASM_ENGINE: Option<Engine> = None;
+static mut WASM_STACK: Option<Stack> = None;
+
+pub struct MainDebugger<'engine> {
     pub instance: Option<Instance>,
     start_fn: Option<u32>,
-
+    executor: Option<Rc<RefCell<Executor<'engine>>>>,
     main_module: Option<(RawModule, String)>,
-    store: Option<Store<WasiCtx>>,
-    stack: Option<Stack>,
-    engine: Option<Engine>,
     opts: DebuggerOpts,
     preopen_dirs: Vec<(String, String)>,
     envs: Vec<(String, String)>,
@@ -58,7 +62,7 @@ impl Breakpoints {
 
     fn should_break_inst(&self, inst: &Instruction) -> bool {
         // self.inst_map.contains_key(&inst.offset)
-        true
+        false
     }
 
     fn insert(&mut self, breakpoint: debugger::Breakpoint) {
@@ -73,7 +77,7 @@ impl Breakpoints {
     }
 }
 
-impl MainDebugger {
+impl<'engine> MainDebugger<'engine> {
     pub fn load_main_module(&mut self, module: &[u8], name: String) -> Result<()> {
         if let Err(err) = wasmparser::validate(module) {
             warn!("{}", err);
@@ -89,9 +93,7 @@ impl MainDebugger {
         Ok(Self {
             instance: None,
             start_fn: None,
-            store: None,
-            engine: None,
-            stack: None,
+            executor: None,
             main_module: None,
             opts: DebuggerOpts::default(),
             breakpoints: Default::default(),
@@ -102,15 +104,6 @@ impl MainDebugger {
         })
     }
 
-    // fn executor(&self) -> Result<Rc<RefCell<Executor>>> {
-    //     let instance = self.instance()?;
-    //     if let Some(ref executor) = instance.executor {
-    //         Ok(executor.clone())
-    //     } else {
-    //         Err(anyhow::anyhow!("No execution context"))
-    //     }
-    // }
-
     fn instance(&self) -> Result<&Instance> {
         if let Some(ref instance) = self.instance {
             Ok(instance)
@@ -120,12 +113,13 @@ impl MainDebugger {
     }
 
     pub fn lookup_func(&self, name: &str) -> Result<Func> {
+        let store = get_store();
         let instance = self
             .instance
             .as_ref()
             .expect("Wasm module not run start. Please run `start` function before run others");
 
-        if let Some(func) = instance.get_func(&self.store.as_ref().unwrap(), name) {
+        if let Some(func) = instance.get_func(store, name) {
             Ok(func)
         } else {
             Err(anyhow!("Entry function {} not found", name))
@@ -134,9 +128,7 @@ impl MainDebugger {
 
     pub fn lookup_start_func(&self) -> Func {
         let instance = self.instance.as_ref().expect("no instance");
-
-        let store = self.store.as_ref().expect("no store");
-
+        let store = get_store();
         let start_idx = self
             .start_fn
             .unwrap_or_else(|| panic!("module do not have `_start` function"));
@@ -147,9 +139,10 @@ impl MainDebugger {
     }
 
     pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<RunResult> {
-        let store = self.store.as_mut().unwrap();
-        let stack = self.stack.as_mut().expect("no stack");
-        let code_map = self.engine.as_ref().expect("no engine").code_map();
+        let store = get_store();
+        let stack = get_stack();
+        let code_map = get_engine().code_map();
+
         let func_type = func.ty(&store);
         let mut run_result: Vec<Val> = func_type
             .results()
@@ -194,6 +187,15 @@ impl MainDebugger {
             )
             .map_err(|e| anyhow::anyhow!(e))?;
 
+        let store = get_store();
+        let stack = get_stack();
+        let code_map = get_engine().code_map();
+
+        let instance = stack.calls.instance_expect();
+        let cache = CachedInstance::new(&mut store.inner, &instance);
+        self.executor = Some(Rc::new(RefCell::new(Executor::new(
+            stack, &code_map, cache,
+        ))));
         let a = self.process(Some(&mut run_result));
         return a;
     }
@@ -218,7 +220,7 @@ impl MainDebugger {
     // }
 }
 
-impl debugger::Debugger for MainDebugger {
+impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     fn get_opts(&self) -> DebuggerOpts {
         self.opts.clone()
     }
@@ -310,30 +312,25 @@ impl debugger::Debugger for MainDebugger {
     }
 
     fn step(&self, style: debugger::StepStyle) -> Result<Signal> {
-        // let store = self.store;
-        // let executor = self.executor()?;
+        // let store = self.store.as_mut().unwrap();
+        // let stack = self.stack.as_mut().expect("no stack");
+        // let code_map = self.engine.as_ref().expect("no engine").code_map();
+        // let instance = stack.calls.instance_expect();
+        // let cache = CachedInstance::new(&mut store.inner, &instance);
+        // let mut executor = Executor::new(stack, &code_map, cache);
+
         // use debugger::StepStyle::*;
 
         // fn frame_depth(executor: &Executor) -> usize {
-        //     // executor.stack.peek_frames().len()
-        //     1
+        //     executor.stack.calls.frames.len()
         // }
         // match style {
-        //     InstIn => {
-        //         return Ok(executor
-        //             .borrow_mut()
-        //             .execute_step(store)?)
-        //     }
+        //     InstIn => return Ok(executor.execute_step(store, &self.breakpoints)?),
         //     InstOver => {
-        //         let initial_frame_depth = frame_depth(&executor.borrow());
-        //         let mut last_signal =
-        //             executor
-        //                 .borrow_mut()
-        //                 .execute_step(store)?;
-        //         while initial_frame_depth < frame_depth(&executor.borrow()) {
-        //             last_signal = executor
-        //                 .borrow_mut()
-        //                 .execute_step(store)?;
+        //         let initial_frame_depth = frame_depth(&executor);
+        //         let mut last_signal = executor.execute_step(store, &self.breakpoints)?;
+        //         while initial_frame_depth < frame_depth(&executor) {
+        //             last_signal = executor.execute_step(store, &self.breakpoints)?;
         //             if let Signal::Breakpoint = last_signal {
         //                 return Ok(last_signal);
         //             }
@@ -341,15 +338,10 @@ impl debugger::Debugger for MainDebugger {
         //         Ok(last_signal)
         //     }
         //     Out => {
-        //         let initial_frame_depth = frame_depth(&executor.borrow());
-        //         let mut last_signal =
-        //             executor
-        //                 .borrow_mut()
-        //                 .execute_step(store)?;
-        //         while initial_frame_depth <= frame_depth(&executor.borrow()) {
-        //             last_signal = executor
-        //                 .borrow_mut()
-        //                 .execute_step(store)?;
+        //         let initial_frame_depth = frame_depth(&executor);
+        //         let mut last_signal = executor.execute_step(store, &self.breakpoints)?;
+        //         while initial_frame_depth <= frame_depth(&executor) {
+        //             last_signal = executor.execute_step(store, &self.breakpoints)?;
         //             if let Signal::Breakpoint = last_signal {
         //                 return Ok(last_signal);
         //             }
@@ -362,15 +354,20 @@ impl debugger::Debugger for MainDebugger {
     }
 
     fn process(&mut self, results: Option<&mut [Val]>) -> Result<RunResult> {
-        let store = self.store.as_mut().unwrap();
-        let stack = self.stack.as_mut().expect("no stack");
-        let code_map = self.engine.as_ref().expect("no engine").code_map();
-        let instance = stack.calls.instance_expect();
-        let cache = CachedInstance::new(&mut store.inner, &instance);
-        let mut exec = Executor::new(stack, &code_map, cache);
+        let store = get_store();
+        let stack = get_stack();
+        // let code_map = get_engine().code_map();
 
+        // let instance = stack.calls.instance_expect();
+        // let cache = CachedInstance::new(&mut store.inner, &instance);
+        // let mut executor = Executor::new(stack, &code_map, cache);
+
+        let mut executor = self.executor.clone().unwrap();
         loop {
-            match exec.execute_instr(store)? {
+            match executor
+                .borrow_mut()
+                .execute_step(store, &self.breakpoints)?
+            {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
                 Signal::End => {
@@ -388,8 +385,8 @@ impl debugger::Debugger for MainDebugger {
         } else {
             self.lookup_start_func()
         };
-        let signal = self.execute_func(func, &args)?;
-        return Ok(signal);
+        let result = self.execute_func(func, &args)?;
+        return Ok(result);
     }
 
     fn instantiate(
@@ -398,7 +395,7 @@ impl debugger::Debugger for MainDebugger {
         wasi_ctx: WasiCtx,
         fuel: Option<u64>,
         compilation_mode: CompilationMode,
-    ) -> Result<u32, Error> {
+    ) -> Result<(), Error> {
         let mut config = Config::default();
         if fuel.is_some() {
             config.consume_fuel(true);
@@ -409,6 +406,7 @@ impl debugger::Debugger for MainDebugger {
         let module = wasmi::Module::new(&engine, &wasm_bytes[..]).map_err(|error| {
             anyhow!("failed to parse and validate Wasm module {wasm_file:?}: {error}")
         })?;
+
         let mut store = wasmi::Store::new(&engine, wasi_ctx);
         if let Some(fuel) = fuel {
             store.set_fuel(fuel).unwrap_or_else(|error| {
@@ -420,24 +418,28 @@ impl debugger::Debugger for MainDebugger {
         wasmi_wasi::add_to_linker(&mut linker, |ctx| ctx)
             .map_err(|error| anyhow!("failed to add WASI definitions to the linker: {error}"))?;
 
+        wasmi_wasi::add_preview0_to_linker(&mut linker, |ctx| ctx).map_err(|error| {
+            anyhow!("failed to add preview0 WASI definitions to the linker: {error}")
+        })?;
+
         let instance = linker.instantiate(&mut store, &module).map(|pre| {
             self.start_fn = pre.start_fn();
             pre.initialize_instance(&mut store)
         })?;
 
-        let engine = store.engine().clone();
-        self.stack = Some(engine.stacks().lock().reuse_or_new());
-        self.engine = Some(engine);
-        self.store = Some(store);
         self.instance = Some(instance);
-        Ok(1)
+        unsafe {
+            WASM_STACK = Some(engine.stacks().lock().reuse_or_new());
+            WASM_STORE = Some(store);
+            WASM_ENGINE = Some(engine);
+        }
+        Ok(())
     }
 }
 
-impl Interceptor for MainDebugger {
+impl Interceptor for Breakpoints {
     fn invoke_func(&self, name: &str) -> ExecResult<Signal> {
-        trace!("Invoke function '{}'", name);
-        if self.breakpoints.should_break_func(name) {
+        if self.should_break_func(name) {
             Ok(Signal::Breakpoint)
         } else {
             Ok(Signal::Next)
@@ -445,13 +447,31 @@ impl Interceptor for MainDebugger {
     }
 
     fn execute_inst(&self, inst: &Instruction) -> ExecResult<Signal> {
-        if self.breakpoints.should_break_inst(inst) {
-            Ok(Signal::Breakpoint)
-        } else if self.is_interrupted.swap(false, Ordering::Relaxed) {
-            println!("Interrupted by signal");
+        if self.should_break_inst(inst) {
             Ok(Signal::Breakpoint)
         } else {
             Ok(Signal::Next)
         }
     }
+}
+
+pub fn get_store() -> &'static mut Store<WasiCtx> {
+    // SAFETY: Within Wasm bytecode execution we are guaranteed by
+    //         Wasm validation and Wasmi codegen to never run out
+    //         of valid bounds using this method.
+    unsafe { WASM_STORE.as_mut().unwrap() }
+}
+
+pub fn get_engine() -> &'static mut Engine {
+    // SAFETY: Within Wasm bytecode execution we are guaranteed by
+    //         Wasm validation and Wasmi codegen to never run out
+    //         of valid bounds using this method.
+    unsafe { WASM_ENGINE.as_mut().unwrap() }
+}
+
+pub fn get_stack() -> &'static mut Stack {
+    // SAFETY: Within Wasm bytecode execution we are guaranteed by
+    //         Wasm validation and Wasmi codegen to never run out
+    //         of valid bounds using this method.
+    unsafe { WASM_STACK.as_mut().unwrap() }
 }

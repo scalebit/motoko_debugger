@@ -62,7 +62,7 @@ pub trait Debugger {
         wasi_ctx: WasiCtx,
         fuel: Option<u64>,
         compilation_mode: CompilationMode,
-    ) -> Result<u32, Error>;
+    ) -> Result<(), Error>;
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
     fn is_running(&self) -> bool;

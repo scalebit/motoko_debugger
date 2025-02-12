@@ -5,29 +5,18 @@ use crate::{
     },
     func::{FuncEntity, HostFuncEntity, HostFuncTrampolineEntity},
     module::{ImportName, ImportType},
-    AsContext,
-    AsContextMut,
-    Caller,
-    Engine,
-    Error,
-    Extern,
-    ExternType,
-    Func,
-    FuncType,
-    GlobalType,
-    InstancePre,
-    IntoFunc,
-    MemoryType,
-    Module,
-    TableType,
-    Val,
+    AsContext, AsContextMut, Caller, Engine, Error, Extern, ExternType, Func, FuncType, GlobalType,
+    InstancePre, IntoFunc, MemoryType, Module, TableType, Val,
 };
 use core::{
     fmt::{self, Debug, Display},
     marker::PhantomData,
 };
 use std::{
-    collections::{btree_map::Entry, BTreeMap}, println, sync::Arc, vec::Vec
+    collections::{btree_map::Entry, BTreeMap},
+    println,
+    sync::Arc,
+    vec::Vec,
 };
 
 /// An error that may occur upon operating with [`Linker`] instances.
@@ -499,7 +488,6 @@ impl<T> Linker<T> {
         module: &str,
         name: &str,
     ) -> Option<&Definition<T>> {
-        println!("get_definition:{}, {}", module, name);
         assert!(Engine::same(
             context.as_context().store.engine(),
             self.engine()
