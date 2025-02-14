@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Read};
 use wasmi::{CompilationMode, LinkerBuilder};
-use wasmi_debugger::{start_debugger, Debugger, RunResult};
+use wasmi_debugger::{commands::debugger::StepStyle, start_debugger, Debugger, RunResult};
 use wasmi_wasi::{wasi_common, WasiCtxBuilder};
 
 fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
@@ -11,27 +11,24 @@ fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
 }
 
 #[test]
-fn test_load_and_execute() -> anyhow::Result<()> {
+fn test_load_and_run() -> anyhow::Result<()> {
     let (mut process, _) = start_debugger(None, vec![], vec![])?;
 
-    // let bytes = load_file("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addthree.wasm")?;
-    let wasm_file_path = std::path::Path::new("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addthree.wasm");
+    let bytes = load_file("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addthree.wasm")?;
+    // let wasm_file_path = std::path::Path::new("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addthree.wasm");
     // let wasm_file_path = std::path::Path::new(
     //     "/data/zhangxiao/rust-project/debugger/motoko_debugger/wasminspect/tests/fib-wasm.mo.wasm",
     // );
-    let mut wasi_ctx_builder = WasiCtxBuilder::new();
-    let ctx = wasi_ctx_builder.build();
 
-    // process
-    //     .debugger
-    //     .load_main_module(&bytes, String::from("calc.wasm"))?;
     process
         .debugger
-        .instantiate(wasm_file_path, ctx, None, CompilationMode::Eager)?;
+        .load_main_module(&bytes, String::from("addthree.wasm"))?;
+    process.debugger.instantiate()?;
+
     let run_result = process.debugger.run(
         Some("AddThree"),
         [wasmi::Val::I32(10), wasmi::Val::I32(1)].to_vec(),
-        // None,
+        // Some("testtt"),
         // [].to_vec(),
     )?;
     match run_result {
@@ -42,5 +39,30 @@ fn test_load_and_execute() -> anyhow::Result<()> {
             eprintln!("Breakpoint");
         }
     }
+    Ok(())
+}
+
+#[test]
+fn test_load_and_step() -> anyhow::Result<()> {
+    let (mut process, _) = start_debugger(None, vec![], vec![])?;
+
+    // let wasm_file_path = std::path::Path::new(
+    //     "/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/test_step.wasm"
+    // );
+    let bytes = load_file("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/test_step.wasm")?;
+    process
+        .debugger
+        .load_main_module(&bytes, String::from("test_step.wasm"))?;
+    let mut wasi_ctx_builder = WasiCtxBuilder::new();
+    let ctx = wasi_ctx_builder.build();
+
+    process.debugger.instantiate()?;
+
+    process.debugger.run_step(Some("testtt"), [].to_vec())?;
+
+    process.debugger.step(StepStyle::InstOver)?;
+    process.debugger.step(StepStyle::InstOver)?;
+    process.debugger.step(StepStyle::InstOver)?;
+    process.debugger.step(StepStyle::Out)?;
     Ok(())
 }

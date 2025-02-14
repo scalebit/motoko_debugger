@@ -1,27 +1,68 @@
-use std::{collections::HashMap, env, io::Read};
-use wasmi::CompilationMode;
-use wasmi_debugger::{start_debugger, Debugger};
-use wasmi_wasi::wasi_common;
+use anyhow::anyhow;
 
+use std::io::Read;
+use structopt::StructOpt;
+use wasmi_debugger::{self, ModuleInput};
+
+fn parse_env_var(s: &str) -> anyhow::Result<(String, String)> {
+    let parts: Vec<_> = s.splitn(2, '=').collect();
+    if parts.len() != 2 {
+        return Err(anyhow!("must be of the form `key=value"));
+    }
+    Ok((parts[0].to_owned(), parts[1].to_owned()))
+}
+
+fn parse_map_dirs(s: &str) -> anyhow::Result<(String, String)> {
+    let parts: Vec<&str> = s.split("::").collect();
+    if parts.len() != 2 {
+        return Err(anyhow!("must contain exactly one double colon ('::')"));
+    }
+    Ok((parts[0].into(), parts[1].into()))
+}
+
+#[derive(StructOpt)]
+struct Opts {
+    /// The wasm binary file
+    #[structopt(name = "FILE")]
+    filepath: Option<String>,
+    /// Tells the debugger to read in and execute the debugger commands in given file, after wasm file has been loaded
+    #[structopt(short, long)]
+    source: Option<String>,
+    /// Grant access to a guest directory mapped as a host directory
+    #[structopt(long = "mapdir", number_of_values = 1, value_name = "GUEST_DIR::HOST_DIR", parse(try_from_str = parse_map_dirs))]
+    map_dirs: Vec<(String, String)>,
+
+    /// Pass an environment variable to the program
+    #[structopt(long = "env", number_of_values = 1, value_name = "NAME=VAL", parse(try_from_str = parse_env_var))]
+    envs: Vec<(String, String)>,
+}
 
 fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let (mut process, _) = start_debugger(None, vec![], vec![])?;
-    let wasm_file_path = std::path::Path::new(&args[1]);
-    let random = wasi_common::sync::random_ctx();
-    let clocks = wasi_common::sync::clocks_ctx();
-    let sched = wasi_common::sync::sched_ctx();
-    let table = wasi_common::Table::new();
-    let ctx = wasi_common::WasiCtx::new(random, clocks, sched, table);
+    env_logger::init_from_env(env_logger::Env::default().default_filter_or("warn"));
 
-    process
-        .debugger
-        .instantiate(wasm_file_path, ctx, None, CompilationMode::Eager)?;
-    println!("----------------------------------------------");
-    println!("---------------- Wasm Debugger ---------------");
-    process.debugger.run(
-        Some("AddThree"), 
-        [wasmi::Val::I32(10), wasmi::Val::I32(1)].to_vec()
-    )?;
+    let opts = Opts::from_args();
+    let module_input = match opts.filepath {
+        Some(filepath) => {
+            let mut buffer = Vec::new();
+            let filepath = std::path::Path::new(&filepath);
+            let basename = filepath
+                .file_name()
+                .expect("invalid file path")
+                .to_str()
+                .expect("invalid file name encoding")
+                .to_string();
+            let mut f = std::fs::File::open(filepath)?;
+            f.read_to_end(&mut buffer)?;
+            Some(ModuleInput {
+                bytes: buffer,
+                basename,
+            })
+        }
+        None => None,
+    };
+    if let Err(err) = wasmi_debugger::run_loop(module_input, opts.source, opts.map_dirs, opts.envs)
+    {
+        println!("{:?}", err)
+    }
     Ok(())
 }

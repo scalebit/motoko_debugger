@@ -34,7 +34,6 @@ num-traits = { version = "0.2.8", default-features = false }
 wasmi_debugger = { version = "0.2.0", path = "crates/debugger", default-features = false }
 wasmi_inst_macro = { version = "0.2.0", path = "crates/inst_macro", default-features = false }
 
-
 [profile.bench]
 lto = "fat"
 codegen-units = 1

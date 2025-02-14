@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(OSX) Launch",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/debugger",
+            "args": ["/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/addthree.wasm"],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "TERM" : "xterm-256color"
+            }
+        }
+    ]
+}

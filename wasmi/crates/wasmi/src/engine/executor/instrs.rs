@@ -1408,11 +1408,7 @@ impl<'engine> Executor<'engine> {
         store: &mut Store<T>,
         interceptor: &I,
     ) -> Result<Signal, Error> {
-        use std::format;
-        let signal = interceptor
-            .execute_inst(self.ip.get())
-            .map_err(|trap| Error::new(format!("{}", trap)))?;
-
+        let signal = interceptor.execute_inst(self.ip.get());
         let result = self.execute_instr(store)?;
         Ok(match (signal, result) {
             (_, Signal::End) => Signal::End,
@@ -1729,10 +1725,12 @@ impl<'engine> Executor<'engine> {
                 self.execute_return_call_indirect_imm16::<T>(store, func_type)?
             }
             Instr::CallInternal0 { results, func } => {
-                self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
+                self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?;
+                return Ok(Signal::Breakpoint);
             }
             Instr::CallInternal { results, func } => {
-                self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
+                self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?;
+                return Ok(Signal::Breakpoint);
             }
             Instr::CallImported0 { results, func } => {
                 self.execute_call_imported_0::<T>(store, results, func)?
@@ -2604,8 +2602,8 @@ impl<'engine> Executor<'engine> {
 }
 
 pub trait Interceptor {
-    fn invoke_func(&self, fn_name: &str) -> ExecResult<Signal>;
-    fn execute_inst(&self, inst: &Instruction) -> ExecResult<Signal>;
+    fn invoke_func(&self, fn_name: &str) -> Signal;
+    fn execute_inst(&self, inst: &Instruction) -> Signal;
 }
 
 macro_rules! get_entity {

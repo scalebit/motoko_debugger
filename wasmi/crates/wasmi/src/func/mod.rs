@@ -512,6 +512,33 @@ impl Func {
             })
     }
 
+    /// Verify that the `inputs` and `outputs` value types match the function signature.
+    ///
+    /// Since [`Func`] is a dynamically typed function instance there is
+    /// a need to verify that the given input parameters match the required
+    /// types and that the given output slice matches the expected length.
+    ///
+    /// These checks can be avoided using the [`TypedFunc`] API.
+    ///
+    /// # Errors
+    ///
+    /// - If the `inputs` value types do not match the function input types.
+    /// - If the number of `inputs` do not match the function input types.
+    pub fn verify_and_prepare_inputs(
+        &self,
+        ctx: impl AsContext,
+        inputs: &[Val],
+    ) -> Result<(), FuncError> {
+        let fn_type = self.ty_dedup(ctx.as_context());
+        ctx.as_context()
+            .store
+            .inner
+            .resolve_func_type_with(fn_type, |func_type| {
+                func_type.match_params(inputs)?;
+                Ok(())
+            })
+    }
+
     /// Creates a new [`TypedFunc`] from this [`Func`].
     ///
     /// # Note

@@ -1,7 +1,7 @@
 // use crate::commands::{backtrace, breakpoint};
 // use crate::commands::debugger::{self, Debugger, DebuggerOpts, RawHostModule, RunResult};
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Error, Ok, Result};
 use log::{trace, warn};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ use wasmi::{
     Val,
 };
 use wasmi_ir::{Instruction, Reg, RegSpan};
-use wasmi_wasi::WasiCtx;
+use wasmi_wasi::{WasiCtx, WasiCtxBuilder};
 
 type RawModule = Vec<u8>;
 
@@ -34,8 +34,10 @@ static mut WASM_STACK: Option<Stack> = None;
 
 pub struct MainDebugger<'engine> {
     pub instance: Option<Instance>,
-    start_fn: Option<u32>,
+    start_fn_idx: Option<u32>,
+    run_func: Option<Func>,
     executor: Option<Rc<RefCell<Executor<'engine>>>>,
+
     main_module: Option<(RawModule, String)>,
     opts: DebuggerOpts,
     preopen_dirs: Vec<(String, String)>,
@@ -92,7 +94,8 @@ impl<'engine> MainDebugger<'engine> {
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
-            start_fn: None,
+            start_fn_idx: None,
+            run_func: None,
             executor: None,
             main_module: None,
             opts: DebuggerOpts::default(),
@@ -112,12 +115,25 @@ impl<'engine> MainDebugger<'engine> {
         }
     }
 
+    fn executor(&self) -> Result<Rc<RefCell<Executor<'engine>>>> {
+        if let Some(executor) = self.executor.as_ref() {
+            Ok(executor.clone())
+        } else {
+            Err(anyhow::anyhow!("No execution context"))
+        }
+    }
+
+    fn run_func(&self) -> Result<Func> {
+        if let Some(func) = self.run_func {
+            Ok(func)
+        } else {
+            Err(anyhow::anyhow!("No Run Func"))
+        }
+    }
+
     pub fn lookup_func(&self, name: &str) -> Result<Func> {
         let store = get_store();
-        let instance = self
-            .instance
-            .as_ref()
-            .expect("Wasm module not run start. Please run `start` function before run others");
+        let instance = self.instance.as_ref().unwrap();
 
         if let Some(func) = instance.get_func(store, name) {
             Ok(func)
@@ -130,7 +146,7 @@ impl<'engine> MainDebugger<'engine> {
         let instance = self.instance.as_ref().expect("no instance");
         let store = get_store();
         let start_idx = self
-            .start_fn
+            .start_fn_idx
             .unwrap_or_else(|| panic!("module do not have `_start` function"));
 
         instance
@@ -138,18 +154,14 @@ impl<'engine> MainDebugger<'engine> {
             .unwrap_or_else(|| panic!("encountered invalid start function after validation"))
     }
 
-    pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<RunResult> {
+    pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<()> {
         let store = get_store();
         let stack = get_stack();
         let code_map = get_engine().code_map();
 
         let func_type = func.ty(&store);
-        let mut run_result: Vec<Val> = func_type
-            .results()
-            .iter()
-            .map(|x| Val::default(x.clone()))
-            .collect();
-        func.verify_and_prepare_inputs_outputs(&store, params, &mut run_result)?;
+
+        func.verify_and_prepare_inputs(&store, params)?;
 
         let wasm_func = match store.inner.resolve_func(&func) {
             FuncEntity::Wasm(x) => x,
@@ -187,17 +199,35 @@ impl<'engine> MainDebugger<'engine> {
             )
             .map_err(|e| anyhow::anyhow!(e))?;
 
-        let store = get_store();
-        let stack = get_stack();
-        let code_map = get_engine().code_map();
+        // let store = get_store();
+        // let stack = get_stack();
+        // let code_map = get_engine().code_map();
 
         let instance = stack.calls.instance_expect();
         let cache = CachedInstance::new(&mut store.inner, &instance);
         self.executor = Some(Rc::new(RefCell::new(Executor::new(
             stack, &code_map, cache,
         ))));
-        let a = self.process(Some(&mut run_result));
-        return a;
+
+        Ok(())
+    }
+
+    pub fn run_step(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<()> {
+        let func = if let Some(name) = name {
+            self.lookup_func(name)?
+        } else {
+            self.lookup_start_func()
+        };
+
+        let func_type = func.ty(&get_store());
+        let mut run_result: Vec<Val> = func_type
+            .results()
+            .iter()
+            .map(|x| Val::default(x.clone()))
+            .collect();
+
+        self.execute_func(func, &args)?;
+        Ok(())
     }
 
     // fn selected_frame(&self) -> Result<CallFrame> {
@@ -266,6 +296,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //     }
     //     vec![]
     // }
+
     // fn current_frame(&self) -> Option<debugger::FunctionFrame> {
     //     let frame = self.selected_frame().ok()?;
     //     let func = match self.store() {
@@ -278,6 +309,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //         argument_count: func.ty().params().len(),
     //     })
     // }
+
     // fn frame(&self) -> Vec<String> {
     //     let instance = if let Ok(instance) = self.instance() {
     //         instance
@@ -296,6 +328,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //         .map(|frame| instance.store.func_global(frame.exec_addr).name().clone())
     //         .collect();
     // }
+
     // fn memory(&self) -> Result<Vec<u8>> {
     //     let instance = self.instance()?;
     //     let store = &instance.store;
@@ -307,71 +340,82 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     // }
 
     fn is_running(&self) -> bool {
-        // self.executor().is_ok()
-        true
+        self.executor().is_ok()
     }
 
     fn step(&self, style: debugger::StepStyle) -> Result<Signal> {
-        // let store = self.store.as_mut().unwrap();
-        // let stack = self.stack.as_mut().expect("no stack");
-        // let code_map = self.engine.as_ref().expect("no engine").code_map();
-        // let instance = stack.calls.instance_expect();
-        // let cache = CachedInstance::new(&mut store.inner, &instance);
-        // let mut executor = Executor::new(stack, &code_map, cache);
+        fn frame_depth(executor: &Executor) -> usize {
+            executor.stack.calls.frames.len()
+        }
 
-        // use debugger::StepStyle::*;
+        let store = get_store();
+        let executor = self.executor()?;
 
-        // fn frame_depth(executor: &Executor) -> usize {
-        //     executor.stack.calls.frames.len()
-        // }
-        // match style {
-        //     InstIn => return Ok(executor.execute_step(store, &self.breakpoints)?),
-        //     InstOver => {
-        //         let initial_frame_depth = frame_depth(&executor);
-        //         let mut last_signal = executor.execute_step(store, &self.breakpoints)?;
-        //         while initial_frame_depth < frame_depth(&executor) {
-        //             last_signal = executor.execute_step(store, &self.breakpoints)?;
-        //             if let Signal::Breakpoint = last_signal {
-        //                 return Ok(last_signal);
-        //             }
-        //         }
-        //         Ok(last_signal)
-        //     }
-        //     Out => {
-        //         let initial_frame_depth = frame_depth(&executor);
-        //         let mut last_signal = executor.execute_step(store, &self.breakpoints)?;
-        //         while initial_frame_depth <= frame_depth(&executor) {
-        //             last_signal = executor.execute_step(store, &self.breakpoints)?;
-        //             if let Signal::Breakpoint = last_signal {
-        //                 return Ok(last_signal);
-        //             }
-        //         }
-        //         Ok(last_signal)
-        //     }
-        // }
+        use debugger::StepStyle::*;
+        match style {
+            InstIn => return Ok(executor.borrow_mut().execute_step(store, self)?),
+            InstOver => {
+                let initial_frame_depth = frame_depth(&executor.borrow());
+                let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
+                while initial_frame_depth < frame_depth(&executor.borrow()) {
+                    last_signal = executor.borrow_mut().execute_step(store, self)?;
+                    if let Signal::Breakpoint = last_signal {
+                        return Ok(last_signal);
+                    }
+                }
 
-        Ok(Signal::Next)
+                println!(
+                    "global A: {:?}",
+                    self.instance()?
+                        .get_global(&store, "A")
+                        .unwrap()
+                        .get(&store)
+                );
+
+                Ok(last_signal)
+            }
+            Out => {
+                let initial_frame_depth = frame_depth(&executor.borrow());
+                let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
+                while initial_frame_depth <= frame_depth(&executor.borrow()) {
+                    last_signal = executor.borrow_mut().execute_step(store, self)?;
+                    if let Signal::Breakpoint = last_signal {
+                        return Ok(last_signal);
+                    } else if let Signal::End = last_signal {
+                        println!("signal::End");
+                    }
+                }
+
+                println!(
+                    "global A: {:?}",
+                    self.instance()?
+                        .get_global(&store, "A")
+                        .unwrap()
+                        .get(&store)
+                );
+
+                Ok(last_signal)
+            }
+        }
     }
 
-    fn process(&mut self, results: Option<&mut [Val]>) -> Result<RunResult> {
+    fn process(&self) -> Result<RunResult> {
         let store = get_store();
         let stack = get_stack();
-        // let code_map = get_engine().code_map();
+        let executor = self.executor()?;
 
-        // let instance = stack.calls.instance_expect();
-        // let cache = CachedInstance::new(&mut store.inner, &instance);
-        // let mut executor = Executor::new(stack, &code_map, cache);
-
-        let mut executor = self.executor.clone().unwrap();
         loop {
-            match executor
-                .borrow_mut()
-                .execute_step(store, &self.breakpoints)?
-            {
+            match executor.borrow_mut().execute_step(store, self)? {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
                 Signal::End => {
-                    let results = results.expect("signal end but not got result array");
+                    let func_type = self.run_func()?.ty(&get_store());
+                    let results: &mut [Val] = &mut func_type
+                        .results()
+                        .iter()
+                        .map(|x| Val::default(x.clone()))
+                        .collect::<Vec<Val>>();
+
                     results.call_results(&stack.values.as_slice()[..results.len_results()]);
                     return Ok(RunResult::Finish(results.to_vec()));
                 }
@@ -379,35 +423,41 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         }
     }
 
-    fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult, Error> {
+    fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult> {
         let func = if let Some(name) = name {
             self.lookup_func(name)?
         } else {
             self.lookup_start_func()
         };
-        let result = self.execute_func(func, &args)?;
-        return Ok(result);
+
+        self.run_func = Some(func);
+        self.execute_func(func, &args)?;
+        self.process()
     }
 
-    fn instantiate(
-        &mut self,
-        wasm_file: &Path,
-        wasi_ctx: WasiCtx,
-        fuel: Option<u64>,
-        compilation_mode: CompilationMode,
-    ) -> Result<(), Error> {
+    fn instantiate(&mut self) -> Result<(), Error> {
+        let mut wasi_ctx_builder = WasiCtxBuilder::new();
+        let wasi_ctx = wasi_ctx_builder.build();
+
         let mut config = Config::default();
+        let fuel = None;
         if fuel.is_some() {
             config.consume_fuel(true);
         }
-        config.compilation_mode(compilation_mode);
+        config.compilation_mode(CompilationMode::Eager);
         let engine = wasmi::Engine::new(&config);
-        let wasm_bytes = crate::commands::utils::read_wasm_or_wat(wasm_file)?;
-        let module = wasmi::Module::new(&engine, &wasm_bytes[..]).map_err(|error| {
-            anyhow!("failed to parse and validate Wasm module {wasm_file:?}: {error}")
+        let mut store = wasmi::Store::new(&engine, wasi_ctx);
+
+        let (main_module, basename) = if let Some((main_module, basename)) = &self.main_module {
+            (main_module, basename.clone())
+        } else {
+            return Err(anyhow::anyhow!("No main module registered"));
+        };
+
+        let module = wasmi::Module::new(&engine, &main_module[..]).map_err(|error| {
+            anyhow!("failed to parse and validate Wasm module from  {basename:?}: {error}")
         })?;
 
-        let mut store = wasmi::Store::new(&engine, wasi_ctx);
         if let Some(fuel) = fuel {
             store.set_fuel(fuel).unwrap_or_else(|error| {
                 panic!("error: fuel metering is enabled but encountered: {error}")
@@ -423,7 +473,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         })?;
 
         let instance = linker.instantiate(&mut store, &module).map(|pre| {
-            self.start_fn = pre.start_fn();
+            self.start_fn_idx = pre.start_fn();
             pre.initialize_instance(&mut store)
         })?;
 
@@ -437,20 +487,20 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     }
 }
 
-impl Interceptor for Breakpoints {
-    fn invoke_func(&self, name: &str) -> ExecResult<Signal> {
-        if self.should_break_func(name) {
-            Ok(Signal::Breakpoint)
+impl<'engine> Interceptor for MainDebugger<'engine> {
+    fn invoke_func(&self, name: &str) -> Signal {
+        if self.breakpoints.should_break_func(name) {
+            Signal::Breakpoint
         } else {
-            Ok(Signal::Next)
+            Signal::Next
         }
     }
 
-    fn execute_inst(&self, inst: &Instruction) -> ExecResult<Signal> {
-        if self.should_break_inst(inst) {
-            Ok(Signal::Breakpoint)
+    fn execute_inst(&self, inst: &Instruction) -> Signal {
+        if self.breakpoints.should_break_inst(inst) {
+            Signal::Breakpoint
         } else {
-            Ok(Signal::Next)
+            Signal::Next
         }
     }
 }

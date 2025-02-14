@@ -24,6 +24,7 @@ shell-words = "1.0.0"
 cap-std = "3.4.0"
 signal-hook = "0.3.0"
 wat = "1"
+env_logger = "0.7.1"
 
 wasmi = { workspace = true }
 wasmi_core = { workspace = true }

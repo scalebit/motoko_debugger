@@ -56,13 +56,7 @@ pub trait Debugger {
     ///
     /// - If parsing, validating, compiling or instantiating the Wasm module failed.
     /// - If adding WASI defintions to the linker failed.
-    fn instantiate(
-        &mut self,
-        wasm_file: &Path,
-        wasi_ctx: WasiCtx,
-        fuel: Option<u64>,
-        compilation_mode: CompilationMode,
-    ) -> Result<(), Error>;
+    fn instantiate(&mut self) -> Result<(), Error>;
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
     fn is_running(&self) -> bool;
@@ -75,6 +69,6 @@ pub trait Debugger {
     // fn stack_values(&self) -> Vec<Val>;
     // fn selected_instructions(&self) -> Result<(&[Instruction], usize)>;
     fn step(&self, style: StepStyle) -> Result<Signal>;
-    fn process(&mut self, results: Option<&mut [Val]>) -> Result<RunResult>;
+    fn process(&self) -> Result<RunResult>;
     fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()>;
 }

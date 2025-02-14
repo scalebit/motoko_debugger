@@ -4,9 +4,12 @@ use anyhow::{Context, Result};
 use linefeed::{DefaultTerminal, Interface, ReadResult};
 use std::{cell::RefCell, io, rc::Rc};
 use std::{collections::HashMap, time::Duration};
+use wasmi::Store;
+use wasmi_wasi::WasiCtx;
 
 pub struct Process<D: Debugger> {
     pub debugger: D,
+    pub store: Option<Store<WasiCtx>>,
     commands: HashMap<String, Box<dyn Command<D>>>,
     aliases: HashMap<String, Box<dyn AliasCommand>>,
 }
@@ -27,6 +30,7 @@ impl<D: Debugger> Process<D> {
         }
         Ok(Self {
             debugger,
+            store: None,
             commands: cmd_map,
             aliases: alias_map,
         })
