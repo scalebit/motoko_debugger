@@ -13,7 +13,7 @@ main.o: main.c
 	    -o $@ \
 	    $<
 dummy.o: dummy.c
-	$(CLANG) -c -v \
+	$(CLANG) -c -g -v \
 	    -target wasm32-wasi \
 	    --sysroot=$(WASI_SDK_DIR)/share/wasi-sysroot \
 	    -o $@ \

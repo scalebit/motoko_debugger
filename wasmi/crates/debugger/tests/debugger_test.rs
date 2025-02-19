@@ -53,8 +53,6 @@ fn test_load_and_step() -> anyhow::Result<()> {
     process
         .debugger
         .load_main_module(&bytes, String::from("test_step.wasm"))?;
-    let mut wasi_ctx_builder = WasiCtxBuilder::new();
-    let ctx = wasi_ctx_builder.build();
 
     process.debugger.instantiate()?;
 
@@ -63,6 +61,8 @@ fn test_load_and_step() -> anyhow::Result<()> {
     process.debugger.step(StepStyle::InstOver)?;
     process.debugger.step(StepStyle::InstOver)?;
     process.debugger.step(StepStyle::InstOver)?;
+    process.debugger.step(StepStyle::Out)?;
+    process.debugger.step(StepStyle::Out)?;
     process.debugger.step(StepStyle::Out)?;
     Ok(())
 }

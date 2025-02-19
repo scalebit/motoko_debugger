@@ -27,7 +27,7 @@ structopt = "0.3"
 env_logger = "0.7.1"
 anyhow = "1.0.26"
 tokio = { version = "1", features = ["full"], optional = true }
-
+backtrace = "0.3"
 [workspace]
 members = [
   "crates/debugger",

@@ -123,7 +123,7 @@ impl<'engine> MainDebugger<'engine> {
         }
     }
 
-    fn run_func(&self) -> Result<Func> {
+    fn running_func(&self) -> Result<Func> {
         if let Some(func) = self.run_func {
             Ok(func)
         } else {
@@ -310,24 +310,9 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //     })
     // }
 
-    // fn frame(&self) -> Vec<String> {
-    //     let instance = if let Ok(instance) = self.instance() {
-    //         instance
-    //     } else {
-    //         return vec![];
-    //     };
-    //     let executor = if let Some(executor) = instance.executor.clone() {
-    //         executor
-    //     } else {
-    //         return vec![];
-    //     };
-    //     let executor = executor.borrow();
-    //     let frames = executor.stack.peek_frames();
-    //     return frames
-    //         .iter()
-    //         .map(|frame| instance.store.func_global(frame.exec_addr).name().clone())
-    //         .collect();
-    // }
+    fn frame(&self) -> Vec<String> {
+        return vec![];
+    }
 
     // fn memory(&self) -> Result<Vec<u8>> {
     //     let instance = self.instance()?;
@@ -361,17 +346,19 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         return Ok(last_signal);
+                    } else if let Signal::End = last_signal {
+                        println!("signal::End");
+                        return Ok(last_signal);
                     }
                 }
 
                 println!(
-                    "global A: {:?}",
+                    "over global A: {:?}",
                     self.instance()?
                         .get_global(&store, "A")
                         .unwrap()
                         .get(&store)
                 );
-
                 Ok(last_signal)
             }
             Out => {
@@ -380,14 +367,16 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 while initial_frame_depth <= frame_depth(&executor.borrow()) {
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
-                        return Ok(last_signal);
+                        println!("signal::break");
+                        break;
                     } else if let Signal::End = last_signal {
                         println!("signal::End");
+                        break;
                     }
                 }
 
                 println!(
-                    "global A: {:?}",
+                    "out global A: {:?}",
                     self.instance()?
                         .get_global(&store, "A")
                         .unwrap()
@@ -409,7 +398,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
                 Signal::End => {
-                    let func_type = self.run_func()?.ty(&get_store());
+                    let func_type = self.running_func()?.ty(&get_store());
                     let results: &mut [Val] = &mut func_type
                         .results()
                         .iter()
@@ -430,9 +419,25 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             self.lookup_start_func()
         };
 
+        println!(
+            "over global A: {:?}",
+            self.instance()?
+                .get_global(get_store(), "A")
+                .unwrap()
+                .get(get_store())
+        );
+
         self.run_func = Some(func);
         self.execute_func(func, &args)?;
-        self.process()
+        let a = self.process();
+        println!(
+            "over global A: {:?}",
+            self.instance()?
+                .get_global(get_store(), "A")
+                .unwrap()
+                .get(get_store())
+        );
+        return a;
     }
 
     fn instantiate(&mut self) -> Result<(), Error> {

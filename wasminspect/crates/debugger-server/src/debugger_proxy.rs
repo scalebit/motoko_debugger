@@ -240,7 +240,7 @@ where
             wasmparser::Payload::ImportSection(iter) => {
                 for import in iter {
                     let import = import?;
-                    module_imports.insert((import.module, import.name), import);
+                    module_imports.insert((import.module, import.field), import);
 
                     let ty_idx = match import.ty {
                         wasmparser::ImportSectionEntryType::Function(ty_idx) => ty_idx,
@@ -250,7 +250,7 @@ where
                         Some(wasmparser::TypeDef::Func(ty)) => ty,
                         _ => continue,
                     };
-                    let field_name = match import.name {
+                    let field_name = match import.field {
                         Some(field_name) => field_name,
                         None => continue,
                     };
@@ -297,12 +297,12 @@ fn module_exports(bytes: &[u8]) -> anyhow::Result<Vec<WasmExport>> {
                         wasmparser::ExternalKind::Memory => {
                             let initial_page = mems[export.index as usize];
                             exports.push(WasmExport::Memory {
-                                name: export.name.to_string(),
+                                name: export.field.to_string(),
                                 memory_size: initial_page * wasminspect_vm::WASM_PAGE_SIZE,
                             })
                         }
                         wasmparser::ExternalKind::Function => exports.push(WasmExport::Function {
-                            name: export.name.to_string(),
+                            name: export.field.to_string(),
                         }),
                         _ => unimplemented!("unsupported export kind {:?}", export.kind),
                     }
@@ -325,12 +325,12 @@ fn call_exported(
 
     let func = process.borrow().debugger.lookup_func(&name)?;
     let func_ty = process.borrow().debugger.func_type(func)?;
-    if func_ty.params().len() != args.len() {
+    if func_ty.params.len() != args.len() {
         return Err(RequestError::CallArgumentLengthMismatch.into());
     }
     let args = args
         .iter()
-        .zip(func_ty.params().iter())
+        .zip(func_ty.params.iter())
         .map(|(arg, ty)| from_js_number(*arg, ty))
         .collect();
     let result = { process.borrow_mut().debugger.execute_func(func, args) };

@@ -1,17 +1,12 @@
+use anyhow::Error;
 use anyhow::Result;
-use anyhow::{anyhow, Error};
-use std::path::Path;
-use wasmi::engine::code_map::CodeMap;
-use wasmi::engine::{CallResults, Stack};
+
 // use wasminspect_vm::{HostValue, Instruction, ModuleIndex, Signal, Store, WasmValue};
 use wasmi::{
     engine::executor::instrs::{ModuleIndex, Signal},
     Val,
 };
 // use wasmi::{Val, engine::executor::instrs::{Signal, ExecResult, ModuleIndex, Executor, Interceptor}};
-use wasmi::{CompilationMode, Config, ExternType, Func, FuncType, Instance, Module, Store};
-use wasmi_ir::Instruction;
-use wasmi_wasi::WasiCtx;
 
 #[derive(Default, Clone)]
 pub struct DebuggerOpts {
@@ -60,7 +55,7 @@ pub trait Debugger {
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
     fn is_running(&self) -> bool;
-    // fn frame(&self) -> Vec<String>;
+    fn frame(&self) -> Vec<String>;
     // fn current_frame(&self) -> Option<FunctionFrame>;
     // fn locals(&self) -> Vec<Val>;
     // fn memory(&self) -> Result<Vec<u8>>;

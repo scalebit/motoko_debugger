@@ -52,7 +52,11 @@ macro_rules! forward_return {
 }
 
 macro_rules! forward_return_dbg {
-    ($expr:expr) => {{
+    ($self:expr, $expr:expr) => {{
+        if $self.stack.calls.is_empty() {
+            return Ok(Signal::End); // 如果为空，返回 Signal::End
+        }
+
         if hint::unlikely($expr.is_break()) {
             return Ok(Signal::End);
         }
@@ -1427,79 +1431,76 @@ impl<'engine> Executor<'engine> {
                 self.execute_consume_fuel(&mut store.inner, block_fuel)?
             }
             Instr::Return => {
-                forward_return_dbg!(self.execute_return(&mut store.inner))
+                forward_return_dbg!(self, self.execute_return(&mut store.inner))
             }
             Instr::ReturnReg { value } => {
-                forward_return_dbg!(self.execute_return_reg(&mut store.inner, value))
+                forward_return_dbg!(self, self.execute_return_reg(&mut store.inner, value))
             }
             Instr::ReturnReg2 { values } => {
-                forward_return_dbg!(self.execute_return_reg2(&mut store.inner, values))
+                forward_return_dbg!(self, self.execute_return_reg2(&mut store.inner, values))
             }
             Instr::ReturnReg3 { values } => {
-                forward_return_dbg!(self.execute_return_reg3(&mut store.inner, values))
+                forward_return_dbg!(self, self.execute_return_reg3(&mut store.inner, values))
             }
             Instr::ReturnImm32 { value } => {
-                forward_return_dbg!(self.execute_return_imm32(&mut store.inner, value))
+                forward_return_dbg!(self, self.execute_return_imm32(&mut store.inner, value))
             }
             Instr::ReturnI64Imm32 { value } => {
-                forward_return_dbg!(self.execute_return_i64imm32(&mut store.inner, value))
+                forward_return_dbg!(self, self.execute_return_i64imm32(&mut store.inner, value))
             }
             Instr::ReturnF64Imm32 { value } => {
-                forward_return_dbg!(self.execute_return_f64imm32(&mut store.inner, value))
+                forward_return_dbg!(self, self.execute_return_f64imm32(&mut store.inner, value))
             }
             Instr::ReturnSpan { values } => {
-                forward_return_dbg!(self.execute_return_span(&mut store.inner, values))
+                forward_return_dbg!(self, self.execute_return_span(&mut store.inner, values))
             }
             Instr::ReturnMany { values } => {
-                forward_return_dbg!(self.execute_return_many(&mut store.inner, values))
+                forward_return_dbg!(self, self.execute_return_many(&mut store.inner, values))
             }
             Instr::ReturnNez { condition } => {
-                forward_return_dbg!(self.execute_return_nez(&mut store.inner, condition))
+                forward_return_dbg!(self, self.execute_return_nez(&mut store.inner, condition))
             }
             Instr::ReturnNezReg { condition, value } => {
-                forward_return_dbg!(self.execute_return_nez_reg(&mut store.inner, condition, value))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_reg(&mut store.inner, condition, value)
+                )
             }
             Instr::ReturnNezReg2 { condition, values } => {
-                forward_return_dbg!(self.execute_return_nez_reg2(
-                    &mut store.inner,
-                    condition,
-                    values
-                ))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_reg2(&mut store.inner, condition, values)
+                )
             }
             Instr::ReturnNezImm32 { condition, value } => {
-                forward_return_dbg!(self.execute_return_nez_imm32(
-                    &mut store.inner,
-                    condition,
-                    value
-                ))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_imm32(&mut store.inner, condition, value)
+                )
             }
             Instr::ReturnNezI64Imm32 { condition, value } => {
-                forward_return_dbg!(self.execute_return_nez_i64imm32(
-                    &mut store.inner,
-                    condition,
-                    value
-                ))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_i64imm32(&mut store.inner, condition, value)
+                )
             }
             Instr::ReturnNezF64Imm32 { condition, value } => {
-                forward_return_dbg!(self.execute_return_nez_f64imm32(
-                    &mut store.inner,
-                    condition,
-                    value
-                ))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_f64imm32(&mut store.inner, condition, value)
+                )
             }
             Instr::ReturnNezSpan { condition, values } => {
-                forward_return_dbg!(self.execute_return_nez_span(
-                    &mut store.inner,
-                    condition,
-                    values
-                ))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_span(&mut store.inner, condition, values)
+                )
             }
             Instr::ReturnNezMany { condition, values } => {
-                forward_return_dbg!(self.execute_return_nez_many(
-                    &mut store.inner,
-                    condition,
-                    values
-                ))
+                forward_return_dbg!(
+                    self,
+                    self.execute_return_nez_many(&mut store.inner, condition, values)
+                )
             }
             Instr::Branch { offset } => self.execute_branch(offset),
             Instr::BranchTable0 { index, len_targets } => {
@@ -1725,12 +1726,10 @@ impl<'engine> Executor<'engine> {
                 self.execute_return_call_indirect_imm16::<T>(store, func_type)?
             }
             Instr::CallInternal0 { results, func } => {
-                self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?;
-                return Ok(Signal::Breakpoint);
+                self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
             }
             Instr::CallInternal { results, func } => {
-                self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?;
-                return Ok(Signal::Breakpoint);
+                self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
             }
             Instr::CallImported0 { results, func } => {
                 self.execute_call_imported_0::<T>(store, results, func)?

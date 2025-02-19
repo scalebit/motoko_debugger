@@ -185,7 +185,7 @@ impl StackOffsets {
 /// A single frame of a called [`EngineFunc`].
 #[derive(Debug, Copy, Clone)]
 pub struct CallFrame {
-/// The pointer to the [`Instruction`] that is executed next.
+    /// The pointer to the [`Instruction`] that is executed next.
     instr_ptr: InstructionPtr,
     /// Offsets of the [`CallFrame`] into the [`ValueStack`].
     offsets: StackOffsets,
