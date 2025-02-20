@@ -191,6 +191,7 @@ impl<'engine> MainDebugger<'engine> {
             .calls
             .push(
                 CallFrame::new(
+                    engine_func,
                     InstructionPtr::new(compiled_func.instrs().as_ptr()),
                     offsets,
                     RegSpan::new(Reg::from(0)),
@@ -218,13 +219,6 @@ impl<'engine> MainDebugger<'engine> {
         } else {
             self.lookup_start_func()
         };
-
-        let func_type = func.ty(&get_store());
-        let mut run_result: Vec<Val> = func_type
-            .results()
-            .iter()
-            .map(|x| Val::default(x.clone()))
-            .collect();
 
         self.execute_func(func, &args)?;
         Ok(())
@@ -311,7 +305,20 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     // }
 
     fn frame(&self) -> Vec<String> {
-        return vec![];
+        let executor = if let Some(executor) = self.executor.clone() {
+            executor
+        } else {
+            return vec![];
+        };
+
+        return executor
+            .borrow()
+            .stack
+            .calls
+            .frames
+            .iter()
+            .map(|frame| format!("module 0 : func {}", frame.func))
+            .collect::<Vec<_>>();
     }
 
     // fn memory(&self) -> Result<Vec<u8>> {

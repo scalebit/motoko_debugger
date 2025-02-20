@@ -20,11 +20,7 @@ mod tests;
 use self::{
     comparator::{ComparatorExt, ComparatorExtImm},
     control_frame::{
-        BlockControlFrame,
-        BlockHeight,
-        IfControlFrame,
-        LoopControlFrame,
-        UnreachableControlFrame,
+        BlockControlFrame, BlockHeight, IfControlFrame, LoopControlFrame, UnreachableControlFrame,
     },
     control_stack::AcquiredTarget,
     labels::{LabelRef, LabelRegistry},
@@ -45,36 +41,18 @@ use crate::{
     core::{TrapCode, Typed, TypedVal, UntypedVal, ValType},
     engine::{config::FuelCosts, BlockType, EngineFunc},
     ir::{
-        index,
-        AnyConst16,
-        BoundedRegSpan,
-        BranchOffset,
-        Const16,
-        Const32,
-        Instruction,
-        IntoShiftAmount,
-        Reg,
-        RegSpan,
-        ShiftAmount,
-        Sign,
+        index, AnyConst16, BoundedRegSpan, BranchOffset, Const16, Const32, Instruction,
+        IntoShiftAmount, Reg, RegSpan, ShiftAmount, Sign,
     },
     module::{FuncIdx, FuncTypeIdx, ModuleHeader},
-    Engine,
-    Error,
-    ExternRef,
-    FuncRef,
-    FuncType,
+    Engine, Error, ExternRef, FuncRef, FuncType,
 };
 use core::fmt;
 use stack::RegisterSpace;
 use std::vec::Vec;
 use utils::Wrap;
 use wasmparser::{
-    BinaryReaderError,
-    FuncToValidate,
-    FuncValidatorAllocations,
-    MemArg,
-    ValidatorResources,
+    BinaryReaderError, FuncToValidate, FuncValidatorAllocations, MemArg, ValidatorResources,
     VisitOperator,
 };
 

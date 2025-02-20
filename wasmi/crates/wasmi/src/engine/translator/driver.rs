@@ -1,3 +1,5 @@
+use std::println;
+
 use crate::{
     engine::{code_map::CompiledFuncEntity, WasmTranslator},
     Error,
@@ -46,6 +48,7 @@ where
         }
         self.translate_locals()?;
         let offset = self.translate_operators()?;
+        println!("func offest, {}", offset);
         let allocations = self.finish(offset, finalize)?;
         Ok(allocations)
     }

@@ -75,10 +75,10 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 // context.printer.println(&output);
             }
             Opts::Backtrace => {
-                // for (index, frame) in debugger.frame().iter().rev().enumerate() {
-                //     let output = format!("{}: {}", index, frame);
-                //     context.printer.println(&output);
-                // }
+                for (index, frame) in debugger.frame().iter().rev().enumerate() {
+                    let output = format!("{}: {}", index, frame);
+                    context.printer.println(&output);
+                }
             }
             Opts::StepIn | Opts::StepOver => {
                 let style = match opts {

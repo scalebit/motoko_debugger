@@ -1726,7 +1726,8 @@ impl<'engine> Executor<'engine> {
                 self.execute_return_call_indirect_imm16::<T>(store, func_type)?
             }
             Instr::CallInternal0 { results, func } => {
-                self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
+                self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?;
+                return Ok(Signal::Breakpoint);
             }
             Instr::CallInternal { results, func } => {
                 self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?

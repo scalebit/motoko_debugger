@@ -1,4 +1,4 @@
-use instrs::{Signal};
+use instrs::Signal;
 
 pub use self::instrs::ResumableHostError;
 pub use self::stack::Stack;
@@ -228,6 +228,7 @@ impl<'engine> EngineExecutor<'engine> {
                 uninit_params.init_zeroes();
                 self.stack.calls.push(
                     CallFrame::new(
+                        engine_func,
                         InstructionPtr::new(compiled_func.instrs().as_ptr()),
                         offsets,
                         RegSpan::new(Reg::from(0)),
@@ -366,7 +367,7 @@ impl<'engine> EngineExecutor<'engine> {
 //                     .get(Some(store.inner.fuel_mut()), engine_func)?;
 //                 let (mut uninit_params, offsets) = self
 //                     .stack
-//                     .values  
+//                     .values
 //                     .alloc_call_frame(compiled_func, do_nothing)?;
 //                 for value in params.call_params() {
 //                     unsafe { uninit_params.init_next(value) };

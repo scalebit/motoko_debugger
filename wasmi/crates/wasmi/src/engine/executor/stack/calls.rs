@@ -1,8 +1,14 @@
+use wasmi_collections::arena::ArenaIndex;
+
 use super::{err_stack_overflow, BaseValueStackOffset, FrameValueStackOffset};
 use crate::{
-    collections::HeadVec, core::TrapCode, engine::executor::InstructionPtr, ir::RegSpan, Instance,
+    collections::HeadVec,
+    core::TrapCode,
+    engine::{executor::InstructionPtr, EngineFunc},
+    ir::RegSpan,
+    Instance,
 };
-use std::vec::Vec;
+use std::{boxed::Box, vec::Vec};
 
 #[cfg(doc)]
 use crate::{
@@ -185,6 +191,7 @@ impl StackOffsets {
 /// A single frame of a called [`EngineFunc`].
 #[derive(Debug, Copy, Clone)]
 pub struct CallFrame {
+    pub func: u32,
     /// The pointer to the [`Instruction`] that is executed next.
     instr_ptr: InstructionPtr,
     /// Offsets of the [`CallFrame`] into the [`ValueStack`].
@@ -203,8 +210,14 @@ pub struct CallFrame {
 
 impl CallFrame {
     /// Creates a new [`CallFrame`].
-    pub fn new(instr_ptr: InstructionPtr, offsets: StackOffsets, results: RegSpan) -> Self {
+    pub fn new(
+        func: EngineFunc,
+        instr_ptr: InstructionPtr,
+        offsets: StackOffsets,
+        results: RegSpan,
+    ) -> Self {
         Self {
+            func: func.into_usize() as u32,
             instr_ptr,
             offsets,
             results,

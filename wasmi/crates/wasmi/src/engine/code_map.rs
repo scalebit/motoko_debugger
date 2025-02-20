@@ -6,11 +6,7 @@
 //! register machine based bytecode functions.
 
 use super::{
-    FuelCosts,
-    FuncTranslationDriver,
-    FuncTranslator,
-    TranslationError,
-    ValidatingFuncTranslator,
+    FuelCosts, FuncTranslationDriver, FuncTranslator, TranslationError, ValidatingFuncTranslator,
 };
 use crate::{
     collections::arena::{Arena, ArenaIndex},
@@ -19,8 +15,7 @@ use crate::{
     ir::{index::InternalFunc, Instruction},
     module::{FuncIdx, ModuleHeader},
     store::{Fuel, FuelError},
-    Config,
-    Error,
+    Config, Error,
 };
 use core::{
     fmt,

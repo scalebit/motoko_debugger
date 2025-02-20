@@ -1,3 +1,5 @@
+use wasmi_collections::arena::ArenaIndex;
+
 use super::{Executor, InstructionPtr};
 use crate::{
     core::TrapCode,
@@ -5,21 +7,15 @@ use crate::{
         code_map::CompiledFuncRef,
         executor::stack::{CallFrame, FrameParams, ValueStack},
         utils::unreachable_unchecked,
-        EngineFunc,
-        FuncParams,
+        EngineFunc, FuncParams,
     },
     func::{FuncEntity, HostFuncEntity},
     ir::{index, Instruction, Reg, RegSpan},
     store::StoreInner,
-    CallHook,
-    Error,
-    Func,
-    FuncRef,
-    Instance,
-    Store,
+    CallHook, Error, Func, FuncRef, Instance, Store,
 };
 use core::array;
-use std::fmt;
+use std::{fmt, println};
 
 /// Dispatches and executes the host function.
 ///
@@ -229,7 +225,8 @@ impl Executor<'_> {
     fn dispatch_compiled_func<C: CallContext>(
         &mut self,
         results: RegSpan,
-        func: CompiledFuncRef,
+        func: EngineFunc,
+        compiled_func: CompiledFuncRef,
     ) -> Result<CallFrame, Error> {
         // We have to reinstantiate the `self.sp` [`FrameRegisters`] since we just called
         // [`ValueStack::alloc_call_frame`] which might invalidate all live [`FrameRegisters`].
@@ -238,12 +235,13 @@ impl Executor<'_> {
             .calls
             .peek()
             .expect("need to have a caller on the call stack");
-        let (mut uninit_params, offsets) = self.stack.values.alloc_call_frame(func, |this| {
-            // Safety: We use the base offset of a live call frame on the call stack.
-            self.sp = unsafe { this.stack_ptr_at(caller.base_offset()) };
-        })?;
-        let instr_ptr = InstructionPtr::new(func.instrs().as_ptr());
-        let frame = CallFrame::new(instr_ptr, offsets, results);
+        let (mut uninit_params, offsets) =
+            self.stack.values.alloc_call_frame(compiled_func, |this| {
+                // Safety: We use the base offset of a live call frame on the call stack.
+                self.sp = unsafe { this.stack_ptr_at(caller.base_offset()) };
+            })?;
+        let instr_ptr = InstructionPtr::new(compiled_func.instrs().as_ptr());
+        let frame = CallFrame::new(func, instr_ptr, offsets, results);
         if <C as CallContext>::HAS_PARAMS {
             self.copy_call_params(&mut uninit_params);
         }
@@ -314,8 +312,8 @@ impl Executor<'_> {
         func: EngineFunc,
         mut instance: Option<Instance>,
     ) -> Result<(), Error> {
-        let func = self.code_map.get(Some(store.fuel_mut()), func)?;
-        let mut called = self.dispatch_compiled_func::<C>(results, func)?;
+        let compiled_func = self.code_map.get(Some(store.fuel_mut()), func)?;
+        let mut called = self.dispatch_compiled_func::<C>(results, func, compiled_func)?;
         match <C as CallContext>::KIND {
             CallKind::Nested => {
                 // We need to update the instruction pointer of the caller call frame.
