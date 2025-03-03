@@ -94,7 +94,7 @@ pub fn run_loop(
     preopen_dirs: Vec<(String, String)>,
     envs: Vec<(String, String)>,
 ) -> Result<()> {
-    let (mut process, context) = start_debugger(module_input, preopen_dirs, envs)?;
+    let (process, context) = start_debugger(module_input, preopen_dirs, envs)?;
     let mut interactive = Interactive::new_with_loading_history()?;
     let process = Rc::new(RefCell::new(process));
     while let CommandResult::ProcessFinish(_) = interactive.run_loop(&context, process.clone())? {}

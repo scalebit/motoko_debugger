@@ -74,4 +74,10 @@ impl<T> HeadVec<T> {
         let new_top = self.rest.pop();
         mem::replace(&mut self.head, new_top)
     }
+
+    /// Pops the `rest` from the [`HeadVec`] if any.
+    #[inline]
+    pub fn rest(&self) -> &Vec<T> {
+        &self.rest
+    }
 }

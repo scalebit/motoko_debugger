@@ -8,8 +8,7 @@ use core::{
     fmt::{self, Debug},
     mem::{self, MaybeUninit},
     ops::Range,
-    ptr,
-    slice,
+    ptr, slice,
 };
 use std::vec::Vec;
 
@@ -20,7 +19,7 @@ use crate::engine::EngineFunc;
 
 pub struct ValueStack {
     /// The values on the [`ValueStack`].
-    values: Vec<UntypedVal>,
+    pub values: Vec<UntypedVal>,
     /// Maximal possible `sp` value.
     max_len: usize,
 }

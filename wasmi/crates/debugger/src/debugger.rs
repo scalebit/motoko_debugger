@@ -9,7 +9,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::usize;
+use std::{usize, vec};
 use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
@@ -20,13 +20,14 @@ use wasmi::{
     func::FuncEntity,
     Val,
 };
+use wasmi_core::UntypedVal;
 use wasmi_ir::{Instruction, Reg, RegSpan};
 use wasmi_wasi::{WasiCtx, WasiCtxBuilder};
 
 type RawModule = Vec<u8>;
 
 use wasmi::engine::executor::stack::CallFrame;
-use wasmi::{CompilationMode, Config, Engine, Func, Instance, Store};
+use wasmi::{instance, CompilationMode, Config, Engine, Func, Instance, Store};
 
 static mut WASM_STORE: Option<Store<WasiCtx>> = None;
 static mut WASM_ENGINE: Option<Engine> = None;
@@ -261,19 +262,20 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         self.breakpoints.insert(breakpoint)
     }
 
-    // fn stack_values(&self) -> Vec<Val> {
-    //     if let Ok(ref executor) = self.executor() {
-    //         let executor = executor.borrow();
-    //         let values = executor.stack.peek_values();
-    //         let mut new_values = Vec::<Val>::new();
-    //         for v in values {
-    //             new_values.push(*v);
-    //         }
-    //         new_values
-    //     } else {
-    //         Vec::new()
-    //     }
-    // }
+    fn stack_values(&self) -> Vec<UntypedVal> {
+        if self.executor.is_none() {
+            return vec![];
+        }
+        let executor = self.executor.clone().unwrap();
+        let executor = executor.borrow();
+        let values = executor.stack.values.values.iter().collect::<Vec<_>>();
+
+        let mut new_values = Vec::<UntypedVal>::new();
+        for v in values {
+            new_values.push(*v);
+        }
+        new_values
+    }
 
     // fn store(&self) -> Result<&Store> {
     //     let instance = self.instance()?;
@@ -311,14 +313,23 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             return vec![];
         };
 
-        return executor
-            .borrow()
-            .stack
-            .calls
-            .frames
-            .iter()
-            .map(|frame| format!("module 0 : func {}", frame.func))
-            .collect::<Vec<_>>();
+        let frames = &executor.borrow().stack.calls.frames;
+        let instances = &executor.borrow().stack.calls.instances;
+
+        if instances.last().is_none() {
+            return vec![];
+        }
+        let mut frames_string = vec![];
+        let mut all_instances = instances.rest().iter().collect::<Vec<_>>();
+        all_instances.push(instances.last().unwrap());
+        for f in frames.iter() {
+            frames_string.push(format!(
+                "{:?} - func {}",
+                all_instances.last().unwrap(),
+                f.func
+            ));
+        }
+        return frames_string;
     }
 
     // fn memory(&self) -> Result<Vec<u8>> {

@@ -6,6 +6,7 @@ use wasmi::{
     engine::executor::instrs::{ModuleIndex, Signal},
     Val,
 };
+use wasmi_core::UntypedVal;
 // use wasmi::{Val, engine::executor::instrs::{Signal, ExecResult, ModuleIndex, Executor, Interceptor}};
 
 #[derive(Default, Clone)]
@@ -61,7 +62,7 @@ pub trait Debugger {
     // fn memory(&self) -> Result<Vec<u8>>;
     // fn store(&self) -> Result<&Store>;
     fn set_breakpoint(&mut self, breakpoint: Breakpoint);
-    // fn stack_values(&self) -> Vec<Val>;
+    fn stack_values(&self) -> Vec<UntypedVal>;
     // fn selected_instructions(&self) -> Result<(&[Instruction], usize)>;
     fn step(&self, style: StepStyle) -> Result<Signal>;
     fn process(&self) -> Result<RunResult>;

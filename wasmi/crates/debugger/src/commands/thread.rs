@@ -103,12 +103,12 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 // display_source(line_info, context.printer.as_ref())?;
             }
             Opts::StepInstIn | Opts::StepInstOver => {
-                // let style = match opts {
-                //     Opts::StepInstIn => StepStyle::InstIn,
-                //     Opts::StepInstOver => StepStyle::InstOver,
-                //     _ => panic!(),
-                // };
-                // debugger.step(style)?;
+                let style = match opts {
+                    Opts::StepInstIn => StepStyle::InstIn,
+                    Opts::StepInstOver => StepStyle::InstOver,
+                    _ => panic!(),
+                };
+                debugger.step(style)?;
             }
         }
 

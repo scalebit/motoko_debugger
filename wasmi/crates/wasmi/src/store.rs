@@ -7,31 +7,10 @@ use crate::{
     memory::{DataSegment, MemoryError},
     module::InstantiationError,
     table::TableError,
-    Config,
-    DataSegmentEntity,
-    DataSegmentIdx,
-    ElementSegment,
-    ElementSegmentEntity,
-    ElementSegmentIdx,
-    Engine,
-    Error,
-    Func,
-    FuncEntity,
-    FuncIdx,
-    FuncType,
-    Global,
-    GlobalEntity,
-    GlobalIdx,
-    Instance,
-    InstanceEntity,
-    InstanceIdx,
-    Memory,
-    MemoryEntity,
-    MemoryIdx,
-    ResourceLimiter,
-    Table,
-    TableEntity,
-    TableIdx,
+    Config, DataSegmentEntity, DataSegmentIdx, ElementSegment, ElementSegmentEntity,
+    ElementSegmentIdx, Engine, Error, Func, FuncEntity, FuncIdx, FuncType, Global, GlobalEntity,
+    GlobalIdx, Instance, InstanceEntity, InstanceIdx, Memory, MemoryEntity, MemoryIdx,
+    ResourceLimiter, Table, TableEntity, TableIdx,
 };
 use core::{
     fmt::{self, Debug},
@@ -369,7 +348,7 @@ impl StoreInner {
     /// Creates a new [`StoreInner`] for the given [`Engine`].
     pub fn new(engine: &Engine) -> Self {
         let fuel = Fuel::new(engine.config());
-        StoreInner {         
+        StoreInner {
             engine: engine.clone(),
             store_idx: StoreIdx::new(),
             funcs: Arena::new(),
@@ -1079,7 +1058,7 @@ impl<T> Store<T> {
     /// - Returns the value returned by the call hook.
     /// - Returns `Ok(())` if no call hook exists.
     #[inline]
-    pub(crate) fn  invoke_call_hook(&mut self, call_type: CallHook) -> Result<(), Error> {
+    pub(crate) fn invoke_call_hook(&mut self, call_type: CallHook) -> Result<(), Error> {
         match self.call_hook.as_mut() {
             None => Ok(()),
             Some(call_hook) => Self::invoke_call_hook_impl(&mut self.data, call_type, call_hook),
