@@ -1,32 +1,21 @@
 use super::{
     bail_unreachable,
     control_frame::{
-        BlockControlFrame,
-        BlockHeight,
-        ControlFrame,
-        IfControlFrame,
-        IfReachability,
-        LoopControlFrame,
-        UnreachableControlFrame,
+        BlockControlFrame, BlockHeight, ControlFrame, IfControlFrame, IfReachability,
+        LoopControlFrame, UnreachableControlFrame,
     },
     stack::TypedProvider,
-    ControlFrameKind,
-    FuncTranslator,
-    TypedVal,
+    ControlFrameKind, FuncTranslator, TypedVal,
 };
 use crate::{
     core::{TrapCode, ValType, F32, F64},
     engine::{
         translator::{AcquiredTarget, Provider},
-        BlockType,
-        FuelCosts,
+        BlockType, FuelCosts,
     },
     ir::{self, index, index::FuncType, BoundedRegSpan, Const16, Instruction, Reg},
     module::{self, FuncIdx, WasmiValueType},
-    Error,
-    ExternRef,
-    FuncRef,
-    Mutability,
+    Error, ExternRef, FuncRef, Mutability,
 };
 use core::num::{NonZeroU32, NonZeroU64};
 use wasmparser::VisitOperator;
@@ -91,6 +80,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     wasmparser::for_each_operator!(impl_visit_operator);
 
     fn visit_unreachable(&mut self) -> Self::Output {
+        std::println!("     visit_unreachable");
         bail_unreachable!(self);
         self.push_base_instr(Instruction::trap(TrapCode::UnreachableCodeReached))?;
         self.reachable = false;
@@ -98,11 +88,13 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_nop(&mut self) -> Self::Output {
+        std::println!("     visit_nop");
         // Nothing to do for Wasm `nop` instructions.
         Ok(())
     }
 
     fn visit_block(&mut self, block_type: wasmparser::BlockType) -> Self::Output {
+        std::println!("     visit_block");
         let block_type = BlockType::new(block_type, &self.module);
         if !self.is_reachable() {
             // We keep track of unreachable control flow frames so that we
@@ -140,6 +132,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_loop(&mut self, block_type: wasmparser::BlockType) -> Self::Output {
+        std::println!("     visit_loop");
         let block_type = BlockType::new(block_type, &self.module);
         if !self.is_reachable() {
             // See `visit_block` for rational of tracking unreachable control flow.
@@ -371,6 +364,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_end(&mut self) -> Self::Output {
+        std::println!("     visit_end");
         match self.alloc.control_stack.pop_frame() {
             ControlFrame::Block(frame) => self.translate_end_block(frame),
             ControlFrame::Loop(frame) => self.translate_end_loop(frame),
@@ -382,6 +376,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_br(&mut self, relative_depth: u32) -> Self::Output {
+        std::println!("     visit_br");
         bail_unreachable!(self);
         self.translate_br(relative_depth)
     }
@@ -481,12 +476,14 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_return(&mut self) -> Self::Output {
+        std::println!("     visit_return");
         bail_unreachable!(self);
         self.translate_return()
     }
 
     fn visit_call(&mut self, function_index: u32) -> Self::Output {
         bail_unreachable!(self);
+        std::println!("     visit_call");
         self.bump_fuel_consumption(FuelCosts::call)?;
         let func_idx = FuncIdx::from(function_index);
         let func_type = self.func_type_of(func_idx);
@@ -525,6 +522,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
         table_index: u32,
         _table_byte: u8,
     ) -> Self::Output {
+        std::println!("     visit_call_indirect");
         bail_unreachable!(self);
         self.bump_fuel_consumption(FuelCosts::call)?;
         let type_index = FuncType::from(type_index);
@@ -559,6 +557,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_return_call(&mut self, function_index: u32) -> Self::Output {
+        std::println!("     visit_return_call");
         bail_unreachable!(self);
         self.bump_fuel_consumption(FuelCosts::call)?;
         let func_idx = FuncIdx::from(function_index);
@@ -593,6 +592,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_return_call_indirect(&mut self, type_index: u32, table_index: u32) -> Self::Output {
+        std::println!("     visit_return_call_indirect");
         bail_unreachable!(self);
         self.bump_fuel_consumption(FuelCosts::call)?;
         let type_index = FuncType::from(type_index);
@@ -627,12 +627,14 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_drop(&mut self) -> Self::Output {
+        std::println!("     visit_drop");
         bail_unreachable!(self);
         self.alloc.stack.drop();
         Ok(())
     }
 
     fn visit_select(&mut self) -> Self::Output {
+        std::println!("     visit_select");
         self.translate_select(None)
     }
 
@@ -642,12 +644,14 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_local_get(&mut self, local_index: u32) -> Self::Output {
+        std::println!("     visit_local_get");
         bail_unreachable!(self);
         self.alloc.stack.push_local(local_index)?;
         Ok(())
     }
 
     fn visit_local_set(&mut self, local_index: u32) -> Self::Output {
+        std::println!("     visit_local_set");
         bail_unreachable!(self);
         self.alloc.stack.gc_preservations();
         let value = self.alloc.stack.pop();
@@ -675,6 +679,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_local_tee(&mut self, local_index: u32) -> Self::Output {
+        std::println!("     visit_local_tee");
         bail_unreachable!(self);
         let input = self.alloc.stack.peek();
         self.visit_local_set(local_index)?;
@@ -690,6 +695,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_global_get(&mut self, global_index: u32) -> Self::Output {
+        std::println!("     visit_global_get");
         bail_unreachable!(self);
         let global_idx = module::GlobalIdx::from(global_index);
         let (global_type, init_value) = self.module.get_global(global_idx);
@@ -719,6 +725,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_global_set(&mut self, global_index: u32) -> Self::Output {
+        std::println!("     visit_global_set");
         bail_unreachable!(self);
         let global = ir::index::Global::from(global_index);
         match self.alloc.stack.pop() {
@@ -760,6 +767,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_load(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_load");
         self.translate_load(
             memarg,
             Instruction::i32_load,
@@ -796,6 +804,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_load8_s(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_load8_s");
         self.translate_load(
             memarg,
             Instruction::i32_load8_s,
@@ -805,6 +814,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_load8_u(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_load8_u");
         self.translate_load(
             memarg,
             Instruction::i32_load8_u,
@@ -814,6 +824,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_load16_s(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_load16_s");
         self.translate_load(
             memarg,
             Instruction::i32_load16_s,
@@ -823,6 +834,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_load16_u(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_load16_u");
         self.translate_load(
             memarg,
             Instruction::i32_load16_u,
@@ -928,6 +940,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_store8(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_store8");
         self.translate_istore_wrap::<i32, i8, i8>(
             memarg,
             Instruction::i32_store8,
@@ -940,6 +953,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_store16(&mut self, memarg: wasmparser::MemArg) -> Self::Output {
+        std::println!("     visit_i32_store16");
         self.translate_istore_wrap::<i32, i16, i16>(
             memarg,
             Instruction::i32_store16,
@@ -1021,6 +1035,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_const(&mut self, value: i32) -> Self::Output {
+        std::println!("     visit_i32_const");
         bail_unreachable!(self);
         self.alloc.stack.push_const(value);
         Ok(())
@@ -2036,6 +2051,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
     }
 
     fn visit_i32_add(&mut self) -> Self::Output {
+        std::println!("     visit_i32_add");
         self.translate_binary_commutative(
             Instruction::i32_add,
             Instruction::i32_add_imm16,

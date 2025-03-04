@@ -1,15 +1,7 @@
 use super::{
-    relink_result::RelinkResult as _,
-    utils::FromProviders as _,
-    visit_register::VisitInputRegisters as _,
-    BumpFuelConsumption as _,
-    ComparatorExt as _,
-    ComparatorExtImm,
-    FuelInfo,
-    LabelRef,
-    LabelRegistry,
-    Provider,
-    TypedProvider,
+    relink_result::RelinkResult as _, utils::FromProviders as _,
+    visit_register::VisitInputRegisters as _, BumpFuelConsumption as _, ComparatorExt as _,
+    ComparatorExtImm, FuelInfo, LabelRef, LabelRegistry, Provider, TypedProvider,
 };
 use crate::{
     core::{UntypedVal, ValType, F32},
@@ -18,17 +10,8 @@ use crate::{
         FuelCosts,
     },
     ir::{
-        self,
-        BoundedRegSpan,
-        BranchOffset,
-        BranchOffset16,
-        Comparator,
-        ComparatorAndOffset,
-        Const16,
-        Const32,
-        Instruction,
-        Reg,
-        RegSpan,
+        self, BoundedRegSpan, BranchOffset, BranchOffset16, Comparator, ComparatorAndOffset,
+        Const16, Const32, Instruction, Reg, RegSpan,
     },
     module::ModuleHeader,
     Error,
@@ -99,7 +82,7 @@ impl Instr {
 #[derive(Debug, Default)]
 pub struct InstrEncoder {
     /// Already encoded [`Instruction`] words.
-    instrs: InstrSequence,
+    pub instrs: InstrSequence,
     /// Unresolved and unpinned labels created during function translation.
     labels: LabelRegistry,
     /// The last [`Instruction`] created via [`InstrEncoder::push_instr`].
@@ -118,7 +101,7 @@ pub struct InstrEncoder {
 #[derive(Debug, Default)]
 pub struct InstrSequence {
     /// Already encoded [`Instruction`] words.
-    instrs: Vec<Instruction>,
+    pub instrs: Vec<Instruction>,
 }
 
 impl InstrSequence {
@@ -1186,7 +1169,7 @@ impl InstrEncoder {
     ) -> Result<Option<Instruction>, Error> {
         use Instruction as I;
         let fused_instr = match *self.instrs.get(instr) {
-            | I::I32And { result, lhs, rhs }
+            I::I32And { result, lhs, rhs }
             | I::I32Or { result, lhs, rhs }
             | I::I32Xor { result, lhs, rhs }
             | I::I32AndEqz { result, lhs, rhs }
@@ -1226,7 +1209,7 @@ impl InstrEncoder {
             | I::F64Ge { result, lhs, rhs } => self.try_fuse_branch_cmp(
                 stack, instr, condition, result, lhs, rhs, label, comparator,
             )?,
-            | I::I32AndImm16 { result, lhs, rhs }
+            I::I32AndImm16 { result, lhs, rhs }
             | I::I32OrImm16 { result, lhs, rhs }
             | I::I32XorImm16 { result, lhs, rhs }
             | I::I32AndEqzImm16 { result, lhs, rhs }
@@ -1240,13 +1223,13 @@ impl InstrEncoder {
             | I::I32GeSImm16 { result, lhs, rhs } => self.try_fuse_branch_cmp_imm::<i32>(
                 stack, instr, condition, result, lhs, rhs, label, comparator,
             )?,
-            | I::I32LtUImm16 { result, lhs, rhs }
+            I::I32LtUImm16 { result, lhs, rhs }
             | I::I32LeUImm16 { result, lhs, rhs }
             | I::I32GtUImm16 { result, lhs, rhs }
             | I::I32GeUImm16 { result, lhs, rhs } => self.try_fuse_branch_cmp_imm::<u32>(
                 stack, instr, condition, result, lhs, rhs, label, comparator,
             )?,
-            | I::I64EqImm16 { result, lhs, rhs }
+            I::I64EqImm16 { result, lhs, rhs }
             | I::I64NeImm16 { result, lhs, rhs }
             | I::I64LtSImm16 { result, lhs, rhs }
             | I::I64LeSImm16 { result, lhs, rhs }
@@ -1254,7 +1237,7 @@ impl InstrEncoder {
             | I::I64GeSImm16 { result, lhs, rhs } => self.try_fuse_branch_cmp_imm::<i64>(
                 stack, instr, condition, result, lhs, rhs, label, comparator,
             )?,
-            | I::I64LtUImm16 { result, lhs, rhs }
+            I::I64LtUImm16 { result, lhs, rhs }
             | I::I64LeUImm16 { result, lhs, rhs }
             | I::I64GtUImm16 { result, lhs, rhs }
             | I::I64GeUImm16 { result, lhs, rhs } => self.try_fuse_branch_cmp_imm::<u64>(

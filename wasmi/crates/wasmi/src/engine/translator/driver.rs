@@ -1,4 +1,4 @@
-use std::println;
+use std::{eprintln, println};
 
 use crate::{
     engine::{code_map::CompiledFuncEntity, WasmTranslator},
@@ -67,6 +67,7 @@ where
     fn translate_locals(&mut self) -> Result<(), Error> {
         let mut reader = self.func_body.get_locals_reader()?;
         let len_locals = reader.get_count();
+        eprintln!("  translate_locals = {}", len_locals);
         for _ in 0..len_locals {
             let offset = reader.original_position();
             let (amount, value_type) = reader.read()?;
@@ -84,6 +85,7 @@ where
         let mut reader = self.func_body.get_operators_reader()?;
         while !reader.eof() {
             let pos = reader.original_position();
+            eprintln!("  reader pos = {}", pos);
             self.translator.update_pos(pos);
             reader.visit_operator(&mut self.translator)??;
         }

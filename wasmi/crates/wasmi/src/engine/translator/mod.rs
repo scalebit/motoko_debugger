@@ -554,6 +554,7 @@ impl WasmTranslator<'_> for FuncTranslator {
         }
         let func_consts = self.alloc.stack.func_local_consts();
         let instrs = self.alloc.instr_encoder.drain_instrs();
+        std::println!("instrs len = {}", instrs.len());
         finalize(CompiledFuncEntity::new(len_registers, instrs, func_consts));
         Ok(self.into_allocations())
     }

@@ -49,6 +49,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use executor::instrs::Signal;
 use spin::{Mutex, RwLock};
 use std::{
+    eprintln,
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -592,6 +593,7 @@ impl EngineInner {
     ) -> Result<(), Error> {
         match (self.config.get_compilation_mode(), func_to_validate) {
             (CompilationMode::Eager, Some(func_to_validate)) => {
+                eprintln!("CompilationMode::Eager, Some(func_to_validate))");
                 let (translation_allocs, validation_allocs) = self.get_allocs();
                 let validator = func_to_validate.into_validator(validation_allocs);
                 let translator = FuncTranslator::new(func_index, module, translation_allocs)?;
@@ -601,6 +603,7 @@ impl EngineInner {
                 self.recycle_allocs(allocs.translation, allocs.validation);
             }
             (CompilationMode::Eager, None) => {
+                eprintln!("(CompilationMode::Eager, None)");
                 let allocs = self.get_translation_allocs();
                 let translator = FuncTranslator::new(func_index, module, allocs)?;
                 let allocs = FuncTranslationDriver::new(offset, bytes, translator)?

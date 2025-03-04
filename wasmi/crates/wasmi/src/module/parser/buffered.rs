@@ -1,4 +1,4 @@
-use std::println;
+use std::{eprintln, println};
 
 use super::{
     CustomSectionsBuilder, ModuleBuilder, ModuleHeader, ModuleHeaderBuilder, ModuleParser,
@@ -108,39 +108,21 @@ impl ModuleParser {
                     encoding,
                     range,
                 } => self.process_version(num, encoding, range),
-                Payload::TypeSection(section) => {
-                    self.process_types(section, &mut header)
-                }
-                Payload::ImportSection(section) => {
-                    self.process_imports(section, &mut header)
-                }
-                Payload::FunctionSection(section) => {
-                    self.process_functions(section, &mut header)
-                }
-                Payload::TableSection(section) => {
-                    self.process_tables(section, &mut header)
-                }
-                Payload::MemorySection(section) => {
-                    self.process_memories(section, &mut header)
-                }
-                Payload::GlobalSection(section) => {
-
-                    self.process_globals(section, &mut header)
-                }
-                Payload::ExportSection(section) => {
-                    self.process_exports(section, &mut header)
-                }
+                Payload::TypeSection(section) => self.process_types(section, &mut header),
+                Payload::ImportSection(section) => self.process_imports(section, &mut header),
+                Payload::FunctionSection(section) => self.process_functions(section, &mut header),
+                Payload::TableSection(section) => self.process_tables(section, &mut header),
+                Payload::MemorySection(section) => self.process_memories(section, &mut header),
+                Payload::GlobalSection(section) => self.process_globals(section, &mut header),
+                Payload::ExportSection(section) => self.process_exports(section, &mut header),
                 Payload::StartSection { func, range } => {
                     // println!("Payload::StartSection: {:?}", section);
                     self.process_start(func, range, &mut header)
                 }
-                Payload::ElementSection(section) => {
-                    self.process_element(section, &mut header)
-                }
-                Payload::DataCountSection { count, range } => {
-                    self.process_data_count(count, range)
-                }
+                Payload::ElementSection(section) => self.process_element(section, &mut header),
+                Payload::DataCountSection { count, range } => self.process_data_count(count, range),
                 Payload::CodeSectionStart { count, range, size } => {
+                    println!("Payload CodeSectionStart");
                     self.process_code_start(count, range, size)?;
                     Self::consume_buffer(consumed, buffer);
                     break;
@@ -152,10 +134,6 @@ impl ModuleParser {
                     break;
                 }
                 Payload::CustomSection(reader) => {
-                    // if reader.name() == "name" {
-                    //     let section = NameSectionReader::new(reader.data(), reader.data_offset());
-                    //     func_names = read_name_section(section)?;
-                    // }
                     println!("Payload::CustomSection: {:?}", reader);
                     self.process_custom_section(custom_sections, reader)
                 }
@@ -186,7 +164,10 @@ impl ModuleParser {
         custom_sections: CustomSectionsBuilder,
     ) -> Result<ModuleBuilder, Error> {
         loop {
+            eprintln!("\n------------------------");
+            eprintln!("buffer: {:?}", buffer);
             let (consumed, payload) = self.next_payload(buffer)?;
+            eprintln!("buffer: {:?}, consumed = {}", buffer, consumed);
             match payload {
                 Payload::CodeSectionEntry(func_body) => {
                     // Note: Unfortunately the `wasmparser` crate is missing an API
@@ -194,13 +175,20 @@ impl ModuleParser {
                     //       entry payload. Please remove this work around as soon as
                     //       such an API becomes available.
                     let bytes = Self::consume_buffer(consumed, buffer);
+                    eprintln!(
+                        "buffer: {:?}, consumed = {}, bytes{:?}",
+                        buffer, consumed, bytes
+                    );
                     let remaining = func_body.get_binary_reader().bytes_remaining();
                     let start = consumed - remaining;
+                    eprintln!("start {}", start);
                     let bytes = &bytes[start..];
+                    eprintln!("bytes {:?}", bytes);
                     self.process_code_entry(func_body, bytes, &header)?;
                 }
                 _ => break,
             }
+            eprintln!("------------------------\n");
         }
         Ok(ModuleBuilder::new(header, custom_sections))
     }
