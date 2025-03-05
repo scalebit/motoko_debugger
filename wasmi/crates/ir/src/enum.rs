@@ -52,6 +52,7 @@ macro_rules! define_enum {
                             $( #[$field_docs] )*
                             $field_name: $field_ty
                         ),*
+
                     }
                 )?
             ),*
@@ -82,12 +83,10 @@ for_each_op::for_each_op!(define_enum);
 use wasmi_inst_macro::*;
 use wasmparser::{for_each_operator, BrTable, OperatorsReader};
 
-
 pub struct ZaxInstruction {
     pub kind: InstructionKind,
     pub offset: usize,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct BrTableData {
@@ -133,8 +132,6 @@ pub fn transform_inst(
         offset: offset - base_offset,
     })
 }
-
-
 
 impl Instruction {
     /// Creates a new [`Instruction::ReturnReg2`] for the given [`Reg`] indices.

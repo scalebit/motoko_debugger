@@ -722,6 +722,8 @@ impl<'a> From<&'a [u8]> for SmallByteSlice {
 pub struct CompiledFuncEntity {
     /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
     instrs: Pin<Box<[Instruction]>>,
+    /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
+    offsets: Pin<Box<[usize]>>,
     /// The constant values local to the [`EngineFunc`].
     consts: Pin<Box<[UntypedVal]>>,
     /// The number of registers used by the [`EngineFunc`] in total.
@@ -740,12 +742,14 @@ impl CompiledFuncEntity {
     ///
     /// - If `instrs` is empty.
     /// - If `instrs` contains more than `i32::MAX` instructions.
-    pub fn new<I, C>(len_registers: u16, instrs: I, consts: C) -> Self
+    pub fn new<I, O, C>(len_registers: u16, instrs: I, offsets: O, consts: C) -> Self
     where
         I: IntoIterator<Item = Instruction>,
+        O: IntoIterator<Item = usize>,
         C: IntoIterator<Item = UntypedVal>,
     {
         let instrs: Pin<Box<[Instruction]>> = Pin::new(instrs.into_iter().collect());
+        let offsets: Pin<Box<[usize]>> = Pin::new(offsets.into_iter().collect());
         let consts: Pin<Box<[UntypedVal]>> = Pin::new(consts.into_iter().collect());
         assert!(
             !instrs.is_empty(),
@@ -762,6 +766,7 @@ impl CompiledFuncEntity {
         );
         Self {
             instrs,
+            offsets,
             consts,
             len_registers,
         }
@@ -773,6 +778,8 @@ impl CompiledFuncEntity {
 pub struct CompiledFuncRef<'a> {
     /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
     instrs: Pin<&'a [Instruction]>,
+    /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
+    offsets: Pin<&'a [usize]>,
     /// The constant values local to the [`EngineFunc`].
     consts: Pin<&'a [UntypedVal]>,
     /// The number of registers used by the [`EngineFunc`] in total.
@@ -784,6 +791,7 @@ impl<'a> From<&'a CompiledFuncEntity> for CompiledFuncRef<'a> {
     fn from(func: &'a CompiledFuncEntity) -> Self {
         Self {
             instrs: func.instrs.as_ref(),
+            offsets: func.offsets.as_ref(),
             consts: func.consts.as_ref(),
             len_registers: func.len_registers,
         }
@@ -795,6 +803,12 @@ impl<'a> CompiledFuncRef<'a> {
     #[inline]
     pub fn instrs(&self) -> &'a [Instruction] {
         self.instrs.get_ref()
+    }
+
+    /// Returns the sequence of [`offsets`] of the [`Instruction`].
+    #[inline]
+    pub fn offsets(&self) -> &'a [usize] {
+        self.offsets.get_ref()
     }
 
     /// Returns the number of registers used by the [`EngineFunc`].

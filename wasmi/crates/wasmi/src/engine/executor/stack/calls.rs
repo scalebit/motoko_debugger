@@ -192,6 +192,7 @@ impl StackOffsets {
 #[derive(Debug, Copy, Clone)]
 pub struct CallFrame {
     pub func: u32,
+    pub instr_count: u32,
     /// The pointer to the [`Instruction`] that is executed next.
     instr_ptr: InstructionPtr,
     /// Offsets of the [`CallFrame`] into the [`ValueStack`].
@@ -218,6 +219,7 @@ impl CallFrame {
     ) -> Self {
         Self {
             func: func.into_usize() as u32,
+            instr_count: 0,
             instr_ptr,
             offsets,
             results,

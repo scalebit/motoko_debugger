@@ -1413,7 +1413,12 @@ impl<'engine> Executor<'engine> {
         interceptor: &I,
     ) -> Result<Signal, Error> {
         let signal = interceptor.execute_inst(self.ip.get());
+        if let Some(frame) = self.stack.calls.frames.last_mut() {
+            frame.instr_count += 1;
+        }
+
         let result = self.execute_instr(store)?;
+
         Ok(match (signal, result) {
             (_, Signal::End) => Signal::End,
             (signal, Signal::Next) => signal,

@@ -83,11 +83,17 @@ where
     /// Returns the offset of the `End` Wasm operator.
     fn translate_operators(&mut self) -> Result<usize, Error> {
         let mut reader = self.func_body.get_operators_reader()?;
+        let mut before_len = self.translator.get_instr_encoder_len();
         while !reader.eof() {
             let pos = reader.original_position();
             eprintln!("  reader pos = {}", pos);
             self.translator.update_pos(pos);
             reader.visit_operator(&mut self.translator)??;
+            let after_len = self.translator.get_instr_encoder_len();
+            if before_len != after_len {
+                self.translator.push_instr_offset(pos);
+                before_len = after_len;
+            }
         }
         reader.ensure_end()?;
         Ok(reader.original_position())

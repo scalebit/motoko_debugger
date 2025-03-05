@@ -170,6 +170,9 @@ pub trait WasmTranslator<'parser>: VisitOperator<'parser, Output = Result<(), Er
     /// in order to avoid frequent memory allocations and deallocations.
     type Allocations: Default;
 
+    /// Returns the current length of the instruction encoder.
+    fn get_instr_encoder_len(&self) -> usize;
+
     /// Sets up the translation process for the Wasm `bytes` and Wasm `module` header.
     ///
     /// - Returns `true` if the [`WasmTranslator`] is done with the translation process.
@@ -214,6 +217,8 @@ pub trait WasmTranslator<'parser>: VisitOperator<'parser, Output = Result<(), Er
     ///
     /// This information is mainly required for properly locating translation errors.
     fn update_pos(&mut self, pos: usize);
+
+    fn push_instr_offset(&mut self, offset: usize);
 
     /// Finishes constructing the Wasm function translation.
     ///
@@ -261,6 +266,10 @@ where
 {
     type Allocations = ReusableAllocations<T::Allocations>;
 
+    fn get_instr_encoder_len(&self) -> usize {
+        self.translator.get_instr_encoder_len()
+    }
+
     fn setup(&mut self, bytes: &[u8]) -> Result<bool, Error> {
         self.translator.setup(bytes)?;
         // Note: Wasm validation always need to be driven, therefore returning `Ok(false)`
@@ -286,6 +295,10 @@ where
 
     fn update_pos(&mut self, pos: usize) {
         self.pos = pos;
+    }
+
+    fn push_instr_offset(&mut self, offset: usize) {
+        self.translator.push_instr_offset(offset);
     }
 
     fn finish(
@@ -409,6 +422,10 @@ impl LazyFuncTranslator {
 impl WasmTranslator<'_> for LazyFuncTranslator {
     type Allocations = ();
 
+    fn get_instr_encoder_len(&self) -> usize {
+        0 // LazyFuncTranslator 不会生成任何指令,所以总是返回0
+    }
+
     fn setup(&mut self, bytes: &[u8]) -> Result<bool, Error> {
         self.module
             .engine()
@@ -445,6 +462,9 @@ impl WasmTranslator<'_> for LazyFuncTranslator {
 
     #[inline]
     fn update_pos(&mut self, _pos: usize) {}
+
+    #[inline]
+    fn push_instr_offset(&mut self, _offset: usize) {}
 
     #[inline]
     fn finish(
@@ -507,6 +527,10 @@ pub struct FuncTranslator {
 impl WasmTranslator<'_> for FuncTranslator {
     type Allocations = FuncTranslatorAllocations;
 
+    fn get_instr_encoder_len(&self) -> usize {
+        self.alloc.instr_encoder.instrs.instrs.len()
+    }
+
     fn setup(&mut self, _bytes: &[u8]) -> Result<bool, Error> {
         Ok(false)
     }
@@ -525,6 +549,10 @@ impl WasmTranslator<'_> for FuncTranslator {
     }
 
     fn update_pos(&mut self, _pos: usize) {}
+
+    fn push_instr_offset(&mut self, offset: usize) {
+        self.alloc.instr_encoder.instrs.offsets.push(offset);
+    }
 
     fn finish(
         mut self,
@@ -553,9 +581,13 @@ impl WasmTranslator<'_> for FuncTranslator {
                 })?;
         }
         let func_consts = self.alloc.stack.func_local_consts();
-        let instrs = self.alloc.instr_encoder.drain_instrs();
-        std::println!("instrs len = {}", instrs.len());
-        finalize(CompiledFuncEntity::new(len_registers, instrs, func_consts));
+        let (instrs, offsets) = self.alloc.instr_encoder.drain_instrs();
+        finalize(CompiledFuncEntity::new(
+            len_registers,
+            instrs,
+            offsets,
+            func_consts,
+        ));
         Ok(self.into_allocations())
     }
 }

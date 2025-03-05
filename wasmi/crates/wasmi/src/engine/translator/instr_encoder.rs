@@ -102,6 +102,7 @@ pub struct InstrEncoder {
 pub struct InstrSequence {
     /// Already encoded [`Instruction`] words.
     pub instrs: Vec<Instruction>,
+    pub offsets: Vec<usize>,
 }
 
 impl InstrSequence {
@@ -174,8 +175,10 @@ impl InstrSequence {
     /// # Note
     ///
     /// The [`InstrSequence`] will be in an empty state after this operation.
-    pub fn drain(&mut self) -> Drain<Instruction> {
-        self.instrs.drain(..)
+    pub fn drain_instrs(&mut self) -> (Drain<Instruction>, Drain<usize>) {
+        let instrs = self.instrs.drain(..);
+        let offsets = self.offsets.drain(..);
+        (instrs, offsets)
     }
 
     /// Returns a slice to the sequence of [`Instruction`] starting at `start`.
@@ -226,8 +229,8 @@ impl InstrEncoder {
     /// # Note
     ///
     /// The [`InstrEncoder`] will be in an empty state after this operation.
-    pub fn drain_instrs(&mut self) -> Drain<Instruction> {
-        self.instrs.drain()
+    pub fn drain_instrs(&mut self) -> (Drain<Instruction>, Drain<usize>) {
+        self.instrs.drain_instrs()
     }
 
     /// Creates a new unresolved label and returns its [`LabelRef`].

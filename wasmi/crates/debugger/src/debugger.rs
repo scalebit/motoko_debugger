@@ -13,13 +13,14 @@ use std::{usize, vec};
 use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
-use wasmi::engine::{self, executor, CallResults};
+use wasmi::engine::{self, executor, CallResults, EngineFunc};
 use wasmi::engine::{CallParams, Stack};
 use wasmi::{
     engine::executor::instrs::{ExecResult, Executor, Interceptor, Signal},
     func::FuncEntity,
     Val,
 };
+use wasmi_collections::arena::ArenaIndex;
 use wasmi_core::UntypedVal;
 use wasmi_ir::{Instruction, Reg, RegSpan};
 use wasmi_wasi::{WasiCtx, WasiCtxBuilder};
@@ -122,6 +123,20 @@ impl<'engine> MainDebugger<'engine> {
         } else {
             Err(anyhow::anyhow!("No execution context"))
         }
+    }
+
+    pub fn get_instr_offset(&self) -> Result<()> {
+        let executor = self.executor()?;
+        let executor = executor.borrow();
+        let frame = executor.stack.calls.frames.last().unwrap();
+        let func = frame.func.clone();
+
+        let code_map = get_engine().code_map();
+        let compiled_func = code_map.get(None, EngineFunc::from_usize(func as usize))?;
+        let offsets = compiled_func.offsets();
+        let offset = offsets.get(frame.instr_count as usize).unwrap();
+        println!("curr inst offset: {}", offset);
+        Ok(())
     }
 
     fn running_func(&self) -> Result<Func> {
@@ -361,6 +376,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 let initial_frame_depth = frame_depth(&executor.borrow());
                 let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth < frame_depth(&executor.borrow()) {
+                    self.get_instr_offset();
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         return Ok(last_signal);
@@ -383,6 +399,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 let initial_frame_depth = frame_depth(&executor.borrow());
                 let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth <= frame_depth(&executor.borrow()) {
+                    self.get_instr_offset();
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         println!("signal::break");
