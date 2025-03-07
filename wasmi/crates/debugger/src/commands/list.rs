@@ -45,10 +45,11 @@ pub fn display_source(line_info: LineInfo, printer: &dyn OutputPrinter) -> Resul
     use std::io::{BufRead, BufReader};
     let source = BufReader::new(File::open(line_info.filepath)?);
     // In case compiler can't determine source code location. Page 151.
-    if line_info.line == Some(0) || line_info.line == None {
+    if line_info.line.is_none() || line_info.line == None {
         return Ok(());
     }
     let range = line_info.line.map(|l| {
+        let l = l.get();
         if l < 20 {
             0..(l + 20)
         } else {
@@ -64,12 +65,12 @@ pub fn display_source(line_info: LineInfo, printer: &dyn OutputPrinter) -> Resul
         if !(should_display.unwrap_or(true)) {
             continue;
         }
-        let out = if Some(index as u64) == line_info.line {
+        let out = if Some(index as u64) == line_info.line.map(|l| l.get()) {
             let mut out = format!("-> {: <4} ", index);
             match line_info.column {
                 ColumnType::Column(col) => {
                     for (col_index, col_char) in line.chars().enumerate() {
-                        if (col_index + 1) as u64 == col {
+                        if (col_index + 1) as u64 == col.get() {
                             out = format!("{}\x1B[4m{}\x1B[0m", out, col_char);
                         } else {
                             out = format!("{}{}", out, col_char);

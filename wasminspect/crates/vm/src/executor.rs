@@ -184,7 +184,7 @@ impl Executor {
             Some(inst) => inst,
             None => return Err(Trap::NoMoreInstruction),
         };
-
+        println!("offset: {:?}", inst.offset);
         let signal = interceptor.execute_inst(inst)?; // 暂时不看 打在指令的断点
         let result = self.execute_inst(inst, module_index, store, interceptor, config)?;
         Ok(match (signal, result) {

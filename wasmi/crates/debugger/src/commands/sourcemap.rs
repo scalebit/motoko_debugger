@@ -1,13 +1,15 @@
+use std::num::NonZero;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ColumnType {
     LeftEdge,
-    Column(u64),
+    Column(NonZero<u64>),
 }
 
 impl From<ColumnType> for u64 {
     fn from(val: ColumnType) -> Self {
         match val {
-            ColumnType::Column(c) => c,
+            ColumnType::Column(c) => c.get(),
             ColumnType::LeftEdge => 0,
         }
     }
@@ -16,7 +18,7 @@ impl From<ColumnType> for u64 {
 #[derive(Clone, Debug)]
 pub struct LineInfo {
     pub filepath: String,
-    pub line: Option<u64>,
+    pub line: Option<NonZero<u64>>,
     pub column: ColumnType,
 }
 

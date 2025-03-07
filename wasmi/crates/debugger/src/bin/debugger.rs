@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use object::{Object, ObjectSection};
 
 use std::io::Read;
 use structopt::StructOpt;
@@ -39,7 +40,6 @@ struct Opts {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("warn"));
-
     let opts = Opts::from_args();
     let module_input = match opts.filepath {
         Some(filepath) => {
@@ -66,3 +66,4 @@ fn main() -> anyhow::Result<()> {
     }
     Ok(())
 }
+

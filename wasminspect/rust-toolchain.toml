@@ -1,4 +1,1 @@
-[toolchain]
-channel = "1.71.1"
-components = []
-profile = "minimal"
+1.69.0
