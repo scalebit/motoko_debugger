@@ -56,8 +56,20 @@ impl ModuleParser {
     /// If the Wasm bytecode stream fails to validate.
     unsafe fn parse_buffered_impl(mut self, mut buffer: &[u8]) -> Result<Module, Error> {
         let mut custom_sections = CustomSectionsBuilder::default();
-        let header = Self::parse_buffered_header(&mut self, &mut buffer, &mut custom_sections)?;
-        let builder = Self::parse_buffered_code(&mut self, &mut buffer, header, custom_sections)?;
+        let mut code_section_base_offset: Option<usize> = None;
+        let header = Self::parse_buffered_header(
+            &mut self,
+            &mut buffer,
+            &mut custom_sections,
+            &mut code_section_base_offset,
+        )?;
+        let builder = Self::parse_buffered_code(
+            &mut self,
+            &mut buffer,
+            header,
+            custom_sections,
+            code_section_base_offset,
+        )?;
         let module = Self::parse_buffered_data(&mut self, &mut buffer, builder)?;
         Ok(module)
     }
@@ -98,6 +110,7 @@ impl ModuleParser {
         &mut self,
         buffer: &mut &[u8],
         custom_sections: &mut CustomSectionsBuilder,
+        code_section_base_offset: &mut Option<usize>,
     ) -> Result<ModuleHeader, Error> {
         let mut header = ModuleHeaderBuilder::new(&self.engine);
         loop {
@@ -116,13 +129,12 @@ impl ModuleParser {
                 Payload::GlobalSection(section) => self.process_globals(section, &mut header),
                 Payload::ExportSection(section) => self.process_exports(section, &mut header),
                 Payload::StartSection { func, range } => {
-                    // println!("Payload::StartSection: {:?}", section);
                     self.process_start(func, range, &mut header)
                 }
                 Payload::ElementSection(section) => self.process_element(section, &mut header),
                 Payload::DataCountSection { count, range } => self.process_data_count(count, range),
                 Payload::CodeSectionStart { count, range, size } => {
-                    println!("Payload CodeSectionStart");
+                    *code_section_base_offset = Some(range.start.clone());
                     self.process_code_start(count, range, size)?;
                     Self::consume_buffer(consumed, buffer);
                     break;
@@ -162,12 +174,10 @@ impl ModuleParser {
         buffer: &mut &[u8],
         header: ModuleHeader,
         custom_sections: CustomSectionsBuilder,
+        code_section_base_offset: Option<usize>,
     ) -> Result<ModuleBuilder, Error> {
         loop {
-            eprintln!("\n------------------------");
-            eprintln!("buffer: {:?}", buffer);
             let (consumed, payload) = self.next_payload(buffer)?;
-            eprintln!("buffer: {:?}, consumed = {}", buffer, consumed);
             match payload {
                 Payload::CodeSectionEntry(func_body) => {
                     // Note: Unfortunately the `wasmparser` crate is missing an API
@@ -175,20 +185,13 @@ impl ModuleParser {
                     //       entry payload. Please remove this work around as soon as
                     //       such an API becomes available.
                     let bytes = Self::consume_buffer(consumed, buffer);
-                    eprintln!(
-                        "buffer: {:?}, consumed = {}, bytes{:?}",
-                        buffer, consumed, bytes
-                    );
                     let remaining = func_body.get_binary_reader().bytes_remaining();
                     let start = consumed - remaining;
-                    eprintln!("start {}", start);
                     let bytes = &bytes[start..];
-                    eprintln!("bytes {:?}", bytes);
-                    self.process_code_entry(func_body, bytes, &header)?;
+                    self.process_code_entry(func_body, bytes, &header, code_section_base_offset)?;
                 }
                 _ => break,
             }
-            eprintln!("------------------------\n");
         }
         Ok(ModuleBuilder::new(header, custom_sections))
     }

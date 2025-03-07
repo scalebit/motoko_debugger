@@ -114,11 +114,13 @@ impl ModuleParser {
     unsafe fn parse_streaming_impl(mut self, mut stream: impl Read) -> Result<Module, Error> {
         let mut custom_sections = CustomSectionsBuilder::default();
         let mut buffer = ParseBuffer::default();
+        let mut code_section_base_offset: Option<usize> = None;
         let header = Self::parse_streaming_header(
             &mut self,
             &mut stream,
             &mut buffer,
             &mut custom_sections,
+            &mut code_section_base_offset,
         )?;
         let builder = Self::parse_streaming_code(
             &mut self,
@@ -126,6 +128,7 @@ impl ModuleParser {
             &mut buffer,
             header,
             custom_sections,
+            code_section_base_offset,
         )?;
         let module = Self::parse_streaming_data(&mut self, &mut stream, &mut buffer, builder)?;
         Ok(module)
@@ -146,6 +149,7 @@ impl ModuleParser {
         stream: &mut impl Read,
         buffer: &mut ParseBuffer,
         custom_sections: &mut CustomSectionsBuilder,
+        code_section_base_offset: &mut Option<usize>,
     ) -> Result<ModuleHeader, Error> {
         let mut header = ModuleHeaderBuilder::new(&self.engine);
         loop {
@@ -190,6 +194,7 @@ impl ModuleParser {
                             self.process_data_count(count, range)
                         }
                         Payload::CodeSectionStart { count, range, size } => {
+                            *code_section_base_offset = Some(range.start.clone());
                             self.process_code_start(count, range, size)?;
                             ParseBuffer::consume(buffer, consumed);
                             break;
@@ -224,6 +229,7 @@ impl ModuleParser {
         buffer: &mut ParseBuffer,
         header: ModuleHeader,
         custom_sections: CustomSectionsBuilder,
+        code_section_base_offset: Option<usize>,
     ) -> Result<ModuleBuilder, Error> {
         loop {
             match self.parser.parse(&buffer[..], self.eof)? {
@@ -240,7 +246,7 @@ impl ModuleParser {
                             let remaining = func_body.get_binary_reader().bytes_remaining();
                             let start = consumed - remaining;
                             let bytes = &buffer[start..consumed];
-                            self.process_code_entry(func_body, bytes, &header)?;
+                            self.process_code_entry(func_body, bytes, &header, code_section_base_offset)?;
                         }
                         _ => break,
                     }

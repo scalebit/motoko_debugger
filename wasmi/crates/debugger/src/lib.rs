@@ -23,6 +23,10 @@ pub fn try_load_dwarf(
 ) -> Result<()> {
     use dwarf::transform_dwarf;
     let debug_info = transform_dwarf(buffer)?;
+
+    // for (offset, line) in debug_info.sourcemap.address_sorted_rows.iter() {
+    //     println!("offset: {}, line: {:?}", offset, line);
+    // }
     context.sourcemap = Box::new(debug_info.sourcemap);
     context.subroutine = Box::new(debug_info.subroutine);
     Ok(())

@@ -350,6 +350,61 @@ fn evaluate_variable_location<R: gimli::Reader>(
 
 use std::path::Path;
 
+pub fn transform_debug_line_without_unit<R: gimli::Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    debug_line: &DebugLine<R>,
+) -> Result<DwarfUnitSourceMap> {
+    let offset = 0;
+
+    let program = debug_line
+        .program(offset, 4, None, None)
+        .expect("parsable debug_line");
+
+    let header = program.header();
+
+    let sequence_base_index: usize;
+    let mut dirs = vec![];
+    if header.version() <= 4 {
+        dirs.push("./".to_string());
+        sequence_base_index = 1;
+    } else {
+        sequence_base_index = 0;
+    }
+
+    for dir in header.include_directories() {
+        dirs.push(clone_string_attribute(dwarf, unit, dir.clone()).expect("parsable dir string"));
+    }
+    let mut files = Vec::new();
+    for file_entry in header.file_names() {
+        let dir = dirs[file_entry.directory_index() as usize].clone();
+        let dir_path = Path::new(&dir);
+        let mut path = dir_path.join(clone_string_attribute(dwarf, unit, file_entry.path_name())?);
+        if !path.is_absolute() {
+            if let Some(comp_dir) = unit.comp_dir.clone() {
+                let comp_dir = String::from_utf8(comp_dir.to_slice()?.to_vec()).unwrap();
+                path = Path::new(&comp_dir).join(path);
+            }
+        }
+        files.push(path);
+    }
+
+    let mut count = 0;
+    let mut rows = program.rows();
+    let mut sorted_rows = BTreeMap::new();
+    while let Some((_, row)) = rows.next_row()? {
+        println!("address {} row: {:?}", row.address(), row);
+        sorted_rows.insert(row.address(), *row);
+    }
+
+    let sorted_rows: Vec<_> = sorted_rows.into_iter().collect();
+    Ok(DwarfUnitSourceMap {
+        address_sorted_rows: sorted_rows,
+        paths: files,
+        sequence_base_index,
+    })
+}
+
+
 pub fn transform_debug_line<R: gimli::Reader>(
     unit: &Unit<R, R::Offset>,
     root: &DebuggingInformationEntry<R>,
@@ -362,7 +417,7 @@ pub fn transform_debug_line<R: gimli::Reader>(
             return Err(anyhow!("Debug line offset is not found"));
         }
     };
-
+    println!("offset: {offset:?}, {:?}", unit.header.address_size());
     let program = debug_line
         .program(offset, unit.header.address_size(), None, None)
         .expect("parsable debug_line");
@@ -395,11 +450,14 @@ pub fn transform_debug_line<R: gimli::Reader>(
         files.push(path);
     }
 
+    let mut count = 0;
     let mut rows = program.rows();
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
+        // println!("address {} row: {:?}", row.address(), row);
         sorted_rows.insert(row.address(), *row);
     }
+
     let sorted_rows: Vec<_> = sorted_rows.into_iter().collect();
     Ok(DwarfUnitSourceMap {
         address_sorted_rows: sorted_rows,
@@ -431,7 +489,7 @@ impl DwarfUnitSourceMap {
 
 use std::cell::RefCell;
 pub struct DwarfSourceMap {
-    address_sorted_rows: Vec<(u64, sourcemap::LineInfo)>,
+    pub address_sorted_rows: Vec<(u64, sourcemap::LineInfo)>,
     directory_map: RefCell<HashMap<String, String>>,
 }
 

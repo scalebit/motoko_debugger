@@ -147,27 +147,28 @@ impl<'engine> MainDebugger<'engine> {
         }
     }
 
-    pub fn lookup_func(&self, name: &str) -> Result<Func> {
+    pub fn lookup_func_by_name(&self, name: &str) -> Option<Func> {
         let store = get_store();
         let instance = self.instance.as_ref().unwrap();
-
-        if let Some(func) = instance.get_func(store, name) {
-            Ok(func)
-        } else {
-            Err(anyhow!("Entry function {} not found", name))
-        }
+        instance.get_func(store, name)
     }
 
-    pub fn lookup_start_func(&self) -> Func {
+    pub fn lookup_func_by_index(&self, index: u32) -> Option<Func> {
+        let store = get_store();
+        let instance = self.instance.as_ref().unwrap();
+        instance.get_func_by_index(store, index)
+    }
+
+    pub fn lookup_start_func(&self) -> Option<Func> {
         let instance = self.instance.as_ref().expect("no instance");
         let store = get_store();
-        let start_idx = self
-            .start_fn_idx
-            .unwrap_or_else(|| panic!("module do not have `_start` function"));
-
-        instance
-            .get_func_by_index(store, start_idx)
-            .unwrap_or_else(|| panic!("encountered invalid start function after validation"))
+        let start_fn = if let Some(idx) =  self.start_fn_idx {
+            instance
+            .get_func_by_index(store, idx)
+        } else {
+            None
+        };
+        start_fn
     }
 
     pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<()> {
@@ -231,12 +232,21 @@ impl<'engine> MainDebugger<'engine> {
 
     pub fn run_step(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<()> {
         let func = if let Some(name) = name {
-            self.lookup_func(name)?
+            let f = if let std::result::Result::Ok(index) =  name.parse::<u32>() {
+                self.lookup_func_by_index(index)
+            } else {
+                self.lookup_func_by_name(name)
+            };
+            f
         } else {
             self.lookup_start_func()
         };
 
-        self.execute_func(func, &args)?;
+        if let Some(func) = func {
+            self.execute_func(func, &args)?;
+        } else {
+            return Err(anyhow::anyhow!("No function {} found", name.unwrap_or("start")));
+        }
         Ok(())
     }
 
@@ -429,6 +439,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         let executor = self.executor()?;
 
         loop {
+            self.get_instr_offset()?;
             match executor.borrow_mut().execute_step(store, self)? {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
@@ -449,29 +460,39 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult> {
         let func = if let Some(name) = name {
-            self.lookup_func(name)?
+            let f = if let std::result::Result::Ok(index) =  name.parse::<u32>() {
+                self.lookup_func_by_index(index)
+            } else {
+                self.lookup_func_by_name(name)
+            };
+            f
         } else {
             self.lookup_start_func()
         };
 
-        println!(
-            "over global A: {:?}",
-            self.instance()?
-                .get_global(get_store(), "A")
-                .unwrap()
-                .get(get_store())
-        );
+        if func.is_none() {
+            return Err(anyhow::anyhow!("No function {} found", name.unwrap_or("start")));
+        }
 
+        // println!(
+        //     "over global A: {:?}",
+        //     self.instance()?
+        //         .get_global(get_store(), "A")
+        //         .unwrap()
+        //         .get(get_store())
+        // );
+
+        let func = func.unwrap();
         self.run_func = Some(func);
         self.execute_func(func, &args)?;
         let a = self.process();
-        println!(
-            "over global A: {:?}",
-            self.instance()?
-                .get_global(get_store(), "A")
-                .unwrap()
-                .get(get_store())
-        );
+        // println!(
+        //     "over global A: {:?}",
+        //     self.instance()?
+        //         .get_global(get_store(), "A")
+        //         .unwrap()
+        //         .get(get_store())
+        // );
         return a;
     }
 

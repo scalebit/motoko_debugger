@@ -13,7 +13,7 @@ impl From<ColumnType> for u64 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LineInfo {
     pub filepath: String,
     pub line: Option<u64>,

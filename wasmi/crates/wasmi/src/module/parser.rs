@@ -3,37 +3,18 @@ use super::{
     export::ExternIdx,
     global::Global,
     import::{FuncTypeIdx, Import},
-    CustomSectionsBuilder,
-    ElementSegment,
-    FuncIdx,
-    ModuleBuilder,
-    ModuleHeader,
+    CustomSectionsBuilder, ElementSegment, FuncIdx, ModuleBuilder, ModuleHeader,
 };
 use crate::{
     engine::{EnforcedLimitsError, EngineFunc},
-    Engine,
-    Error,
-    FuncType,
-    MemoryType,
-    TableType,
+    Engine, Error, FuncType, MemoryType, TableType,
 };
 use core::ops::Range;
 use std::{boxed::Box, println};
 use wasmparser::{
-    CustomSectionReader,
-    DataSectionReader,
-    ElementSectionReader,
-    Encoding,
-    ExportSectionReader,
-    FunctionBody,
-    FunctionSectionReader,
-    GlobalSectionReader,
-    ImportSectionReader,
-    MemorySectionReader,
-    Parser as WasmParser,
-    Payload,
-    TableSectionReader,
-    TypeSectionReader,
+    CustomSectionReader, DataSectionReader, ElementSectionReader, Encoding, ExportSectionReader,
+    FunctionBody, FunctionSectionReader, GlobalSectionReader, ImportSectionReader,
+    MemorySectionReader, Parser as WasmParser, Payload, TableSectionReader, TypeSectionReader,
     Validator,
 };
 
@@ -482,6 +463,7 @@ impl ModuleParser {
         func_body: FunctionBody,
         bytes: &[u8],
         header: &ModuleHeader,
+        code_section_base_offset: Option<usize>,
     ) -> Result<(), Error> {
         let (func, engine_func) = self.next_func(header);
         let module = header.clone();
@@ -490,8 +472,15 @@ impl ModuleParser {
             Some(validator) => Some(validator.code_section_entry(&func_body)?),
             None => None,
         };
-        self.engine
-            .translate_func(func, engine_func, offset, bytes, module, func_to_validate)?;
+        self.engine.translate_func(
+            func,
+            engine_func,
+            offset,
+            bytes,
+            module,
+            func_to_validate,
+            code_section_base_offset,
+        )?;
         Ok(())
     }
 

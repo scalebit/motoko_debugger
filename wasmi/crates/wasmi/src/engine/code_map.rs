@@ -618,7 +618,7 @@ impl UncompiledFuncEntity {
                 };
                 let validator = func_to_validate.into_validator(allocs.1);
                 let translator = ValidatingFuncTranslator::new(validator, translator)?;
-                let allocs = FuncTranslationDriver::new(0, &bytes[..], translator)?.translate(
+                let allocs = FuncTranslationDriver::new(0, &bytes[..], None, translator)?.translate(
                     |compiled_func| {
                         result.write(compiled_func);
                     },
@@ -628,7 +628,7 @@ impl UncompiledFuncEntity {
             None => {
                 let allocs = engine.get_translation_allocs();
                 let translator = FuncTranslator::new(func_idx, module, allocs)?;
-                let allocs = FuncTranslationDriver::new(0, &bytes[..], translator)?.translate(
+                let allocs = FuncTranslationDriver::new(0, &bytes[..],  None,translator)?.translate(
                     |compiled_func| {
                         result.write(compiled_func);
                     },
