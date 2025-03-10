@@ -1,6 +1,0 @@
-/target
-**/*.rs.bk
-.wabt
-.wasi-sdk
-/vendor
-.vscode
