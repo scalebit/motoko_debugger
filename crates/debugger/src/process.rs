@@ -82,7 +82,7 @@ fn history_file_path() -> String {
     //     "{}/.wasminspect-history",
     //     std::env::var_os("HOME").unwrap().to_str().unwrap()
     // )
-    format!("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/.wasminspect-history")
+    format!("./.motoko-debugger-history")
 }
 
 impl Interactive {
