@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 
 use gimli::{
-    AbbreviationsCache, AttributeValue, DebugAbbrev, DebugAddr, DebugAranges, DebugInfo, DebugInfoOffset, DebugInfoUnitHeadersIter, DebugLine, DebugLineStr, DebugLoc, DebugLocLists, DebugRanges, DebugRngLists, DebugStr, DebugStrOffsets, DebugTypes, DebuggingInformationEntry, DwarfFileType, EndianSlice, LineRow, LittleEndian, LocationLists, RangeLists, Unit, UnitHeader, UnitOffset, UnitSectionOffset
+    AbbreviationsCache, AttributeValue, DebugAbbrev, DebugAddr, DebugAranges, DebugInfo, DebugInfoOffset, DebugInfoUnitHeadersIter, DebugLine, DebugLineOffset, DebugLineStr, DebugLoc, DebugLocLists, DebugRanges, DebugRngLists, DebugStr, DebugStrOffsets, DebugTypes, DebuggingInformationEntry, DwarfFileType, EndianSlice, LineRow, LittleEndian, LocationLists, RangeLists, ReaderOffset, Unit, UnitHeader, UnitOffset, UnitSectionOffset
 };
 use log::trace;
 use std::{collections::{BTreeMap, HashMap}, fs::OpenOptions, io::Write};
@@ -109,7 +109,9 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
     let mut sourcemaps = Vec::new();
     let mut subroutines = Vec::new();
 
+    let mut count: i32 = 0;
     while let Some(header) = headers.next()? {
+        count += 1;
         let unit = dwarf.unit(header)?;
         let mut entries = unit.entries();
         let root = match entries.next_dfs()? {
@@ -128,8 +130,13 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
         if let UnitSectionOffset::DebugInfoOffset(debug_info_offset) = header.offset() {
             subroutines.append(&mut transform_subprogram(&dwarf, &unit, debug_info_offset)?);
         }
-        
     }
+
+    if count == 0 {
+        transform_debug_line_without_debug_info(&dwarf,&dwarf.debug_line);
+    }
+
+
     Ok(DwarfDebugInfo {
         sourcemap: DwarfSourceMap::new(sourcemaps),
         subroutine: DwarfSubroutineMap {
@@ -428,6 +435,60 @@ pub fn transform_debug_line<R: gimli::Reader>(
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
         if let Some(_line) = row.line() {
+            sorted_rows.insert(row.address(), *row);
+        }
+    }
+
+    let sorted_rows: Vec<_> = sorted_rows.into_iter().collect();
+    Ok(DwarfUnitSourceMap {
+        address_sorted_rows: sorted_rows,
+        paths: files,
+        sequence_base_index,
+    })
+}
+
+
+pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
+    dwarf: &gimli::Dwarf<R>,
+    debug_line: &DebugLine<R>,
+) -> Result<DwarfUnitSourceMap> {
+    let offset = DebugLineOffset::<R::Offset>(ReaderOffset::from_u32(0));
+
+    let program = debug_line
+        .program(offset, 4, None, None)
+        .expect("parsable debug_line");
+
+    let header = program.header();
+
+    let sequence_base_index: usize;
+    let mut dirs = vec![];
+    if header.version() <= 4 {
+        dirs.push("./".to_string());
+        sequence_base_index = 1;
+    } else {
+        sequence_base_index = 0;
+    }
+
+    for dir in header.include_directories() {
+        let s = clone_string_attribute_with_out_unit(dwarf,  dir.clone()).expect("parsable dir string");
+        dirs.push(s);
+    }
+    let mut files = Vec::new();
+    for file_entry in header.file_names() {
+        let dir = dirs[file_entry.directory_index() as usize].clone();
+        let dir_path = Path::new(&dir);
+        let mut path = dir_path.join(clone_string_attribute_with_out_unit(dwarf,  file_entry.path_name())?);
+        files.push(path);
+    }
+
+
+    let mut rows = program.rows();
+    let mut sorted_rows = BTreeMap::new();
+    while let Some((_, row)) = rows.next_row()? {
+        if let Some(_line) = row.line()   {
+            if row.file_index() == 0 {
+                println!(" file: {:?}, line: {:?}, column: {:?}",  files[0], row.line(), row.column());
+            }
             sorted_rows.insert(row.address(), *row);
         }
     }

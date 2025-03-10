@@ -18,3 +18,10 @@ pub use self::snapshots::preview_0::{
     add_wasi_snapshot_preview0_to_linker_builder as add_preview0_to_linker_builder,
     AddWasiPreview0,
 };
+
+#[doc(inline)]
+pub use self::snapshots::motoko_syscall::{
+    add_motoko_syscall_to_linker as add_motoko_syscall_to_linker,
+    add_motoko_syscall_to_linker_builder as add_motoko_syscall_to_linker_builder,
+    AddWasiMotokoSyscall,
+};

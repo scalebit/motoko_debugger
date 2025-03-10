@@ -397,7 +397,6 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 let initial_frame_depth = frame_depth(&executor.borrow());
                 let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth < frame_depth(&executor.borrow()) {
-                    self.get_instr_offset();
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         return Ok(last_signal);
@@ -407,20 +406,15 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                     }
                 }
 
-                // println!(
-                //     "over global A: {:?}",
-                //     self.instance()?
-                //         .get_global(&store, "A")
-                //         .unwrap()
-                //         .get(&store)
-                // );
+                if let Some(gloval_a) = self.instance()?.get_global(&store, "A") {
+                    println!("over global A: {:?}", gloval_a.get(&store));
+                }
                 Ok(last_signal)
             }
             Out => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
                 let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth <= frame_depth(&executor.borrow()) {
-                    self.get_instr_offset();
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         println!("signal::break");
@@ -431,13 +425,9 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                     }
                 }
 
-                println!(
-                    "out global A: {:?}",
-                    self.instance()?
-                        .get_global(&store, "A")
-                        .unwrap()
-                        .get(&store)
-                );
+                if let Some(gloval_a) = self.instance()?.get_global(&store, "A") {
+                    println!("over global A: {:?}", gloval_a.get(&store));
+                }
 
                 Ok(last_signal)
             }
@@ -542,6 +532,9 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
 
         wasmi_wasi::add_preview0_to_linker(&mut linker, |ctx| ctx).map_err(|error| {
             anyhow!("failed to add preview0 WASI definitions to the linker: {error}")
+        })?;
+        wasmi_wasi::add_motoko_syscall_to_linker(&mut linker, |ctx| ctx).map_err(|error| {
+            anyhow!("failed to add motoko syscall to the linker: {error}")
         })?;
 
         let instance = linker.instantiate(&mut store, &module).map(|pre| {

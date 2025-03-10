@@ -2,6 +2,7 @@ use super::command::{Command, CommandContext, CommandResult};
 use super::debugger::{Debugger, OutputPrinter};
 use super::sourcemap::{ColumnType, LineInfo, SourceMap};
 use anyhow::{anyhow, Result};
+use gimli::FileEntry;
 
 pub struct ListCommand {}
 
@@ -26,8 +27,8 @@ impl<D: Debugger> Command<D> for ListCommand {
         context: &CommandContext,
         _args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
-        // let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
-        // display_source(line_info, context.printer.as_ref())?;
+        let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
+        display_source(line_info, context.printer.as_ref())?;
         Ok(None)
     }
 }
@@ -43,7 +44,12 @@ pub fn next_line_info<D: Debugger>(debugger: &D, sourcemap: &dyn SourceMap) -> R
 pub fn display_source(line_info: LineInfo, printer: &dyn OutputPrinter) -> Result<()> {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
-    let source = BufReader::new(File::open(line_info.filepath)?);
+    let file = if let Ok(file_entry)  = File::open(&line_info.filepath) {
+        file_entry
+    } else {
+        return Err(anyhow::anyhow!("File not found: {:?}", line_info.filepath));
+    };
+    let source = BufReader::new(file);
     // In case compiler can't determine source code location. Page 151.
     if line_info.line.is_none() || line_info.line == None {
         return Ok(());

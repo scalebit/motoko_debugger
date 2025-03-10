@@ -543,11 +543,9 @@ impl<T> Linker<T> {
         let import_name = import.import_name();
         let module_name = import.module();
         let field_name = import.name();
-        println!("--------1111111---------");
         let resolved = self
             .get_definition(context.as_context(), module_name, field_name)
             .ok_or_else(|| LinkerError::missing_definition(&import))?;
-        println!("--------1111111---------");
         let invalid_type = || LinkerError::invalid_type_definition(&import, &resolved.ty(&context));
         match import.ty() {
             ExternType::Func(expected_type) => {

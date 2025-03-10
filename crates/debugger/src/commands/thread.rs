@@ -98,8 +98,8 @@ impl<D: Debugger> Command<D> for ThreadCommand {
             }
             Opts::StepOut => {
                 debugger.step(StepStyle::Out)?;
-                // let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
-                // display_source(line_info, context.printer.as_ref())?;
+                let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
+                display_source(line_info, context.printer.as_ref())?;
             }
             Opts::StepInstIn | Opts::StepInstOver => {
                 let style = match opts {

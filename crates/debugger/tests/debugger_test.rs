@@ -49,7 +49,7 @@ fn test_load_and_step() -> anyhow::Result<()> {
     // let wasm_file_path = std::path::Path::new(
     //     "/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/test_step.wasm"
     // );
-    let bytes = load_file("/data/zhangxiao/rust-project/debugger/motoko_debugger/wasmi/crates/debugger/tests/test_step.wasm")?;
+    let bytes = load_file("/data/zhangxiao/rust-project/debugger/motoko_debugger/crates/debugger/tests/test_step.wasm")?;
     process
         .debugger
         .load_main_module(&bytes, String::from("test_step.wasm"))?;
