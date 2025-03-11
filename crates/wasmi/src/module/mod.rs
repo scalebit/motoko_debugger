@@ -46,6 +46,7 @@ use crate::{
 };
 use core::{iter, slice::Iter as SliceIter};
 use std::{boxed::Box, sync::Arc};
+use custom_section::NameSectionInner;
 use wasmparser::{FuncValidatorAllocations, Parser, ValidPayload, Validator};
 
 /// A parsed and validated WebAssembly module.
@@ -289,6 +290,10 @@ impl Module {
     /// Returns the [`Engine`] used during creation of the [`Module`].
     pub fn engine(&self) -> &Engine {
         &self.inner.engine
+    }
+
+    pub fn name_custom_sections(&self) -> &NameSectionInner {
+        &self.inner.custom_sections.name_inner
     }
 
     /// Returns a shared reference to the [`ModuleHeaderInner`].

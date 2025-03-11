@@ -19,15 +19,22 @@ pub(crate) fn clone_string_attribute_with_out_unit<R: gimli::Reader>(
     attr: gimli::AttributeValue<R>,
 ) -> Result<String> {
 
-    let string = match attr {
-        AttributeValue::String(string) => Ok(string),
-        AttributeValue::DebugStrRef(offset) => dwarf.string(offset),
-        AttributeValue::DebugStrRefSup(offset) => dwarf.sup_string(offset),
-        AttributeValue::DebugLineStrRef(offset) => dwarf.line_string(offset),
-        // AttributeValue::DebugStrOffsetsIndex(index) => Ok("".to_string()),
-        _ => Err(Error::ExpectedStringAttributeValue),
-    };
+    // let string = match attr {
+    //     AttributeValue::String(string) => Ok(string),
+    //     AttributeValue::DebugStrRef(offset) => dwarf.string(offset),
+    //     AttributeValue::DebugStrRefSup(offset) => dwarf.sup_string(offset),
+    //     AttributeValue::DebugLineStrRef(offset) => dwarf.line_string(offset),
+    //     // AttributeValue::DebugStrOffsetsIndex(index) => Ok("".to_string()),
+    //     _ => Err(Error::ExpectedStringAttributeValue),
+    // };
 
+    let string = match attr {
+            AttributeValue::String(string) => Ok(string),
+            AttributeValue::DebugStrRef(offset) => dwarf.debug_str.get_str(offset),
+            AttributeValue::DebugStrRefSup(offset) => dwarf.debug_str_sup.get_str(offset),
+            AttributeValue::DebugLineStrRef(offset) => dwarf.debug_line_str.get_str(offset),
+            _ => Err(Error::ExpectedStringAttributeValue),
+        };
     Ok(string?
         .to_string()?
         .as_ref()

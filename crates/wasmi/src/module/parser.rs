@@ -10,7 +10,7 @@ use crate::{
     Engine, Error, FuncType, MemoryType, TableType,
 };
 use core::ops::Range;
-use std::{boxed::Box, println};
+use std::{boxed::Box, collections::HashMap, println, string::{String, ToString}, vec::{self, Vec}};
 use wasmparser::{
     CustomSectionReader, DataSectionReader, ElementSectionReader, Encoding, ExportSectionReader,
     FunctionBody, FunctionSectionReader, GlobalSectionReader, ImportSectionReader,
@@ -493,7 +493,38 @@ impl ModuleParser {
         if self.engine.config().get_ignore_custom_sections() {
             return Ok(());
         }
-        custom_sections.push(reader.name(), reader.data());
+
+        if reader.name() == "name" {
+            let mut func_names = HashMap::new();
+            let mut local_names = HashMap::new();
+            let mut global_names = HashMap::new();
+
+            let section =
+                wasmparser::NameSectionReader::new(reader.data(), reader.data_offset());
+            
+            for a in section.into_iter() {
+                match a {
+                    std::result::Result::Ok(name) => {
+                        match name {
+                            wasmparser::Name::Function(naming) => {
+                                collect_nameing(naming, &mut func_names);
+                            },
+                            wasmparser::Name::Global(naming) => {
+                                collect_nameing(naming, &mut global_names);
+                            },
+                            wasmparser::Name::Local(indrect_nameing) => {
+                                collect_indrect_nameing(indrect_nameing, &mut local_names);
+                            }
+                            _ => {}
+                        }
+                    }
+                    Err(_) => {}
+                }
+            } 
+            custom_sections.set_name_section(func_names, local_names, global_names);
+        } else {
+            custom_sections.push(reader.name(), reader.data());
+        }
         Ok(())
     }
 
@@ -505,5 +536,41 @@ impl ModuleParser {
             }
         }
         panic!("encountered unsupported, unexpected or malformed Wasm payload: {payload:?}")
+    }
+}
+
+
+fn collect_nameing<'a>(
+    naming: wasmparser::SectionLimited<'a, wasmparser::Naming<'a>>,  
+    results: &mut HashMap<u32, String>,
+) {
+    for item in naming.into_iter() {
+        match item {
+            std::result::Result::Ok(nameing) => {
+                results.insert(nameing.index, nameing.name.to_string());
+            }
+            _ => {}
+        }
+    }
+}
+
+fn collect_indrect_nameing<'a>(
+    indrect_nameing: wasmparser::SectionLimited<'a, wasmparser::IndirectNaming<'a>>,  
+    results: &mut HashMap<u32, String>,
+) {
+    for item1 in indrect_nameing.into_iter() {
+        match item1 {
+            std::result::Result::Ok(func_naming) => {
+                for item2 in func_naming.names.into_iter() {
+                    match item2 {
+                        std::result::Result::Ok(nameing) => {
+                            results.insert(nameing.index, nameing.name.to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }

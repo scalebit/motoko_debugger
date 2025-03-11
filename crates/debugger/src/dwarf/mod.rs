@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Context, Result};
-
 use gimli::{
-    AbbreviationsCache, AttributeValue, DebugAbbrev, DebugAddr, DebugAranges, DebugInfo, DebugInfoOffset, DebugInfoUnitHeadersIter, DebugLine, DebugLineOffset, DebugLineStr, DebugLoc, DebugLocLists, DebugRanges, DebugRngLists, DebugStr, DebugStrOffsets, DebugTypes, DebuggingInformationEntry, DwarfFileType, EndianSlice, LineRow, LittleEndian, LocationLists, RangeLists, ReaderOffset, Unit, UnitHeader, UnitOffset, UnitSectionOffset
+    AttributeValue, CompilationUnitHeader, DebugAbbrev, DebugAddr, DebugInfo, DebugInfoOffset, DebugLine, DebugLineOffset, DebugLineStr, DebugLoc, DebugLocLists, DebugRanges, DebugRngLists, DebugStr, DebugStrOffsets, DebugTypes, DebuggingInformationEntry, EndianSlice, LineRow, LittleEndian, LocationLists, RangeLists, ReaderOffset, Unit, UnitOffset
 };
 use log::trace;
-use std::{collections::{BTreeMap, HashMap}, fs::OpenOptions, io::Write};
+use std::collections::{BTreeMap, HashMap};
 
 mod format;
 mod types;
@@ -30,72 +29,53 @@ pub fn parse_dwarf(module: &[u8]) -> Result<Dwarf> {
     let try_get = |key: &str| sections.get(key).with_context(|| format!("no {}", key));
     let endian = LittleEndian;
     let debug_str = match sections.get(".debug_str") {
-        Some(section) => {
-            DebugStr::from(EndianSlice::new(section, endian))
-        },
+        Some(section) => DebugStr::from(EndianSlice::new(section, endian)),
         None => DebugStr::from(EndianSlice::new(EMPTY_SECTION, endian)),
     };
     let debug_abbrev = match sections.get(".debug_abbrev") {
-        Some(section) => {
-            DebugAbbrev::new(section, endian)
-        },
+        Some(section) => DebugAbbrev::new(section, endian),
         None => DebugAbbrev::new(EMPTY_SECTION, endian),
     };
     let debug_info = match sections.get(".debug_info") {
-        Some(section) => {
-            DebugInfo::new(section, endian)
-        },
+        Some(section) => DebugInfo::new(section, endian),
         None => DebugInfo::new(EMPTY_SECTION, endian),
     };
     let debug_line = match sections.get(".debug_line") {
-        Some(section) => {
-            DebugLine::new(section, endian)
-        },
+        Some(section) => DebugLine::new(section, endian),
         None => DebugLine::new(EMPTY_SECTION, endian),
     };
     let debug_addr = DebugAddr::from(EndianSlice::new(EMPTY_SECTION, endian));
     let debug_line_str = match sections.get(".debug_line_str") {
-        Some(section) => {
-            DebugLineStr::from(EndianSlice::new(section, endian))
-        },
+        Some(section) => DebugLineStr::from(EndianSlice::new(section, endian)),
         None => DebugLineStr::from(EndianSlice::new(EMPTY_SECTION, endian)),
     };
+    let debug_str_sup = DebugStr::from(EndianSlice::new(EMPTY_SECTION, endian));
     let debug_ranges = match sections.get(".debug_ranges") {
-        Some(section) => {
-            DebugRanges::new(section, endian)
-        },
+        Some(section) => DebugRanges::new(section, endian),
         None => DebugRanges::new(EMPTY_SECTION, endian),
     };
     let debug_rnglists = DebugRngLists::new(EMPTY_SECTION, endian);
     let ranges = RangeLists::new(debug_ranges, debug_rnglists);
     let debug_loc = match sections.get(".debug_loc") {
-        Some(section) => {
-            DebugLoc::new(section, endian)
-        },
+        Some(section) => DebugLoc::new(section, endian),
         None => DebugLoc::new(EMPTY_SECTION, endian),
     };
-    
     let debug_loclists = DebugLocLists::new(EMPTY_SECTION, endian);
     let locations = LocationLists::new(debug_loc, debug_loclists);
     let debug_str_offsets = DebugStrOffsets::from(EndianSlice::new(EMPTY_SECTION, endian));
     let debug_types = DebugTypes::from(EndianSlice::new(EMPTY_SECTION, endian));
-    
-    let debug_aranges = DebugAranges::new(EMPTY_SECTION, endian);
     Ok(Dwarf {
         debug_abbrev,
         debug_addr,
-        debug_aranges,
         debug_info,
         debug_line,
         debug_line_str,
         debug_str,
         debug_str_offsets,
-        sup: None,
+        debug_str_sup,
         debug_types,
         locations,
         ranges,
-        file_type: DwarfFileType::default(),
-        abbreviations_cache: AbbreviationsCache::new()
     })
 }
 
@@ -108,17 +88,13 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
     let mut headers = dwarf.units();
     let mut sourcemaps = Vec::new();
     let mut subroutines = Vec::new();
-
-    let mut count: i32 = 0;
+    let mut count = 0;
     while let Some(header) = headers.next()? {
         count += 1;
         let unit = dwarf.unit(header)?;
         let mut entries = unit.entries();
         let root = match entries.next_dfs()? {
-            Some((depth_delta, entry)) => {
-                assert_eq!(depth_delta, 0);
-                entry
-            },
+            Some((_, entry)) => entry,
             None => continue,
         };
         sourcemaps.push(transform_debug_line(
@@ -127,15 +103,12 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
             &dwarf,
             &dwarf.debug_line,
         )?);
-        if let UnitSectionOffset::DebugInfoOffset(debug_info_offset) = header.offset() {
-            subroutines.append(&mut transform_subprogram(&dwarf, &unit, debug_info_offset)?);
-        }
+        subroutines.append(&mut transform_subprogram(&dwarf, &unit, header.offset())?);
     }
 
-    if count == 0 {
-        transform_debug_line_without_debug_info(&dwarf,&dwarf.debug_line);
-    }
-
+    // if count == 0 && !dwarf.debug_line.is_empty() {
+    //     transform_debug_line_without_debug_info( &dwarf,&dwarf.debug_line);
+    // }
 
     Ok(DwarfDebugInfo {
         sourcemap: DwarfSourceMap::new(sourcemaps),
@@ -392,13 +365,8 @@ pub fn transform_debug_line<R: gimli::Reader>(
             return Err(anyhow!("Debug line offset is not found"));
         }
     };
-
     let program = debug_line
-        .program(
-            offset, 
-            unit.header.address_size(),
-         None, 
-         None)
+        .program(offset, unit.header.address_size(), None, None)
         .expect("parsable debug_line");
 
     let header = program.header();
@@ -413,8 +381,7 @@ pub fn transform_debug_line<R: gimli::Reader>(
     }
 
     for dir in header.include_directories() {
-        let s = clone_string_attribute(dwarf, unit, dir.clone()).expect("parsable dir string");
-        dirs.push(s);
+        dirs.push(clone_string_attribute(dwarf, unit, dir.clone()).expect("parsable dir string"));
     }
     let mut files = Vec::new();
     for file_entry in header.file_names() {
@@ -430,13 +397,12 @@ pub fn transform_debug_line<R: gimli::Reader>(
         files.push(path);
     }
 
-
+    let mut count = 0;
     let mut rows = program.rows();
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
-        if let Some(_line) = row.line() {
-            sorted_rows.insert(row.address(), *row);
-        }
+        // println!("address {} row: {:?}", row.address(), row);
+        sorted_rows.insert(row.address(), *row);
     }
 
     let sorted_rows: Vec<_> = sorted_rows.into_iter().collect();
@@ -446,7 +412,6 @@ pub fn transform_debug_line<R: gimli::Reader>(
         sequence_base_index,
     })
 }
-
 
 pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
     dwarf: &gimli::Dwarf<R>,
@@ -579,15 +544,13 @@ pub struct DwarfSubroutineMap {
 fn header_from_offset<R: gimli::Reader>(
     dwarf: &gimli::Dwarf<R>,
     offset: DebugInfoOffset<R::Offset>,
-) -> Result<Option<UnitHeader<R>>> {
+) -> Result<Option<CompilationUnitHeader<R>>> {
     let mut headers = dwarf.units();
     while let Some(header) = headers.next()? {
-        if let UnitSectionOffset::DebugInfoOffset(debug_info_offset) = header.offset() {
-            if debug_info_offset == offset {
-                return Ok(Some(header));
-            } else {
-                continue;
-            }
+        if header.offset() == offset {
+            return Ok(Some(header));
+        } else {
+            continue;
         }
     }
     Ok(None)
@@ -665,7 +628,6 @@ impl subroutine::SubroutineMap for DwarfSubroutineMap {
                 if let Ok(ty_name) = unit_type_name(&dwarf, &unit, var.ty_offset) {
                     v.type_name = ty_name;
                 }
-                println!("v: {:?}, {}", v.name, v.type_name);
                 v
             })
             .collect())

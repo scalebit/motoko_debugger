@@ -1,10 +1,11 @@
 use core::slice;
-use std::{str, vec::Vec};
+use std::{collections::HashMap, str, string::String, vec::Vec};
 
 /// Wasm custom sections.
 #[derive(Default, Debug)]
 pub struct CustomSections {
     inner: CustomSectionsInner,
+    pub name_inner: NameSectionInner,
 }
 
 impl CustomSections {
@@ -13,12 +14,15 @@ impl CustomSections {
     pub fn iter(&self) -> CustomSectionsIter {
         self.inner.iter()
     }
+
+
 }
 
 /// A builder for [`CustomSections`].
 #[derive(Default, Debug)]
 pub struct CustomSectionsBuilder {
     inner: CustomSectionsInner,
+    name_inner: NameSectionInner,
 }
 
 impl CustomSectionsBuilder {
@@ -28,11 +32,33 @@ impl CustomSectionsBuilder {
         self.inner.push(name, data);
     }
 
+    pub fn set_name_section(
+        &mut self, 
+        functions:HashMap<u32, String>, 
+        locals:HashMap<u32, String>, 
+        globals:HashMap<u32, String>
+    ) {
+        self.name_inner.functions = functions;
+        self.name_inner.locals = locals;
+        self.name_inner.globals = globals;
+    }
+
     /// Finalize construction of the [`CustomSections`].
     #[inline]
     pub fn finish(self) -> CustomSections {
-        CustomSections { inner: self.inner }
+        CustomSections { 
+            inner: self.inner, 
+            name_inner: self.name_inner 
+        }
     }
+}
+
+/// Internal representation of [`CustomSections`].
+#[derive(Debug, Default)]
+pub struct NameSectionInner {
+    pub functions: HashMap<u32, String>,
+    pub locals: HashMap<u32, String>,
+    pub globals: HashMap<u32, String>,
 }
 
 /// Internal representation of [`CustomSections`].

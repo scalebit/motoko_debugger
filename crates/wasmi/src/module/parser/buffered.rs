@@ -146,11 +146,9 @@ impl ModuleParser {
                     break;
                 }
                 Payload::CustomSection(reader) => {
-                    println!("Payload::CustomSection: {:?}", reader);
                     self.process_custom_section(custom_sections, reader)
                 }
                 _ => {
-                    println!("Payload not expet");
                     Ok(())
                 }
                 unexpected => self.process_invalid_payload(unexpected),

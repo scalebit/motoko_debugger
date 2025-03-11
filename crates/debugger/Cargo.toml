@@ -17,7 +17,7 @@ structopt = "0.3"
 thiserror = "1.0.9"
 anyhow = "1.0.26"
 wasmparser = { version = "0.100.2", package = "wasmparser-nostd", default-features = false }
-gimli = "0.31.1"
+gimli = "0.21.0"
 log = "0.4.8"
 num-bigint = "0.4"
 shell-words = "1.0.0"
