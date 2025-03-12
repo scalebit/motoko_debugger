@@ -106,7 +106,7 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
         subroutines.append(&mut transform_subprogram(&dwarf, &unit, header.offset())?);
     }
 
-    // if count == 0 && !dwarf.debug_line.is_empty() {
+    // if count == 0 {
     //     transform_debug_line_without_debug_info( &dwarf,&dwarf.debug_line);
     // }
 

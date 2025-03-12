@@ -31,7 +31,7 @@ pub enum TaggedProvider {
 #[derive(Debug, Default)]
 pub struct ProviderStack {
     /// The internal stack of providers.
-    providers: Vec<TaggedProvider>,
+    pub providers: Vec<TaggedProvider>,
     /// The number of locals on the `providers` stack.
     ///
     /// # Note

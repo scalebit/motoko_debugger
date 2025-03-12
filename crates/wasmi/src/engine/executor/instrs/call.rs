@@ -617,11 +617,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<(), Error> {
+    ) -> Result<u32, Error> {
         let (index, table) = self.pull_call_indirect_params();
         self.execute_call_indirect_impl::<marker::NestedCall0, T>(
             store, results, func_type, index, table,
-        )
+        )?;
+        Ok(index)
     }
 
     /// Executes an [`Instruction::CallIndirect0Imm16`].
@@ -630,11 +631,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<(), Error> {
+    ) -> Result<u32, Error> {
         let (index, table) = self.pull_call_indirect_params_imm16();
         self.execute_call_indirect_impl::<marker::NestedCall0, T>(
             store, results, func_type, index, table,
-        )
+        )?;
+        Ok(index)
     }
 
     /// Executes an [`Instruction::CallIndirect`].
@@ -643,11 +645,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<(), Error> {
+    ) -> Result<u32, Error> {
         let (index, table) = self.pull_call_indirect_params();
         self.execute_call_indirect_impl::<marker::NestedCall, T>(
             store, results, func_type, index, table,
-        )
+        )?;
+        Ok(index)
     }
 
     /// Executes an [`Instruction::CallIndirectImm16`].
@@ -656,11 +659,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<(), Error> {
+    ) -> Result<u32, Error> {
         let (index, table) = self.pull_call_indirect_params_imm16();
         self.execute_call_indirect_impl::<marker::NestedCall, T>(
             store, results, func_type, index, table,
-        )
+        )?;
+        Ok(index)
     }
 
     /// Executes an [`Instruction::CallIndirect`] and [`Instruction::CallIndirect0`].

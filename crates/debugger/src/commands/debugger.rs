@@ -22,6 +22,7 @@ pub enum Breakpoint {
 pub enum RunResult {
     Finish(Vec<Val>),
     Breakpoint,
+    Next, // Only for step
 }
 
 #[derive(Clone, Copy)]
@@ -63,8 +64,8 @@ pub trait Debugger {
     // fn store(&self) -> Result<&Store>;
     fn set_breakpoint(&mut self, breakpoint: Breakpoint);
     fn stack_values(&self) -> Vec<UntypedVal>;
-    fn selected_instr_offset(&self) -> Result<usize>;
-    fn step(&self, style: StepStyle) -> Result<Signal>;
+    fn selected_instr_offset(&self) -> Result<Option<usize>>;
+    fn step(&self, style: StepStyle) -> Result<RunResult>;
     fn process(&self) -> Result<RunResult>;
     fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()>;
 }

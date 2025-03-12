@@ -60,6 +60,7 @@ impl<D: Debugger> Command<D> for ProcessCommand {
                 RunResult::Breakpoint => {
                     context.printer.println("Hit breakpoint");
                 }
+                _ => {}
             },
             Opts::Launch { start, args } => {
                 return self.start_debugger(debugger, context, start, args);
@@ -100,6 +101,7 @@ impl ProcessCommand {
             Ok(RunResult::Breakpoint) => {
                 context.printer.println("Hit breakpoint");
             }
+            Ok(RunResult::Next) => {}
             Err(msg) => {
                 let output = format!("{}", msg);
                 context.printer.eprintln(&output);

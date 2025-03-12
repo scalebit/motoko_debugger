@@ -34,10 +34,13 @@ impl<D: Debugger> Command<D> for ListCommand {
 }
 
 pub fn next_line_info<D: Debugger>(debugger: &D, sourcemap: &dyn SourceMap) -> Result<LineInfo> {
-    let instr_offset = debugger.selected_instr_offset()?;
-    match sourcemap.find_line_info(instr_offset) {
-        Some(info) => Ok(info),
-        None => Err(anyhow!("Source info not found")),
+    if let Some(instr_offset) = debugger.selected_instr_offset()? {
+        match sourcemap.find_line_info(instr_offset) {
+            Some(info) => Ok(info),
+            None => Err(anyhow!("Source info not found")),
+        }
+    } else {
+        Err(anyhow!("No instruction offset found"))
     }
 }
 

@@ -38,6 +38,7 @@ impl CustomSectionsBuilder {
         locals:HashMap<u32, String>, 
         globals:HashMap<u32, String>
     ) {
+        std::println!("locals length: {:?}", locals.len());
         self.name_inner.functions = functions;
         self.name_inner.locals = locals;
         self.name_inner.globals = globals;

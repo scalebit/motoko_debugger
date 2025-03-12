@@ -61,7 +61,7 @@ impl From<TaggedProvider> for TypedProvider {
 /// The value stack.
 #[derive(Debug, Default)]
 pub struct ValueStack {
-    providers: ProviderStack,
+    pub providers: ProviderStack,
     reg_alloc: RegisterAlloc,
     consts: FuncLocalConsts,
 }

@@ -38,6 +38,7 @@ fn test_load_and_run() -> anyhow::Result<()> {
         RunResult::Breakpoint => {
             eprintln!("Breakpoint");
         }
+        _ => {eprintln!("Next");}
     }
     Ok(())
 }

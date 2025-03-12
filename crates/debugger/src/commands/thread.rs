@@ -1,3 +1,5 @@
+use crate::RunResult;
+
 use super::command::{Command, CommandContext, CommandResult};
 use super::debugger::{Debugger, StepStyle};
 // use super::list::{display_source, next_line_info};
@@ -48,6 +50,7 @@ impl<D: Debugger> Command<D> for ThreadCommand {
         args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
         let opts = Opts::from_iter_safe(args.clone())?;
+        let mut ret = None;
         match opts {
             Opts::Info => {
                 // let frames = debugger.frame();
@@ -88,7 +91,7 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 };
                 let initial_line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
                 while {
-                    debugger.step(style)?;
+                    ret = Some(debugger.step(style)?);
                     let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
                     initial_line_info.filepath == line_info.filepath
                         && initial_line_info.line == line_info.line
@@ -97,7 +100,7 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 display_source(line_info, context.printer.as_ref())?;
             }
             Opts::StepOut => {
-                debugger.step(StepStyle::Out)?;
+                ret = Some(debugger.step(StepStyle::Out)?);
                 let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
                 display_source(line_info, context.printer.as_ref())?;
             }
@@ -107,7 +110,15 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                     Opts::StepInstOver => StepStyle::InstOver,
                     _ => panic!(),
                 };
-                debugger.step(style)?;
+                ret = Some(debugger.step(style)?);
+            }
+        }
+        if let Some(ret) = ret {
+            match ret {
+                RunResult::Breakpoint => {
+                    context.printer.println("Hit breakpoint");
+                }
+                _ => {}
             }
         }
 

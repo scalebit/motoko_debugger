@@ -87,7 +87,7 @@ impl_typed_for! {
 #[derive(Debug, Default)]
 pub struct FuncTranslatorAllocations {
     /// The emulated value stack.
-    stack: ValueStack,
+    pub stack: ValueStack,
     /// The instruction sequence encoder.
     instr_encoder: InstrEncoder,
     /// The control stack.
@@ -582,6 +582,14 @@ impl WasmTranslator<'_> for FuncTranslator {
         }
         let func_consts = self.alloc.stack.func_local_consts();
         let (instrs, offsets) = self.alloc.instr_encoder.drain_instrs();
+        for i in self.alloc.stack.providers.providers.iter() {
+            match i {
+                crate::engine::translator::stack::TaggedProvider::Local(register) => {
+                    std::println!(" local: {:?}", register);
+                }
+                _ => {std::println!(" TaggedProvider::Other");}
+            };
+        }
         finalize(CompiledFuncEntity::new(
             len_registers,
             instrs,

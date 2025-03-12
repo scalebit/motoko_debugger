@@ -78,7 +78,6 @@ where
         let len_locals = reader.get_count();
         for _ in 0..len_locals {
             let offset = reader.original_position();
-            // println!("  local offset: {}", offset);
             let (amount, value_type) = reader.read()?;
             self.translator.update_pos(offset);
             self.translator.translate_locals(amount, value_type)?;
@@ -99,8 +98,7 @@ where
             reader.visit_operator(&mut self.translator)??;
             let after_len = self.translator.get_instr_encoder_len();
             if before_len != after_len {
-                // println!("after_len - before_len {}", after_len - before_len);
-                for i in 0..after_len - before_len {
+                for _ in 0..after_len - before_len {
                     self.translator.push_instr_offset(pos - self.base_offset);
                 }
                 before_len = after_len;

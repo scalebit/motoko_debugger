@@ -34,8 +34,15 @@ static mut WASM_STORE: Option<Store<WasiCtx>> = None;
 static mut WASM_ENGINE: Option<Engine> = None;
 static mut WASM_STACK: Option<Stack> = None;
 
+pub struct InstanceWithName {
+    pub inner: Instance,
+    pub func_names: HashMap<u32, String>,
+    pub global_names: HashMap<u32, String>,
+    // pub local_names: HashMap<u32, String>,
+}
+
 pub struct MainDebugger<'engine> {
-    pub instance: Option<Instance>,
+    pub instance: Option<InstanceWithName>,
     start_fn_idx: Option<u32>,
     run_func: Option<Func>,
     executor: Option<Rc<RefCell<Executor<'engine>>>>,
@@ -109,11 +116,19 @@ impl<'engine> MainDebugger<'engine> {
         })
     }
 
-    fn instance(&self) -> Result<&Instance> {
+    fn instance(&self) -> Option<&Instance> {
         if let Some(ref instance) = self.instance {
-            Ok(instance)
+            Some(&instance.inner)
         } else {
-            Err(anyhow::anyhow!("No instance"))
+            None
+        }
+    }
+
+    fn get_func_name_by_idx(&self, func_idx: u32) -> Option<String> {
+        if let Some(instance) = &self.instance {
+            instance.func_names.get(&func_idx).map(|s| s.clone())
+        } else {
+            None
         }
     }
 
@@ -147,26 +162,46 @@ impl<'engine> MainDebugger<'engine> {
 
     pub fn lookup_func_by_name(&self, name: &str) -> Option<Func> {
         let store = get_store();
-        let instance = self.instance.as_ref().unwrap();
-        instance.get_func(store, name)
+        if let Some(instance) = self.instance() {
+            instance.get_func(store, name)
+        } else {
+            None
+        }
     }
 
     pub fn lookup_func_by_index(&self, index: u32) -> Option<Func> {
         let store = get_store();
-        let instance = self.instance.as_ref().unwrap();
-        instance.get_func_by_index(store, index)
+        if let Some(instance) = self.instance() {
+            instance.get_func_by_index(store, index)
+        } else {
+            None
+        }
     }
 
     pub fn lookup_start_func(&self) -> Option<Func> {
-        let instance = self.instance.as_ref().expect("no instance");
-        let store = get_store();
-        let start_fn = if let Some(idx) =  self.start_fn_idx {
-            instance
-            .get_func_by_index(store, idx)
+        if let Some(instance) = self.instance() {
+            let store = get_store();
+            if let Some(idx) =  self.start_fn_idx {
+                instance.get_func_by_index(store, idx)
+            } else {
+                None
+            }
         } else {
             None
-        };
-        start_fn
+        }
+    }
+
+    pub fn get_finish_result(&self) -> Result<Vec<Val>> {
+        let stack = get_stack();
+        let func_type = self.running_func()?.ty(&get_store());
+        let results: &mut [Val] = &mut func_type
+            .results()
+            .iter()
+            .map(|x| Val::default(x.clone()))
+            .collect::<Vec<Val>>();
+
+        results.call_results(&stack.values.as_slice()[..results.len_results()]);
+        Ok(results.to_vec())
     }
 
     pub fn execute_func(&mut self, func: Func, params: &[Val]) -> Result<()> {
@@ -281,17 +316,24 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         Ok(())
     }
 
-    fn selected_instr_offset(&self) -> Result<usize> {
+    fn selected_instr_offset(&self) -> Result<Option<usize>> {
         let executor = self.executor()?;
         let executor = executor.borrow();
-        let frame = executor.stack.calls.frames.last().unwrap();
-        let func = frame.func.clone();
+        let frame = executor.stack.calls.frames.last();
+        if frame.is_none() {
+            return Ok(None);
+        }
 
+        let frame = frame.unwrap();
+        let func = frame.func.clone();
         let code_map = get_engine().code_map();
         let compiled_func = code_map.get(None, EngineFunc::from_usize(func as usize))?;
         let offsets = compiled_func.offsets();
-        let offset = offsets.get(frame.instr_count as usize).unwrap();
-        Ok(offset.clone())
+        if let Some(offset) = offsets.get(frame.instr_count as usize) {
+            Ok(Some(offset.clone()))
+        } else {
+            Ok(None)
+        }
     }
 
     fn set_breakpoint(&mut self, breakpoint: debugger::Breakpoint) {
@@ -382,7 +424,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         self.executor().is_ok()
     }
 
-    fn step(&self, style: debugger::StepStyle) -> Result<Signal> {
+    fn step(&self, style: debugger::StepStyle) -> Result<RunResult> {
         fn frame_depth(executor: &Executor) -> usize {
             executor.stack.calls.frames.len()
         }
@@ -392,24 +434,23 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
 
         use debugger::StepStyle::*;
         match style {
-            InstIn => return Ok(executor.borrow_mut().execute_step(store, self)?),
+            InstIn => {
+                executor.borrow_mut().execute_step(store, self)?;
+                Ok(RunResult::Next)
+            },
             InstOver => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
                 let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth < frame_depth(&executor.borrow()) {
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
-                        return Ok(last_signal);
+                        return Ok(RunResult::Breakpoint);
                     } else if let Signal::End = last_signal {
-                        println!("signal::End");
-                        return Ok(last_signal);
+                        let results = self.get_finish_result()?;
+                        return Ok(RunResult::Finish(results));
                     }
                 }
-
-                if let Some(gloval_a) = self.instance()?.get_global(&store, "A") {
-                    println!("over global A: {:?}", gloval_a.get(&store));
-                }
-                Ok(last_signal)
+                Ok(RunResult::Next)
             }
             Out => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
@@ -417,19 +458,13 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 while initial_frame_depth <= frame_depth(&executor.borrow()) {
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
-                        println!("signal::break");
-                        break;
+                        return Ok(RunResult::Breakpoint);
                     } else if let Signal::End = last_signal {
-                        println!("signal::End");
-                        break;
+                        let results = self.get_finish_result()?;
+                        return Ok(RunResult::Finish(results));
                     }
                 }
-
-                if let Some(gloval_a) = self.instance()?.get_global(&store, "A") {
-                    println!("over global A: {:?}", gloval_a.get(&store));
-                }
-
-                Ok(last_signal)
+                Ok(RunResult::Next)
             }
         }
     }
@@ -445,15 +480,8 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
                 Signal::End => {
-                    let func_type = self.running_func()?.ty(&get_store());
-                    let results: &mut [Val] = &mut func_type
-                        .results()
-                        .iter()
-                        .map(|x| Val::default(x.clone()))
-                        .collect::<Vec<Val>>();
-
-                    results.call_results(&stack.values.as_slice()[..results.len_results()]);
-                    return Ok(RunResult::Finish(results.to_vec()));
+                    let results = self.get_finish_result()?;
+                    return Ok(RunResult::Finish(results));
                 }
             }
         }
@@ -475,13 +503,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             return Err(anyhow::anyhow!("No function {} found", name.unwrap_or("start")));
         }
 
-        // println!(
-        //     "over global A: {:?}",
-        //     self.instance()?
-        //         .get_global(get_store(), "A")
-        //         .unwrap()
-        //         .get(get_store())
-        // );
+        // self.get_func_name_by_idx(func_idx)
 
         let func = func.unwrap();
         self.run_func = Some(func);
@@ -542,20 +564,29 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             pre.initialize_instance(&mut store)
         })?;
 
-        self.instance = Some(instance);
+        self.instance = Some(InstanceWithName {
+            inner: instance,
+            func_names: module.name_custom_sections().functions.clone(),
+            global_names: module.name_custom_sections().globals.clone(),
+        });
+
         unsafe {
             WASM_STACK = Some(engine.stacks().lock().reuse_or_new());
             WASM_STORE = Some(store);
             WASM_ENGINE = Some(engine);
         }
-        Ok(())
+        Ok(()) 
     }
 }
 
 impl<'engine> Interceptor for MainDebugger<'engine> {
-    fn invoke_func(&self, name: &str) -> Signal {
-        if self.breakpoints.should_break_func(name) {
-            Signal::Breakpoint
+    fn invoke_func(&self, func_idx: u32) -> Signal {
+        if let Some(name) = self.get_func_name_by_idx(func_idx) {
+            if self.breakpoints.should_break_func(&name) {
+                Signal::Breakpoint
+            } else {
+                Signal::Next
+            }
         } else {
             Signal::Next
         }

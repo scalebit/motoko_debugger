@@ -507,15 +507,18 @@ impl ModuleParser {
                     std::result::Result::Ok(name) => {
                         match name {
                             wasmparser::Name::Function(naming) => {
+                                println!("wasmparser::Name::Function");
                                 collect_nameing(naming, &mut func_names);
                             },
                             wasmparser::Name::Global(naming) => {
+                                println!("wasmparser::Name::Global");
                                 collect_nameing(naming, &mut global_names);
                             },
                             wasmparser::Name::Local(indrect_nameing) => {
+                                println!("wasmparser::Name::Local");
                                 collect_indrect_nameing(indrect_nameing, &mut local_names);
                             }
-                            _ => {}
+                            _ => {println!("wasmparser::Name::other");}
                         }
                     }
                     Err(_) => {}
@@ -544,33 +547,40 @@ fn collect_nameing<'a>(
     naming: wasmparser::SectionLimited<'a, wasmparser::Naming<'a>>,  
     results: &mut HashMap<u32, String>,
 ) {
+    let mut count = 0;
     for item in naming.into_iter() {
+        count += 1;
         match item {
             std::result::Result::Ok(nameing) => {
                 results.insert(nameing.index, nameing.name.to_string());
             }
-            _ => {}
+            _ => {println!("collect_nameing error");}
         }
     }
+    println!("collect_nameing count: {} ", count);
 }
 
 fn collect_indrect_nameing<'a>(
     indrect_nameing: wasmparser::SectionLimited<'a, wasmparser::IndirectNaming<'a>>,  
     results: &mut HashMap<u32, String>,
 ) {
-    for item1 in indrect_nameing.into_iter() {
+    let mut count = 0;
+    for (func_index,item1) in indrect_nameing.into_iter().enumerate() {
+        count += 1;
         match item1 {
             std::result::Result::Ok(func_naming) => {
                 for item2 in func_naming.names.into_iter() {
                     match item2 {
                         std::result::Result::Ok(nameing) => {
-                            results.insert(nameing.index, nameing.name.to_string());
+                            println!("count: {}, func_idx: {} nameing: {:?}, index: {:?}", count, func_index, nameing.name, nameing.index); 
+                            results.insert( nameing.index, nameing.name.to_string());
                         }
-                        _ => {}
+                        _ => {println!("collect_indrect_nameing error");}
                     }
                 }
             }
-            _ => {}
-        }
+            _ => {println!("collect_indrect_nameing error");}
+        };
     }
+    println!("collect_indrect_nameing count: {} ", count);
 }

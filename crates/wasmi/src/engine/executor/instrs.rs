@@ -483,16 +483,16 @@ impl<'engine> Executor<'engine> {
                     self.execute_call_imported::<T>(store, results, func)?
                 }
                 Instr::CallIndirect0 { results, func_type } => {
-                    self.execute_call_indirect_0::<T>(store, results, func_type)?
+                    self.execute_call_indirect_0::<T>(store, results, func_type)?;
                 }
                 Instr::CallIndirect0Imm16 { results, func_type } => {
-                    self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?
+                    self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?;
                 }
                 Instr::CallIndirect { results, func_type } => {
-                    self.execute_call_indirect::<T>(store, results, func_type)?
+                    self.execute_call_indirect::<T>(store, results, func_type)?;
                 }
                 Instr::CallIndirectImm16 { results, func_type } => {
-                    self.execute_call_indirect_imm16::<T>(store, results, func_type)?
+                    self.execute_call_indirect_imm16::<T>(store, results, func_type)?;
                 }
                 Instr::Select { result, lhs } => self.execute_select(result, lhs),
                 Instr::SelectImm32Rhs { result, lhs } => self.execute_select_imm32_rhs(result, lhs),
@@ -1412,22 +1412,30 @@ impl<'engine> Executor<'engine> {
         store: &mut Store<T>,
         interceptor: &I,
     ) -> Result<Signal, Error> {
-        let signal = interceptor.execute_inst(self.ip.get());
         if let Some(frame) = self.stack.calls.frames.last_mut() {
             frame.instr_count += 1;
         }
 
-        let result = self.execute_instr(store)?;
+        let signal_inst = interceptor.execute_inst(self.ip.get());
+        let mut call_idx = 0;
+        let result = self.execute_instr(store, &mut call_idx)?;
 
-        Ok(match (signal, result) {
-            (_, Signal::End) => Signal::End,
-            (signal, Signal::Next) => signal,
-            (_, other) => other,
+        let signal_call = if call_idx != 0 {
+            interceptor.invoke_func(call_idx)
+        } else {
+            Signal::Next
+        };
+
+        Ok(match (signal_inst, signal_call, result) {
+            (_, _, Signal::End) => Signal::End,
+            (Signal::Breakpoint, _, Signal::Next) => Signal::Breakpoint,
+            (_, Signal::Breakpoint, Signal::Next) => Signal::Breakpoint,
+            (_, _, other) => other,
         })
     }
 
     #[inline(always)]
-    pub fn execute_instr<T>(&mut self, store: &mut Store<T>) -> Result<Signal, Error> {
+    pub fn execute_instr<T>(&mut self, store: &mut Store<T>, call_idx: &mut u32) -> Result<Signal, Error> {
         use Instruction as Instr;
 
         match *self.ip.get() {
@@ -1731,29 +1739,33 @@ impl<'engine> Executor<'engine> {
                 self.execute_return_call_indirect_imm16::<T>(store, func_type)?
             }
             Instr::CallInternal0 { results, func } => {
+                *call_idx = u32::from(func);
                 self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
                 // return Ok(Signal::Breakpoint);
             }
             Instr::CallInternal { results, func } => {
+                *call_idx = u32::from(func);
                 self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
             }
             Instr::CallImported0 { results, func } => {
-                self.execute_call_imported_0::<T>(store, results, func)?
+                self.execute_call_imported_0::<T>(store, results, func)?;
+                *call_idx = u32::from(func);
             }
             Instr::CallImported { results, func } => {
-                self.execute_call_imported::<T>(store, results, func)?
+                self.execute_call_imported::<T>(store, results, func)?;
+                *call_idx = u32::from(func);
             }
             Instr::CallIndirect0 { results, func_type } => {
-                self.execute_call_indirect_0::<T>(store, results, func_type)?
+                *call_idx = self.execute_call_indirect_0::<T>(store, results, func_type)?;
             }
             Instr::CallIndirect0Imm16 { results, func_type } => {
-                self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?
+                *call_idx = self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?;
             }
             Instr::CallIndirect { results, func_type } => {
-                self.execute_call_indirect::<T>(store, results, func_type)?
+                *call_idx = self.execute_call_indirect::<T>(store, results, func_type)?;
             }
             Instr::CallIndirectImm16 { results, func_type } => {
-                self.execute_call_indirect_imm16::<T>(store, results, func_type)?
+                *call_idx = self.execute_call_indirect_imm16::<T>(store, results, func_type)?;
             }
             Instr::Select { result, lhs } => self.execute_select(result, lhs),
             Instr::SelectImm32Rhs { result, lhs } => self.execute_select_imm32_rhs(result, lhs),
@@ -2171,7 +2183,10 @@ impl<'engine> Executor<'engine> {
             Instr::I32Clz { result, input } => self.execute_i32_clz(result, input),
             Instr::I32Ctz { result, input } => self.execute_i32_ctz(result, input),
             Instr::I32Popcnt { result, input } => self.execute_i32_popcnt(result, input),
-            Instr::I32Add { result, lhs, rhs } => self.execute_i32_add(result, lhs, rhs),
+            Instr::I32Add { result, lhs, rhs } => {
+                println!("result: {:?}, lhs: {:?}, rhs: {:?}", result, lhs, rhs);
+                self.execute_i32_add(result, lhs, rhs)
+            },
             Instr::I32AddImm16 { result, lhs, rhs } => self.execute_i32_add_imm16(result, lhs, rhs),
             Instr::I32Sub { result, lhs, rhs } => self.execute_i32_sub(result, lhs, rhs),
             Instr::I32SubImm16Lhs { result, lhs, rhs } => {
@@ -2607,7 +2622,7 @@ impl<'engine> Executor<'engine> {
 }
 
 pub trait Interceptor {
-    fn invoke_func(&self, fn_name: &str) -> Signal;
+    fn invoke_func(&self, func_idx: u32) -> Signal;
     fn execute_inst(&self, inst: &Instruction) -> Signal;
 }
 
