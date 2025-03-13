@@ -92,6 +92,18 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 let initial_line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
                 while {
                     ret = Some(debugger.step(style)?);
+                    ret = if let Some(ret) = ret {
+                        match ret {
+                            RunResult::Finish(finish_result) => {
+                                let output = format!("Finish: {:?}", finish_result);
+                                context.printer.println(&output);
+                                return Ok(Some(CommandResult::ProcessFinish(finish_result)));
+                            }
+                            _ => {Some(ret)}
+                        }
+                    } else {
+                        None
+                    };
                     let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
                     initial_line_info.filepath == line_info.filepath
                         && initial_line_info.line == line_info.line
@@ -101,6 +113,18 @@ impl<D: Debugger> Command<D> for ThreadCommand {
             }
             Opts::StepOut => {
                 ret = Some(debugger.step(StepStyle::Out)?);
+                ret = if let Some(ret) = ret {
+                    match ret {
+                        RunResult::Finish(finish_result) => {
+                            let output = format!("Finish: {:?}", finish_result);
+                            context.printer.println(&output);
+                            return Ok(Some(CommandResult::ProcessFinish(finish_result)));
+                        }
+                        _ => {Some(ret)}
+                    }
+                } else {
+                    None
+                };
                 let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
                 display_source(line_info, context.printer.as_ref())?;
             }
@@ -111,6 +135,18 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                     _ => panic!(),
                 };
                 ret = Some(debugger.step(style)?);
+                ret = if let Some(ret) = ret {
+                    match ret {
+                        RunResult::Finish(finish_result) => {
+                            let output = format!("Finish: {:?}", finish_result);
+                            context.printer.println(&output);
+                            return Ok(Some(CommandResult::ProcessFinish(finish_result)));
+                        }
+                        _ => {Some(ret)}
+                    }
+                } else {
+                    None
+                };
             }
         }
         if let Some(ret) = ret {
@@ -121,7 +157,7 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 _ => {}
             }
         }
-
+        
         Ok(None)
     }
 }

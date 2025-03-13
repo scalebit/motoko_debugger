@@ -1,0 +1,11 @@
+./target/debug/debugger ./crates/debugger/tests/native-wat-for-global/demo.wasm 
+breakpoint set --name increase_a
+run testtt
+global read A
+thread step-out
+global read A
+thread step-out
+global read A
+thread step-out
+global read A
+thread step-out

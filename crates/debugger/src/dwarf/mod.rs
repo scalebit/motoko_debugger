@@ -89,26 +89,26 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
     let mut sourcemaps = Vec::new();
     let mut subroutines = Vec::new();
     let mut count = 0;
-    while let Some(header) = headers.next()? {
-        count += 1;
-        let unit = dwarf.unit(header)?;
-        let mut entries = unit.entries();
-        let root = match entries.next_dfs()? {
-            Some((_, entry)) => entry,
-            None => continue,
-        };
-        sourcemaps.push(transform_debug_line(
-            &unit,
-            root,
-            &dwarf,
-            &dwarf.debug_line,
-        )?);
-        subroutines.append(&mut transform_subprogram(&dwarf, &unit, header.offset())?);
-    }
-
-    // if count == 0 {
-    //     transform_debug_line_without_debug_info( &dwarf,&dwarf.debug_line);
+    // while let Some(header) = headers.next()? {
+    //     count += 1;
+    //     let unit = dwarf.unit(header)?;
+    //     let mut entries = unit.entries();
+    //     let root = match entries.next_dfs()? {
+    //         Some((_, entry)) => entry,
+    //         None => continue,
+    //     };
+    //     sourcemaps.push(transform_debug_line(
+    //         &unit,
+    //         root,
+    //         &dwarf,
+    //         &dwarf.debug_line,
+    //     )?);
+    //     subroutines.append(&mut transform_subprogram(&dwarf, &unit, header.offset())?);
     // }
+
+    if count == 0 {
+        transform_debug_line_without_debug_info( &dwarf,&dwarf.debug_line);
+    }
 
     Ok(DwarfDebugInfo {
         sourcemap: DwarfSourceMap::new(sourcemaps),
@@ -394,6 +394,7 @@ pub fn transform_debug_line<R: gimli::Reader>(
                 path = Path::new(&comp_dir).join(path);
             }
         }
+        println!("path: {:?}", path);
         files.push(path);
     }
 
@@ -401,7 +402,7 @@ pub fn transform_debug_line<R: gimli::Reader>(
     let mut rows = program.rows();
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
-        // println!("address {} row: {:?}", row.address(), row);
+        println!("address {} row: {:?}", row.address(), row);
         sorted_rows.insert(row.address(), *row);
     }
 
@@ -450,7 +451,7 @@ pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
     let mut rows = program.rows();
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
-        if let Some(_line) = row.line()   {
+        if let Some(_line) = row.line() {
             if row.file_index() == 0 {
                 println!(" file: {:?}, line: {:?}, column: {:?}",  files[0], row.line(), row.column());
             }

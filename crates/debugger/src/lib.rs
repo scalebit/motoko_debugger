@@ -83,6 +83,7 @@ pub fn start_debugger(
             Box::new(commands::local::LocalCommand::new()),
             Box::new(commands::frame::FrameCommand::new()),
             Box::new(commands::settings::SettingsCommand::new()),
+            Box::new(commands::global::GlobalCommand::new()),
             Box::new(commands::process::ProcessCommand::new()),
         ],
         vec![

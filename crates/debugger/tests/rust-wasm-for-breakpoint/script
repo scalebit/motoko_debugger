@@ -1,0 +1,9 @@
+./target/debug/debugger ./crates/debugger/tests/rust-wasm-for-breakpoint/demo.wasm 
+breakpoint set --name inc
+run testtt
+list
+thread step-in
+thread step-out
+thread step-over
+thread step-over
+thread step-over

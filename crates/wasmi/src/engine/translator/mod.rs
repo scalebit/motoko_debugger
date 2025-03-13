@@ -585,7 +585,7 @@ impl WasmTranslator<'_> for FuncTranslator {
         for i in self.alloc.stack.providers.providers.iter() {
             match i {
                 crate::engine::translator::stack::TaggedProvider::Local(register) => {
-                    std::println!(" local: {:?}", register);
+                    // std::println!(" local: {:?}", register);
                 }
                 _ => {std::println!(" TaggedProvider::Other");}
             };

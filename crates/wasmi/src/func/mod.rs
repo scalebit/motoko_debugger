@@ -321,7 +321,7 @@ impl Func {
     }
 
     /// Returns the underlying stored representation.
-    pub(super) fn as_inner(&self) -> &Stored<FuncIdx> {
+    pub fn as_inner(&self) -> &Stored<FuncIdx> {
         &self.0
     }
 

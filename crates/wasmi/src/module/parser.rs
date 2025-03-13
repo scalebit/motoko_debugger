@@ -507,18 +507,15 @@ impl ModuleParser {
                     std::result::Result::Ok(name) => {
                         match name {
                             wasmparser::Name::Function(naming) => {
-                                println!("wasmparser::Name::Function");
                                 collect_nameing(naming, &mut func_names);
                             },
                             wasmparser::Name::Global(naming) => {
-                                println!("wasmparser::Name::Global");
                                 collect_nameing(naming, &mut global_names);
                             },
                             wasmparser::Name::Local(indrect_nameing) => {
-                                println!("wasmparser::Name::Local");
                                 collect_indrect_nameing(indrect_nameing, &mut local_names);
                             }
-                            _ => {println!("wasmparser::Name::other");}
+                            _ => {}
                         }
                     }
                     Err(_) => {}
@@ -547,17 +544,15 @@ fn collect_nameing<'a>(
     naming: wasmparser::SectionLimited<'a, wasmparser::Naming<'a>>,  
     results: &mut HashMap<u32, String>,
 ) {
-    let mut count = 0;
     for item in naming.into_iter() {
-        count += 1;
         match item {
             std::result::Result::Ok(nameing) => {
+                // println!("nameing: {:?}, index: {:?}", nameing.name, nameing.index);
                 results.insert(nameing.index, nameing.name.to_string());
             }
-            _ => {println!("collect_nameing error");}
+            _ => {}
         }
     }
-    println!("collect_nameing count: {} ", count);
 }
 
 fn collect_indrect_nameing<'a>(
@@ -572,15 +567,14 @@ fn collect_indrect_nameing<'a>(
                 for item2 in func_naming.names.into_iter() {
                     match item2 {
                         std::result::Result::Ok(nameing) => {
-                            println!("count: {}, func_idx: {} nameing: {:?}, index: {:?}", count, func_index, nameing.name, nameing.index); 
+                            // println!("count: {}, func_idx: {} nameing: {:?}, index: {:?}", count, func_index, nameing.name, nameing.index); 
                             results.insert( nameing.index, nameing.name.to_string());
                         }
-                        _ => {println!("collect_indrect_nameing error");}
+                        _ => {}
                     }
                 }
             }
-            _ => {println!("collect_indrect_nameing error");}
+            _ => {}
         };
     }
-    println!("collect_indrect_nameing count: {} ", count);
 }

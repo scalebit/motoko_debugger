@@ -3,6 +3,7 @@
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
 use anyhow::{anyhow, Error, Ok, Result};
 use log::{trace, warn};
+use wasmi::store::StoreIdx;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
@@ -163,7 +164,17 @@ impl<'engine> MainDebugger<'engine> {
     pub fn lookup_func_by_name(&self, name: &str) -> Option<Func> {
         let store = get_store();
         if let Some(instance) = self.instance() {
-            instance.get_func(store, name)
+            if let Some(func) = instance.get_func(&store, name) {
+                Some(func)
+            } else {
+                let instance_with_name = self.instance.as_ref().unwrap();
+                for (idx, func_name) in instance_with_name.func_names.iter() {
+                    if func_name == name {
+                        return Some(instance.get_func_by_index(&store, *idx).unwrap());
+                    }
+                }
+                None
+            }
         } else {
             None
         }
@@ -276,6 +287,7 @@ impl<'engine> MainDebugger<'engine> {
         };
 
         if let Some(func) = func {
+            self.run_func = Some(func);
             self.execute_func(func, &args)?;
         } else {
             return Err(anyhow::anyhow!("No function {} found", name.unwrap_or("start")));
@@ -371,6 +383,16 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //     vec![]
     // }
 
+    fn global(&self, name: &str) -> Option<Val> {
+        if let Some(global)= self.instance()?.get_global(get_store(), name) {
+            Some(global.get(get_store()))
+        } else {
+            None
+        }
+                
+    }
+
+
     // fn current_frame(&self) -> Option<debugger::FunctionFrame> {
     //     let frame = self.selected_frame().ok()?;
     //     let func = match self.store() {
@@ -441,6 +463,13 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             InstOver => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
                 let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
+                if let Signal::Breakpoint = last_signal {
+                    return Ok(RunResult::Breakpoint);
+                } else if let Signal::End = last_signal {
+                    let results = self.get_finish_result()?;
+                    return Ok(RunResult::Finish(results));
+                }
+                
                 while initial_frame_depth < frame_depth(&executor.borrow()) {
                     last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
@@ -454,9 +483,9 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             }
             Out => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
-                let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
+                // let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth <= frame_depth(&executor.borrow()) {
-                    last_signal = executor.borrow_mut().execute_step(store, self)?;
+                    let last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         return Ok(RunResult::Breakpoint);
                     } else if let Signal::End = last_signal {
@@ -503,19 +532,14 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             return Err(anyhow::anyhow!("No function {} found", name.unwrap_or("start")));
         }
 
-        // self.get_func_name_by_idx(func_idx)
-
         let func = func.unwrap();
+        // if let Some(func_idx  ) = func.as_inner().entity_index(StoreIdx::from_usize(0)) {
+        //     println!("run func: {:?}, name: {:?}", func, self.get_func_name_by_idx(func_idx.into_usize() as u32));
+        // }
         self.run_func = Some(func);
         self.execute_func(func, &args)?;
         let a = self.process();
-        // println!(
-        //     "over global A: {:?}",
-        //     self.instance()?
-        //         .get_global(get_store(), "A")
-        //         .unwrap()
-        //         .get(get_store())
-        // );
+
         return a;
     }
 
@@ -555,6 +579,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         wasmi_wasi::add_preview0_to_linker(&mut linker, |ctx| ctx).map_err(|error| {
             anyhow!("failed to add preview0 WASI definitions to the linker: {error}")
         })?;
+
         wasmi_wasi::add_motoko_syscall_to_linker(&mut linker, |ctx| ctx).map_err(|error| {
             anyhow!("failed to add motoko syscall to the linker: {error}")
         })?;
@@ -580,8 +605,11 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
 }
 
 impl<'engine> Interceptor for MainDebugger<'engine> {
+    
     fn invoke_func(&self, func_idx: u32) -> Signal {
+        // println!("run func: {:?}", func_idx);
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
+            // println!("  its name: {:?}", name);
             if self.breakpoints.should_break_func(&name) {
                 Signal::Breakpoint
             } else {

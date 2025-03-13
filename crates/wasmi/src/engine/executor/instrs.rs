@@ -2184,7 +2184,7 @@ impl<'engine> Executor<'engine> {
             Instr::I32Ctz { result, input } => self.execute_i32_ctz(result, input),
             Instr::I32Popcnt { result, input } => self.execute_i32_popcnt(result, input),
             Instr::I32Add { result, lhs, rhs } => {
-                println!("result: {:?}, lhs: {:?}, rhs: {:?}", result, lhs, rhs);
+                // println!("result: {:?}, lhs: {:?}, rhs: {:?}", result, lhs, rhs);
                 self.execute_i32_add(result, lhs, rhs)
             },
             Instr::I32AddImm16 { result, lhs, rhs } => self.execute_i32_add_imm16(result, lhs, rhs),

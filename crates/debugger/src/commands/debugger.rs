@@ -62,6 +62,7 @@ pub trait Debugger {
     // fn locals(&self) -> Vec<Val>;
     // fn memory(&self) -> Result<Vec<u8>>;
     // fn store(&self) -> Result<&Store>;
+    fn global(&self, name: &str) -> Option<Val>;
     fn set_breakpoint(&mut self, breakpoint: Breakpoint);
     fn stack_values(&self) -> Vec<UntypedVal>;
     fn selected_instr_offset(&self) -> Result<Option<usize>>;
