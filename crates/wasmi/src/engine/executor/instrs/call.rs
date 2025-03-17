@@ -177,7 +177,7 @@ impl Executor<'_> {
     fn pull_call_indirect_params(&mut self) -> (u32, index::Table) {
         self.ip.add(1);
         match *self.ip.get() {
-            Instruction::CallIndirectParams { index, table } => {
+            Instruction::CallIndirectParams { instr_offset: _, index, table } => {
                 let index = u32::from(self.get_register(index));
                 (index, table)
             }
@@ -206,7 +206,7 @@ impl Executor<'_> {
     fn pull_call_indirect_params_imm16(&mut self) -> (u32, index::Table) {
         self.ip.add(1);
         match *self.ip.get() {
-            Instruction::CallIndirectParamsImm16 { index, table } => {
+            Instruction::CallIndirectParamsImm16 { instr_offset: _, index, table } => {
                 let index = u32::from(index);
                 (index, table)
             }
@@ -259,13 +259,13 @@ impl Executor<'_> {
             self.copy_call_params_list(uninit_params);
         }
         match self.ip.get() {
-            Instruction::Register { reg } => {
+            Instruction::Register { instr_offset: _, reg } => {
                 self.copy_regs(uninit_params, array::from_ref(reg));
             }
-            Instruction::Register2 { regs } => {
+            Instruction::Register2 { instr_offset: _, regs } => {
                 self.copy_regs(uninit_params, regs);
             }
-            Instruction::Register3 { regs } => {
+            Instruction::Register3 { instr_offset: _, regs } => {
                 self.copy_regs(uninit_params, regs);
             }
             unexpected => {
@@ -298,7 +298,7 @@ impl Executor<'_> {
     /// last [`Instruction::RegisterList`] if any.
     #[cold]
     fn copy_call_params_list(&mut self, uninit_params: &mut FrameParams) {
-        while let Instruction::RegisterList { regs } = self.ip.get() {
+        while let Instruction::RegisterList { instr_offset: _, regs } = self.ip.get() {
             self.copy_regs(uninit_params, regs);
             self.ip.add(1);
         }
@@ -617,12 +617,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<u32, Error> {
+    ) -> Result<(u32, index::Table), Error> {
         let (index, table) = self.pull_call_indirect_params();
         self.execute_call_indirect_impl::<marker::NestedCall0, T>(
             store, results, func_type, index, table,
         )?;
-        Ok(index)
+        Ok((index, table))
     }
 
     /// Executes an [`Instruction::CallIndirect0Imm16`].
@@ -631,12 +631,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<u32, Error> {
+    ) -> Result<(u32, index::Table), Error> {
         let (index, table) = self.pull_call_indirect_params_imm16();
         self.execute_call_indirect_impl::<marker::NestedCall0, T>(
             store, results, func_type, index, table,
         )?;
-        Ok(index)
+        Ok((index, table))
     }
 
     /// Executes an [`Instruction::CallIndirect`].
@@ -645,12 +645,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<u32, Error> {
+    ) -> Result<(u32, index::Table), Error> {
         let (index, table) = self.pull_call_indirect_params();
         self.execute_call_indirect_impl::<marker::NestedCall, T>(
             store, results, func_type, index, table,
         )?;
-        Ok(index)
+        Ok((index, table))
     }
 
     /// Executes an [`Instruction::CallIndirectImm16`].
@@ -659,12 +659,12 @@ impl Executor<'_> {
         store: &mut Store<T>,
         results: RegSpan,
         func_type: index::FuncType,
-    ) -> Result<u32, Error> {
+    ) -> Result<(u32, index::Table), Error> {
         let (index, table) = self.pull_call_indirect_params_imm16();
         self.execute_call_indirect_impl::<marker::NestedCall, T>(
             store, results, func_type, index, table,
         )?;
-        Ok(index)
+        Ok((index, table))
     }
 
     /// Executes an [`Instruction::CallIndirect`] and [`Instruction::CallIndirect0`].

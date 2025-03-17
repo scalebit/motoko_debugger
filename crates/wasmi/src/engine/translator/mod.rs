@@ -218,6 +218,14 @@ pub trait WasmTranslator<'parser>: VisitOperator<'parser, Output = Result<(), Er
     /// This information is mainly required for properly locating translation errors.
     fn update_pos(&mut self, pos: usize);
 
+    /// Updates the [`WasmTranslator`] about the current byte position relative to code start section
+    /// within translated Wasm binary.
+    ///
+    /// # Note
+    ///
+    /// This information is mainly used in visit operator to record map<instr_offset, instr> for debugger
+    fn update_visit_pos(&mut self, pos: usize);
+
     fn push_instr_offset(&mut self, offset: usize);
 
     /// Finishes constructing the Wasm function translation.
@@ -295,6 +303,10 @@ where
 
     fn update_pos(&mut self, pos: usize) {
         self.pos = pos;
+    }
+
+    fn update_visit_pos(&mut self, pos: usize) {
+        self.translator.update_visit_pos(pos);
     }
 
     fn push_instr_offset(&mut self, offset: usize) {
@@ -464,6 +476,9 @@ impl WasmTranslator<'_> for LazyFuncTranslator {
     fn update_pos(&mut self, _pos: usize) {}
 
     #[inline]
+    fn update_visit_pos(&mut self, _pos: usize) {}
+
+    #[inline]
     fn push_instr_offset(&mut self, _offset: usize) {}
 
     #[inline]
@@ -522,6 +537,8 @@ pub struct FuncTranslator {
     fuel_costs: Option<FuelCosts>,
     /// The reusable data structures of the [`FuncTranslator`].
     alloc: FuncTranslatorAllocations,
+    /// curr offset when visit instr relative to code start section
+    visit_pos: usize, 
 }
 
 impl WasmTranslator<'_> for FuncTranslator {
@@ -549,6 +566,10 @@ impl WasmTranslator<'_> for FuncTranslator {
     }
 
     fn update_pos(&mut self, _pos: usize) {}
+
+    fn update_visit_pos(&mut self, _pos: usize) {
+        self.visit_pos = _pos;
+    }
 
     fn push_instr_offset(&mut self, offset: usize) {
         self.alloc.instr_encoder.instrs.offsets.push(offset);
@@ -664,6 +685,7 @@ impl FuncTranslator {
             reachable: true,
             fuel_costs,
             alloc,
+            visit_pos: 0,
         }
         .init()
     }
@@ -2849,7 +2871,7 @@ trait BumpFuelConsumption {
 impl BumpFuelConsumption for Instruction {
     fn bump_fuel_consumption(&mut self, delta: u64) -> Result<(), Error> {
         match self {
-            Self::ConsumeFuel { block_fuel } => block_fuel.bump_by(delta).map_err(Into::into),
+            Self::ConsumeFuel { block_fuel, instr_offset } => block_fuel.bump_by(delta).map_err(Into::into),
             instr => panic!("expected `Instruction::ConsumeFuel` but found: {instr:?}"),
         }
     }

@@ -11,7 +11,7 @@ impl<'engine> Executor<'engine> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(1);
         match *addr.get() {
-            Instruction::Register2 { regs: [reg0, reg1] } => (reg0, reg1),
+            Instruction::Register2 { instr_offset: _, regs: [reg0, reg1] } => (reg0, reg1),
             unexpected => {
                 // Safety: Wasmi translation guarantees that [`Instruction::Register2`] exists.
                 unsafe {
@@ -31,7 +31,7 @@ impl<'engine> Executor<'engine> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(1);
         match *addr.get() {
-            Instruction::RegisterAndImm32 { reg, imm } => (reg, T::from(imm)),
+            Instruction::RegisterAndImm32 { instr_offset: _, reg, imm } => (reg, T::from(imm)),
             unexpected => {
                 // Safety: Wasmi translation guarantees that [`Instruction::RegisterAndImm32`] exists.
                 unsafe {

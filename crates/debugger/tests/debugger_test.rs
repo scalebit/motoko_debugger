@@ -23,7 +23,7 @@ fn test_load_and_run() -> anyhow::Result<()> {
     process
         .debugger
         .load_main_module(&bytes, String::from("addthree.wasm"))?;
-    process.debugger.instantiate()?;
+    process.debugger.instantiate(vec![])?;
 
     let run_result = process.debugger.run(
         Some("AddThree"),
@@ -51,7 +51,7 @@ fn test_load_and_step() -> anyhow::Result<()> {
         .debugger
         .load_main_module(&bytes, String::from("test_step.wasm"))?;
 
-    process.debugger.instantiate()?;
+    process.debugger.instantiate(vec![])?;
 
     process.debugger.run_step(Some("testtt"), [].to_vec())?;
 

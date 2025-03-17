@@ -208,14 +208,14 @@ impl Executor<'_> {
         };
         copy_results(values);
         let mut ip = ip;
-        while let Instruction::RegisterList { regs } = ip.get() {
+        while let Instruction::RegisterList { instr_offset: _, regs } = ip.get() {
             copy_results(regs);
             ip.add(1);
         }
         let values = match ip.get() {
-            Instruction::Register { reg } => slice::from_ref(reg),
-            Instruction::Register2 { regs } => regs,
-            Instruction::Register3 { regs } => regs,
+            Instruction::Register { instr_offset: _, reg } => slice::from_ref(reg),
+            Instruction::Register2 { instr_offset: _, regs } => regs,
+            Instruction::Register3 { instr_offset: _, regs } => regs,
             unexpected => {
                 // Safety: Wasmi translation guarantees that a register-list finalizer exists.
                 unsafe {

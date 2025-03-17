@@ -42,8 +42,9 @@ macro_rules! define_enum {
             $(
                 $( #[doc = $doc] )*
                 $name
-                $(
-                    {
+                {
+                    instr_offset: usize,
+                    $(
                         $(
                             /// The register(s) storing the result of the instruction.
                             $result_name: $result_ty,
@@ -52,9 +53,9 @@ macro_rules! define_enum {
                             $( #[$field_docs] )*
                             $field_name: $field_ty
                         ),*
-
-                    }
-                )?
+                    )?
+                }
+                
             ),*
         }
 
@@ -68,6 +69,7 @@ macro_rules! define_enum {
                     )?
                 ) -> Self {
                     Self::$name {
+                        instr_offset: 0,
                         $(
                             $( $result_name: $result_name.into(), )?
                             $( $field_name: $field_name.into() ),*
@@ -75,6 +77,17 @@ macro_rules! define_enum {
                     }
                 }
             )*
+
+            pub fn set_offset_direct(&mut self, value: usize) {
+                use std::ptr;
+                unsafe {
+                    let ptr1 = self as *mut Instruction; // 获取枚举的原始指针
+                    let data_ptr = ptr1 as *mut usize; // 将指针转换为指向 u32 的指针
+        
+                    // 写入新的 u32 值
+                    ptr::write(data_ptr, value);
+                }
+            }
         }
     };
 }
@@ -176,7 +189,7 @@ impl Instruction {
     }
 
     /// Creates a new [`Instruction::Copy2`].
-    pub fn copy2_ext(results: RegSpan, value0: impl Into<Reg>, value1: impl Into<Reg>) -> Self {
+    pub fn copy2_ext( results: RegSpan, value0: impl Into<Reg>, value1: impl Into<Reg>) -> Self {
         let span = FixedRegSpan::new(results).unwrap_or_else(|_| {
             panic!("encountered invalid `results` `RegSpan` for `Copy2`: {results:?}")
         });

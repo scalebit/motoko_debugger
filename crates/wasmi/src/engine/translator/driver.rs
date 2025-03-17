@@ -95,6 +95,7 @@ where
         while !reader.eof() {
             let pos = reader.original_position();
             self.translator.update_pos(pos);
+            self.translator.update_visit_pos(pos - self.base_offset);
             reader.visit_operator(&mut self.translator)??;
             let after_len = self.translator.get_instr_encoder_len();
             if before_len != after_len {
@@ -103,7 +104,6 @@ where
                 }
                 before_len = after_len;
             }
-            
         }
         reader.ensure_end()?;
         Ok(reader.original_position())

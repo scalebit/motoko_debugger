@@ -27,6 +27,7 @@ pub struct LineInfo {
 pub trait SourceMap {
     fn find_line_info(&self, offset: usize) -> Option<LineInfo>;
     fn set_directory_map(&self, from: String, to: String);
+    fn inst_in_file_0(&self) -> Vec<u64>;
 }
 
 pub struct EmptySourceMap {}
@@ -41,4 +42,7 @@ impl SourceMap for EmptySourceMap {
         None
     }
     fn set_directory_map(&self, _: String, _: String) {}
+    fn inst_in_file_0(&self) -> Vec<u64> {
+        vec![]
+    }
 }

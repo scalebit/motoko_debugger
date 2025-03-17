@@ -55,10 +55,10 @@ impl Executor<'_> {
         let offset = self.fetch_branch_table_offset(index, len_targets);
         self.ip.add(1);
         let value = match *self.ip.get() {
-            Instruction::Register { reg } => self.get_register(reg),
-            Instruction::Const32 { value } => UntypedVal::from(u32::from(value)),
-            Instruction::I64Const32 { value } => UntypedVal::from(i64::from(value)),
-            Instruction::F64Const32 { value } => UntypedVal::from(f64::from(value)),
+            Instruction::Register { instr_offset: _, reg } => self.get_register(reg),
+            Instruction::Const32 { instr_offset: _, value } => UntypedVal::from(u32::from(value)),
+            Instruction::I64Const32 { instr_offset: _, value } => UntypedVal::from(i64::from(value)),
+            Instruction::F64Const32 { instr_offset: _, value } => UntypedVal::from(f64::from(value)),
             unexpected => {
                 // Safety: one of the above instruction parameters is guaranteed to exist by the Wasmi translation.
                 unsafe {
@@ -69,7 +69,7 @@ impl Executor<'_> {
             }
         };
         self.ip.add(offset);
-        if let Instruction::BranchTableTarget { results, offset } = *self.ip.get() {
+        if let Instruction::BranchTableTarget { instr_offset: _, results, offset } = *self.ip.get() {
             // Note: we explicitly do _not_ handle branch table returns here for technical reasons.
             //       They are executed as the next conventional instruction in the pipeline, no special treatment required.
             self.set_register(results.head(), value);
@@ -81,7 +81,7 @@ impl Executor<'_> {
         let offset = self.fetch_branch_table_offset(index, len_targets);
         self.ip.add(1);
         let regs = match *self.ip.get() {
-            Instruction::Register2 { regs } => regs,
+            Instruction::Register2 { instr_offset: _, regs } => regs,
             unexpected => {
                 // Safety: Wasmi translation guarantees that `Instruction::Register2` follows.
                 unsafe {
@@ -92,7 +92,7 @@ impl Executor<'_> {
             }
         };
         self.ip.add(offset);
-        if let Instruction::BranchTableTarget { results, offset } = *self.ip.get() {
+        if let Instruction::BranchTableTarget { instr_offset: _, results, offset } = *self.ip.get() {
             // Note: we explicitly do _not_ handle branch table returns here for technical reasons.
             //       They are executed as the next conventional instruction in the pipeline, no special treatment required.
             let values = [0, 1].map(|i| self.get_register(regs[i]));
@@ -108,7 +108,7 @@ impl Executor<'_> {
         let offset = self.fetch_branch_table_offset(index, len_targets);
         self.ip.add(1);
         let regs = match *self.ip.get() {
-            Instruction::Register3 { regs } => regs,
+            Instruction::Register3 { instr_offset: _, regs } => regs,
             unexpected => {
                 // Safety: Wasmi translation guarantees that `Instruction::Register3` follows.
                 unsafe {
@@ -119,7 +119,7 @@ impl Executor<'_> {
             }
         };
         self.ip.add(offset);
-        if let Instruction::BranchTableTarget { results, offset } = *self.ip.get() {
+        if let Instruction::BranchTableTarget { instr_offset: _, results, offset } = *self.ip.get() {
             // Note: we explicitly do _not_ handle branch table returns here for technical reasons.
             //       They are executed as the next conventional instruction in the pipeline, no special treatment required.
             let values = [0, 1, 2].map(|i| self.get_register(regs[i]));
@@ -135,7 +135,7 @@ impl Executor<'_> {
         let offset = self.fetch_branch_table_offset(index, len_targets);
         self.ip.add(1);
         let values = match *self.ip.get() {
-            Instruction::RegisterSpan { span } => span,
+            Instruction::RegisterSpan { instr_offset: _, span } => span,
             unexpected => {
                 // Safety: Wasmi translation guarantees that `Instruction::RegisterSpan` follows.
                 unsafe {
@@ -151,11 +151,11 @@ impl Executor<'_> {
         match *self.ip.get() {
             // Note: we explicitly do _not_ handle branch table returns here for technical reasons.
             //       They are executed as the next conventional instruction in the pipeline, no special treatment required.
-            Instruction::BranchTableTarget { results, offset } => {
+            Instruction::BranchTableTarget { instr_offset: _, results, offset } => {
                 self.execute_copy_span_impl(results, values, len);
                 self.execute_branch(offset)
             }
-            Instruction::BranchTableTargetNonOverlapping { results, offset } => {
+            Instruction::BranchTableTargetNonOverlapping { instr_offset: _, results, offset } => {
                 self.execute_copy_span_non_overlapping_impl(results, values, len);
                 self.execute_branch(offset)
             }
@@ -172,15 +172,15 @@ impl Executor<'_> {
         match *self.ip.get() {
             // Note: we explicitly do _not_ handle branch table returns here for technical reasons.
             //       They are executed as the next conventional instruction in the pipeline, no special treatment required.
-            Instruction::BranchTableTarget { results, offset } => {
+            Instruction::BranchTableTarget { instr_offset: _, results, offset } => {
                 self.execute_copy_many_impl(ip_list, results, &[]);
                 self.execute_branch(offset)
             }
-            Instruction::BranchTableTargetNonOverlapping { results, offset } => {
+            Instruction::BranchTableTargetNonOverlapping { instr_offset: _, results, offset } => {
                 self.execute_copy_many_non_overlapping_impl(ip_list, results, &[]);
                 self.execute_branch(offset)
             }
-            Instruction::Return => {
+            Instruction::Return { instr_offset: _ } => {
                 self.copy_many_return_values(ip_list, &[]);
                 // We do not return from this instruction but use the fact that `self.ip`
                 // will point to `Instruction::Return` which does the job for us.

@@ -1,5 +1,7 @@
 use std::println;
 
+use wasmi_collections::arena::ArenaIndex;
+
 pub use self::call::{dispatch_host_func, ResumableHostError};
 use super::{cache::CachedInstance, InstructionPtr, Stack};
 use crate::{
@@ -134,1253 +136,1271 @@ impl<'engine> Executor<'engine> {
         use Instruction as Instr;
         loop {
             match *self.ip.get() {
-                Instr::Trap { trap_code } => self.execute_trap(trap_code)?,
-                Instr::ConsumeFuel { block_fuel } => {
+                Instr::Trap { instr_offset: _, trap_code } => self.execute_trap(trap_code)?,
+                Instr::ConsumeFuel { instr_offset: _, block_fuel } => {
                     self.execute_consume_fuel(&mut store.inner, block_fuel)?
                 }
-                Instr::Return => {
+                Instr::Return { instr_offset: _ } => {
                     forward_return!(self.execute_return(&mut store.inner))
                 }
-                Instr::ReturnReg { value } => {
+                Instr::ReturnReg { instr_offset: _, value } => {
                     forward_return!(self.execute_return_reg(&mut store.inner, value))
                 }
-                Instr::ReturnReg2 { values } => {
+                Instr::ReturnReg2 { instr_offset: _, values } => {
                     forward_return!(self.execute_return_reg2(&mut store.inner, values))
                 }
-                Instr::ReturnReg3 { values } => {
+                Instr::ReturnReg3 { instr_offset: _, values } => {
                     forward_return!(self.execute_return_reg3(&mut store.inner, values))
                 }
-                Instr::ReturnImm32 { value } => {
+                Instr::ReturnImm32 { instr_offset: _, value } => {
                     forward_return!(self.execute_return_imm32(&mut store.inner, value))
                 }
-                Instr::ReturnI64Imm32 { value } => {
+                Instr::ReturnI64Imm32 { instr_offset: _, value } => {
                     forward_return!(self.execute_return_i64imm32(&mut store.inner, value))
                 }
-                Instr::ReturnF64Imm32 { value } => {
+                Instr::ReturnF64Imm32 { instr_offset: _, value } => {
                     forward_return!(self.execute_return_f64imm32(&mut store.inner, value))
                 }
-                Instr::ReturnSpan { values } => {
+                Instr::ReturnSpan { instr_offset: _, values } => {
                     forward_return!(self.execute_return_span(&mut store.inner, values))
                 }
-                Instr::ReturnMany { values } => {
+                Instr::ReturnMany { instr_offset: _, values } => {
                     forward_return!(self.execute_return_many(&mut store.inner, values))
                 }
-                Instr::ReturnNez { condition } => {
+                Instr::ReturnNez { instr_offset: _, condition } => {
                     forward_return!(self.execute_return_nez(&mut store.inner, condition))
                 }
-                Instr::ReturnNezReg { condition, value } => {
+                Instr::ReturnNezReg { instr_offset: _, condition, value } => {
                     forward_return!(self.execute_return_nez_reg(&mut store.inner, condition, value))
                 }
-                Instr::ReturnNezReg2 { condition, values } => {
+                Instr::ReturnNezReg2 { instr_offset: _, condition, values } => {
                     forward_return!(self.execute_return_nez_reg2(
                         &mut store.inner,
                         condition,
                         values
                     ))
                 }
-                Instr::ReturnNezImm32 { condition, value } => {
+                Instr::ReturnNezImm32 { instr_offset: _, condition, value } => {
                     forward_return!(self.execute_return_nez_imm32(
                         &mut store.inner,
                         condition,
                         value
                     ))
                 }
-                Instr::ReturnNezI64Imm32 { condition, value } => {
+                Instr::ReturnNezI64Imm32 { instr_offset: _, condition, value } => {
                     forward_return!(self.execute_return_nez_i64imm32(
                         &mut store.inner,
                         condition,
                         value
                     ))
                 }
-                Instr::ReturnNezF64Imm32 { condition, value } => {
+                Instr::ReturnNezF64Imm32 { instr_offset: _, condition, value } => {
                     forward_return!(self.execute_return_nez_f64imm32(
                         &mut store.inner,
                         condition,
                         value
                     ))
                 }
-                Instr::ReturnNezSpan { condition, values } => {
+                Instr::ReturnNezSpan { instr_offset: _, condition, values } => {
                     forward_return!(self.execute_return_nez_span(
                         &mut store.inner,
                         condition,
                         values
                     ))
                 }
-                Instr::ReturnNezMany { condition, values } => {
+                Instr::ReturnNezMany { instr_offset: _, condition, values } => {
                     forward_return!(self.execute_return_nez_many(
                         &mut store.inner,
                         condition,
                         values
                     ))
                 }
-                Instr::Branch { offset } => self.execute_branch(offset),
-                Instr::BranchTable0 { index, len_targets } => {
+                Instr::Branch { instr_offset: _, offset } => self.execute_branch(offset),
+                Instr::BranchTable0 { instr_offset: _, index, len_targets } => {
                     self.execute_branch_table_0(index, len_targets)
                 }
-                Instr::BranchTable1 { index, len_targets } => {
+                Instr::BranchTable1 { instr_offset: _, index, len_targets } => {
                     self.execute_branch_table_1(index, len_targets)
                 }
-                Instr::BranchTable2 { index, len_targets } => {
+                Instr::BranchTable2 { instr_offset: _, index, len_targets } => {
                     self.execute_branch_table_2(index, len_targets)
                 }
-                Instr::BranchTable3 { index, len_targets } => {
+                Instr::BranchTable3 { instr_offset: _, index, len_targets } => {
                     self.execute_branch_table_3(index, len_targets)
                 }
-                Instr::BranchTableSpan { index, len_targets } => {
+                Instr::BranchTableSpan { instr_offset: _, index, len_targets } => {
                     self.execute_branch_table_span(index, len_targets)
                 }
-                Instr::BranchTableMany { index, len_targets } => {
+                Instr::BranchTableMany { instr_offset: _, index, len_targets } => {
                     self.execute_branch_table_many(index, len_targets)
                 }
-                Instr::BranchCmpFallback { lhs, rhs, params } => {
+                Instr::BranchCmpFallback { instr_offset: _, lhs, rhs, params } => {
                     self.execute_branch_cmp_fallback(lhs, rhs, params)
                 }
-                Instr::BranchI32And { lhs, rhs, offset } => {
+                Instr::BranchI32And { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_and(lhs, rhs, offset)
                 }
-                Instr::BranchI32AndImm { lhs, rhs, offset } => {
+                Instr::BranchI32AndImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_and_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32Or { lhs, rhs, offset } => {
+                Instr::BranchI32Or { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_or(lhs, rhs, offset)
                 }
-                Instr::BranchI32OrImm { lhs, rhs, offset } => {
+                Instr::BranchI32OrImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_or_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32Xor { lhs, rhs, offset } => {
+                Instr::BranchI32Xor { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_xor(lhs, rhs, offset)
                 }
-                Instr::BranchI32XorImm { lhs, rhs, offset } => {
+                Instr::BranchI32XorImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_xor_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32AndEqz { lhs, rhs, offset } => {
+                Instr::BranchI32AndEqz { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_and_eqz(lhs, rhs, offset)
                 }
-                Instr::BranchI32AndEqzImm { lhs, rhs, offset } => {
+                Instr::BranchI32AndEqzImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_and_eqz_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32OrEqz { lhs, rhs, offset } => {
+                Instr::BranchI32OrEqz { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_or_eqz(lhs, rhs, offset)
                 }
-                Instr::BranchI32OrEqzImm { lhs, rhs, offset } => {
+                Instr::BranchI32OrEqzImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_or_eqz_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32XorEqz { lhs, rhs, offset } => {
+                Instr::BranchI32XorEqz { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_xor_eqz(lhs, rhs, offset)
                 }
-                Instr::BranchI32XorEqzImm { lhs, rhs, offset } => {
+                Instr::BranchI32XorEqzImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_xor_eqz_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32Eq { lhs, rhs, offset } => {
+                Instr::BranchI32Eq { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_eq(lhs, rhs, offset)
                 }
-                Instr::BranchI32EqImm { lhs, rhs, offset } => {
+                Instr::BranchI32EqImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_eq_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32Ne { lhs, rhs, offset } => {
+                Instr::BranchI32Ne { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_ne(lhs, rhs, offset)
                 }
-                Instr::BranchI32NeImm { lhs, rhs, offset } => {
+                Instr::BranchI32NeImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_ne_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32LtS { lhs, rhs, offset } => {
+                Instr::BranchI32LtS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_lt_s(lhs, rhs, offset)
                 }
-                Instr::BranchI32LtSImm { lhs, rhs, offset } => {
+                Instr::BranchI32LtSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_lt_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32LtU { lhs, rhs, offset } => {
+                Instr::BranchI32LtU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_lt_u(lhs, rhs, offset)
                 }
-                Instr::BranchI32LtUImm { lhs, rhs, offset } => {
+                Instr::BranchI32LtUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_lt_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32LeS { lhs, rhs, offset } => {
+                Instr::BranchI32LeS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_le_s(lhs, rhs, offset)
                 }
-                Instr::BranchI32LeSImm { lhs, rhs, offset } => {
+                Instr::BranchI32LeSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_le_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32LeU { lhs, rhs, offset } => {
+                Instr::BranchI32LeU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_le_u(lhs, rhs, offset)
                 }
-                Instr::BranchI32LeUImm { lhs, rhs, offset } => {
+                Instr::BranchI32LeUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_le_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32GtS { lhs, rhs, offset } => {
+                Instr::BranchI32GtS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_gt_s(lhs, rhs, offset)
                 }
-                Instr::BranchI32GtSImm { lhs, rhs, offset } => {
+                Instr::BranchI32GtSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_gt_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32GtU { lhs, rhs, offset } => {
+                Instr::BranchI32GtU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_gt_u(lhs, rhs, offset)
                 }
-                Instr::BranchI32GtUImm { lhs, rhs, offset } => {
+                Instr::BranchI32GtUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_gt_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32GeS { lhs, rhs, offset } => {
+                Instr::BranchI32GeS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_ge_s(lhs, rhs, offset)
                 }
-                Instr::BranchI32GeSImm { lhs, rhs, offset } => {
+                Instr::BranchI32GeSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_ge_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI32GeU { lhs, rhs, offset } => {
+                Instr::BranchI32GeU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_ge_u(lhs, rhs, offset)
                 }
-                Instr::BranchI32GeUImm { lhs, rhs, offset } => {
+                Instr::BranchI32GeUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i32_ge_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64Eq { lhs, rhs, offset } => {
+                Instr::BranchI64Eq { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_eq(lhs, rhs, offset)
                 }
-                Instr::BranchI64EqImm { lhs, rhs, offset } => {
+                Instr::BranchI64EqImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_eq_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64Ne { lhs, rhs, offset } => {
+                Instr::BranchI64Ne { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_ne(lhs, rhs, offset)
                 }
-                Instr::BranchI64NeImm { lhs, rhs, offset } => {
+                Instr::BranchI64NeImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_ne_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64LtS { lhs, rhs, offset } => {
+                Instr::BranchI64LtS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_lt_s(lhs, rhs, offset)
                 }
-                Instr::BranchI64LtSImm { lhs, rhs, offset } => {
+                Instr::BranchI64LtSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_lt_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64LtU { lhs, rhs, offset } => {
+                Instr::BranchI64LtU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_lt_u(lhs, rhs, offset)
                 }
-                Instr::BranchI64LtUImm { lhs, rhs, offset } => {
+                Instr::BranchI64LtUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_lt_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64LeS { lhs, rhs, offset } => {
+                Instr::BranchI64LeS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_le_s(lhs, rhs, offset)
                 }
-                Instr::BranchI64LeSImm { lhs, rhs, offset } => {
+                Instr::BranchI64LeSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_le_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64LeU { lhs, rhs, offset } => {
+                Instr::BranchI64LeU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_le_u(lhs, rhs, offset)
                 }
-                Instr::BranchI64LeUImm { lhs, rhs, offset } => {
+                Instr::BranchI64LeUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_le_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64GtS { lhs, rhs, offset } => {
+                Instr::BranchI64GtS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_gt_s(lhs, rhs, offset)
                 }
-                Instr::BranchI64GtSImm { lhs, rhs, offset } => {
+                Instr::BranchI64GtSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_gt_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64GtU { lhs, rhs, offset } => {
+                Instr::BranchI64GtU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_gt_u(lhs, rhs, offset)
                 }
-                Instr::BranchI64GtUImm { lhs, rhs, offset } => {
+                Instr::BranchI64GtUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_gt_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64GeS { lhs, rhs, offset } => {
+                Instr::BranchI64GeS { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_ge_s(lhs, rhs, offset)
                 }
-                Instr::BranchI64GeSImm { lhs, rhs, offset } => {
+                Instr::BranchI64GeSImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_ge_s_imm(lhs, rhs, offset)
                 }
-                Instr::BranchI64GeU { lhs, rhs, offset } => {
+                Instr::BranchI64GeU { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_ge_u(lhs, rhs, offset)
                 }
-                Instr::BranchI64GeUImm { lhs, rhs, offset } => {
+                Instr::BranchI64GeUImm { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_i64_ge_u_imm(lhs, rhs, offset)
                 }
-                Instr::BranchF32Eq { lhs, rhs, offset } => {
+                Instr::BranchF32Eq { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f32_eq(lhs, rhs, offset)
                 }
-                Instr::BranchF32Ne { lhs, rhs, offset } => {
+                Instr::BranchF32Ne { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f32_ne(lhs, rhs, offset)
                 }
-                Instr::BranchF32Lt { lhs, rhs, offset } => {
+                Instr::BranchF32Lt { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f32_lt(lhs, rhs, offset)
                 }
-                Instr::BranchF32Le { lhs, rhs, offset } => {
+                Instr::BranchF32Le { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f32_le(lhs, rhs, offset)
                 }
-                Instr::BranchF32Gt { lhs, rhs, offset } => {
+                Instr::BranchF32Gt { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f32_gt(lhs, rhs, offset)
                 }
-                Instr::BranchF32Ge { lhs, rhs, offset } => {
+                Instr::BranchF32Ge { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f32_ge(lhs, rhs, offset)
                 }
-                Instr::BranchF64Eq { lhs, rhs, offset } => {
+                Instr::BranchF64Eq { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f64_eq(lhs, rhs, offset)
                 }
-                Instr::BranchF64Ne { lhs, rhs, offset } => {
+                Instr::BranchF64Ne { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f64_ne(lhs, rhs, offset)
                 }
-                Instr::BranchF64Lt { lhs, rhs, offset } => {
+                Instr::BranchF64Lt { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f64_lt(lhs, rhs, offset)
                 }
-                Instr::BranchF64Le { lhs, rhs, offset } => {
+                Instr::BranchF64Le { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f64_le(lhs, rhs, offset)
                 }
-                Instr::BranchF64Gt { lhs, rhs, offset } => {
+                Instr::BranchF64Gt { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f64_gt(lhs, rhs, offset)
                 }
-                Instr::BranchF64Ge { lhs, rhs, offset } => {
+                Instr::BranchF64Ge { instr_offset: _, lhs, rhs, offset } => {
                     self.execute_branch_f64_ge(lhs, rhs, offset)
                 }
-                Instr::Copy { result, value } => self.execute_copy(result, value),
-                Instr::Copy2 { results, values } => self.execute_copy_2(results, values),
-                Instr::CopyImm32 { result, value } => self.execute_copy_imm32(result, value),
-                Instr::CopyI64Imm32 { result, value } => self.execute_copy_i64imm32(result, value),
-                Instr::CopyF64Imm32 { result, value } => self.execute_copy_f64imm32(result, value),
+                Instr::Copy { instr_offset: _, result, value } => self.execute_copy(result, value),
+                Instr::Copy2 { instr_offset: _, results, values } => self.execute_copy_2(results, values),
+                Instr::CopyImm32 { instr_offset: _, result, value } => self.execute_copy_imm32(result, value),
+                Instr::CopyI64Imm32 { instr_offset: _, result, value } => self.execute_copy_i64imm32(result, value),
+                Instr::CopyF64Imm32 { instr_offset: _, result, value } => self.execute_copy_f64imm32(result, value),
                 Instr::CopySpan {
+                    instr_offset: _,
                     results,
                     values,
                     len,
                 } => self.execute_copy_span(results, values, len),
                 Instr::CopySpanNonOverlapping {
+                    instr_offset: _,
                     results,
                     values,
                     len,
                 } => self.execute_copy_span_non_overlapping(results, values, len),
-                Instr::CopyMany { results, values } => self.execute_copy_many(results, values),
-                Instr::CopyManyNonOverlapping { results, values } => {
+                Instr::CopyMany { instr_offset: _, results, values } => self.execute_copy_many(results, values),
+                Instr::CopyManyNonOverlapping { instr_offset: _, results, values } => {
                     self.execute_copy_many_non_overlapping(results, values)
                 }
-                Instr::ReturnCallInternal0 { func } => {
+                Instr::ReturnCallInternal0 { instr_offset: _, func } => {
                     self.execute_return_call_internal_0(&mut store.inner, EngineFunc::from(func))?
                 }
-                Instr::ReturnCallInternal { func } => {
+                Instr::ReturnCallInternal { instr_offset: _, func } => {
                     self.execute_return_call_internal(&mut store.inner, EngineFunc::from(func))?
                 }
-                Instr::ReturnCallImported0 { func } => {
+                Instr::ReturnCallImported0 { instr_offset: _, func } => {
                     self.execute_return_call_imported_0::<T>(store, func)?
                 }
-                Instr::ReturnCallImported { func } => {
+                Instr::ReturnCallImported { instr_offset: _, func } => {
                     self.execute_return_call_imported::<T>(store, func)?
                 }
-                Instr::ReturnCallIndirect0 { func_type } => {
+                Instr::ReturnCallIndirect0 { instr_offset: _, func_type } => {
                     self.execute_return_call_indirect_0::<T>(store, func_type)?
                 }
-                Instr::ReturnCallIndirect0Imm16 { func_type } => {
+                Instr::ReturnCallIndirect0Imm16 { instr_offset: _, func_type } => {
                     self.execute_return_call_indirect_0_imm16::<T>(store, func_type)?
                 }
-                Instr::ReturnCallIndirect { func_type } => {
+                Instr::ReturnCallIndirect { instr_offset: _, func_type } => {
                     self.execute_return_call_indirect::<T>(store, func_type)?
                 }
-                Instr::ReturnCallIndirectImm16 { func_type } => {
+                Instr::ReturnCallIndirectImm16 { instr_offset: _, func_type } => {
                     self.execute_return_call_indirect_imm16::<T>(store, func_type)?
                 }
-                Instr::CallInternal0 { results, func } => {
+                Instr::CallInternal0 { instr_offset: _, results, func } => {
                     self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
                 }
-                Instr::CallInternal { results, func } => {
+                Instr::CallInternal { instr_offset: _, results, func } => {
                     self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
                 }
-                Instr::CallImported0 { results, func } => {
+                Instr::CallImported0 { instr_offset: _, results, func } => {
                     self.execute_call_imported_0::<T>(store, results, func)?
                 }
-                Instr::CallImported { results, func } => {
+                Instr::CallImported { instr_offset: _, results, func } => {
                     self.execute_call_imported::<T>(store, results, func)?
                 }
-                Instr::CallIndirect0 { results, func_type } => {
+                Instr::CallIndirect0 { instr_offset: _, results, func_type } => {
                     self.execute_call_indirect_0::<T>(store, results, func_type)?;
                 }
-                Instr::CallIndirect0Imm16 { results, func_type } => {
+                Instr::CallIndirect0Imm16 { instr_offset: _, results, func_type } => {
                     self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?;
                 }
-                Instr::CallIndirect { results, func_type } => {
+                Instr::CallIndirect { instr_offset: _, results, func_type } => {
                     self.execute_call_indirect::<T>(store, results, func_type)?;
                 }
-                Instr::CallIndirectImm16 { results, func_type } => {
+                Instr::CallIndirectImm16 { instr_offset: _, results, func_type } => {
                     self.execute_call_indirect_imm16::<T>(store, results, func_type)?;
                 }
-                Instr::Select { result, lhs } => self.execute_select(result, lhs),
-                Instr::SelectImm32Rhs { result, lhs } => self.execute_select_imm32_rhs(result, lhs),
-                Instr::SelectImm32Lhs { result, lhs } => self.execute_select_imm32_lhs(result, lhs),
-                Instr::SelectImm32 { result, lhs } => self.execute_select_imm32(result, lhs),
-                Instr::SelectI64Imm32Rhs { result, lhs } => {
+                Instr::Select { instr_offset: _, result, lhs } => self.execute_select(result, lhs),
+                Instr::SelectImm32Rhs { instr_offset: _, result, lhs } => self.execute_select_imm32_rhs(result, lhs),
+                Instr::SelectImm32Lhs { instr_offset: _, result, lhs } => self.execute_select_imm32_lhs(result, lhs),
+                Instr::SelectImm32 { instr_offset: _, result, lhs } => self.execute_select_imm32(result, lhs),
+                Instr::SelectI64Imm32Rhs { instr_offset: _, result, lhs } => {
                     self.execute_select_i64imm32_rhs(result, lhs)
                 }
-                Instr::SelectI64Imm32Lhs { result, lhs } => {
+                Instr::SelectI64Imm32Lhs { instr_offset: _, result, lhs } => {
                     self.execute_select_i64imm32_lhs(result, lhs)
                 }
-                Instr::SelectI64Imm32 { result, lhs } => self.execute_select_i64imm32(result, lhs),
-                Instr::SelectF64Imm32Rhs { result, lhs } => {
+                Instr::SelectI64Imm32 { instr_offset: _, result, lhs } => self.execute_select_i64imm32(result, lhs),
+                Instr::SelectF64Imm32Rhs { instr_offset: _, result, lhs } => {
                     self.execute_select_f64imm32_rhs(result, lhs)
                 }
-                Instr::SelectF64Imm32Lhs { result, lhs } => {
+                Instr::SelectF64Imm32Lhs { instr_offset: _, result, lhs } => {
                     self.execute_select_f64imm32_lhs(result, lhs)
                 }
-                Instr::SelectF64Imm32 { result, lhs } => self.execute_select_f64imm32(result, lhs),
-                Instr::RefFunc { result, func } => self.execute_ref_func(result, func),
-                Instr::GlobalGet { result, global } => {
+                Instr::SelectF64Imm32 { instr_offset: _, result, lhs } => self.execute_select_f64imm32(result, lhs),
+                Instr::RefFunc { instr_offset: _, result, func } => self.execute_ref_func(result, func),
+                Instr::GlobalGet { instr_offset: _, result, global } => {
                     self.execute_global_get(&store.inner, result, global)
                 }
-                Instr::GlobalSet { global, input } => {
+                Instr::GlobalSet { instr_offset: _, global, input } => {
                     self.execute_global_set(&mut store.inner, global, input)
                 }
-                Instr::GlobalSetI32Imm16 { global, input } => {
+                Instr::GlobalSetI32Imm16 { instr_offset: _, global, input } => {
                     self.execute_global_set_i32imm16(&mut store.inner, global, input)
                 }
-                Instr::GlobalSetI64Imm16 { global, input } => {
+                Instr::GlobalSetI64Imm16 { instr_offset: _, global, input } => {
                     self.execute_global_set_i64imm16(&mut store.inner, global, input)
                 }
-                Instr::I32Load { result, memory } => {
+                Instr::I32Load { instr_offset: _, result, memory } => {
                     self.execute_i32_load(&store.inner, result, memory)?
                 }
-                Instr::I32LoadAt { result, address } => {
+                Instr::I32LoadAt { instr_offset: _, result, address } => {
                     self.execute_i32_load_at(&store.inner, result, address)?
                 }
                 Instr::I32LoadOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i32_load_offset16(result, ptr, offset)?,
-                Instr::I64Load { result, memory } => {
+                Instr::I64Load { instr_offset: _, result, memory } => {
                     self.execute_i64_load(&store.inner, result, memory)?
                 }
-                Instr::I64LoadAt { result, address } => {
+                Instr::I64LoadAt { instr_offset: _, result, address } => {
                     self.execute_i64_load_at(&store.inner, result, address)?
                 }
                 Instr::I64LoadOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load_offset16(result, ptr, offset)?,
-                Instr::F32Load { result, memory } => {
+                Instr::F32Load { instr_offset: _, result, memory } => {
                     self.execute_f32_load(&store.inner, result, memory)?
                 }
-                Instr::F32LoadAt { result, address } => {
+                Instr::F32LoadAt { instr_offset: _, result, address } => {
                     self.execute_f32_load_at(&store.inner, result, address)?
                 }
                 Instr::F32LoadOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_f32_load_offset16(result, ptr, offset)?,
-                Instr::F64Load { result, memory } => {
+                Instr::F64Load { instr_offset: _, result, memory } => {
                     self.execute_f64_load(&store.inner, result, memory)?
                 }
-                Instr::F64LoadAt { result, address } => {
+                Instr::F64LoadAt { instr_offset: _, result, address } => {
                     self.execute_f64_load_at(&store.inner, result, address)?
                 }
                 Instr::F64LoadOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_f64_load_offset16(result, ptr, offset)?,
-                Instr::I32Load8s { result, memory } => {
+                Instr::I32Load8s { instr_offset: _, result, memory } => {
                     self.execute_i32_load8_s(&store.inner, result, memory)?
                 }
-                Instr::I32Load8sAt { result, address } => {
+                Instr::I32Load8sAt { instr_offset: _, result, address } => {
                     self.execute_i32_load8_s_at(&store.inner, result, address)?
                 }
                 Instr::I32Load8sOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i32_load8_s_offset16(result, ptr, offset)?,
-                Instr::I32Load8u { result, memory } => {
+                Instr::I32Load8u { instr_offset: _, result, memory } => {
                     self.execute_i32_load8_u(&store.inner, result, memory)?
                 }
-                Instr::I32Load8uAt { result, address } => {
+                Instr::I32Load8uAt { instr_offset: _, result, address } => {
                     self.execute_i32_load8_u_at(&store.inner, result, address)?
                 }
                 Instr::I32Load8uOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i32_load8_u_offset16(result, ptr, offset)?,
-                Instr::I32Load16s { result, memory } => {
+                Instr::I32Load16s { instr_offset: _, result, memory } => {
                     self.execute_i32_load16_s(&store.inner, result, memory)?
                 }
-                Instr::I32Load16sAt { result, address } => {
+                Instr::I32Load16sAt { instr_offset: _, result, address } => {
                     self.execute_i32_load16_s_at(&store.inner, result, address)?
                 }
                 Instr::I32Load16sOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i32_load16_s_offset16(result, ptr, offset)?,
-                Instr::I32Load16u { result, memory } => {
+                Instr::I32Load16u { instr_offset: _, result, memory } => {
                     self.execute_i32_load16_u(&store.inner, result, memory)?
                 }
-                Instr::I32Load16uAt { result, address } => {
+                Instr::I32Load16uAt { instr_offset: _, result, address } => {
                     self.execute_i32_load16_u_at(&store.inner, result, address)?
                 }
                 Instr::I32Load16uOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i32_load16_u_offset16(result, ptr, offset)?,
-                Instr::I64Load8s { result, memory } => {
+                Instr::I64Load8s { instr_offset: _, result, memory } => {
                     self.execute_i64_load8_s(&store.inner, result, memory)?
                 }
-                Instr::I64Load8sAt { result, address } => {
+                Instr::I64Load8sAt { instr_offset: _, result, address } => {
                     self.execute_i64_load8_s_at(&store.inner, result, address)?
                 }
                 Instr::I64Load8sOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load8_s_offset16(result, ptr, offset)?,
-                Instr::I64Load8u { result, memory } => {
+                Instr::I64Load8u { instr_offset: _, result, memory } => {
                     self.execute_i64_load8_u(&store.inner, result, memory)?
                 }
-                Instr::I64Load8uAt { result, address } => {
+                Instr::I64Load8uAt { instr_offset: _, result, address } => {
                     self.execute_i64_load8_u_at(&store.inner, result, address)?
                 }
                 Instr::I64Load8uOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load8_u_offset16(result, ptr, offset)?,
-                Instr::I64Load16s { result, memory } => {
+                Instr::I64Load16s { instr_offset: _, result, memory } => {
                     self.execute_i64_load16_s(&store.inner, result, memory)?
                 }
-                Instr::I64Load16sAt { result, address } => {
+                Instr::I64Load16sAt { instr_offset: _, result, address } => {
                     self.execute_i64_load16_s_at(&store.inner, result, address)?
                 }
                 Instr::I64Load16sOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load16_s_offset16(result, ptr, offset)?,
-                Instr::I64Load16u { result, memory } => {
+                Instr::I64Load16u { instr_offset: _, result, memory } => {
                     self.execute_i64_load16_u(&store.inner, result, memory)?
                 }
-                Instr::I64Load16uAt { result, address } => {
+                Instr::I64Load16uAt { instr_offset: _, result, address } => {
                     self.execute_i64_load16_u_at(&store.inner, result, address)?
                 }
                 Instr::I64Load16uOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load16_u_offset16(result, ptr, offset)?,
-                Instr::I64Load32s { result, memory } => {
+                Instr::I64Load32s { instr_offset: _, result, memory } => {
                     self.execute_i64_load32_s(&store.inner, result, memory)?
                 }
-                Instr::I64Load32sAt { result, address } => {
+                Instr::I64Load32sAt { instr_offset: _, result, address } => {
                     self.execute_i64_load32_s_at(&store.inner, result, address)?
                 }
                 Instr::I64Load32sOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load32_s_offset16(result, ptr, offset)?,
-                Instr::I64Load32u { result, memory } => {
+                Instr::I64Load32u { instr_offset: _, result, memory } => {
                     self.execute_i64_load32_u(&store.inner, result, memory)?
                 }
-                Instr::I64Load32uAt { result, address } => {
+                Instr::I64Load32uAt { instr_offset: _, result, address } => {
                     self.execute_i64_load32_u_at(&store.inner, result, address)?
                 }
                 Instr::I64Load32uOffset16 {
+                    instr_offset: _,
                     result,
                     ptr,
                     offset,
                 } => self.execute_i64_load32_u_offset16(result, ptr, offset)?,
-                Instr::I32Store { ptr, memory } => {
+                Instr::I32Store { instr_offset: _, ptr, memory } => {
                     self.execute_i32_store(&mut store.inner, ptr, memory)?
                 }
-                Instr::I32StoreImm16 { ptr, memory } => {
+                Instr::I32StoreImm16 { instr_offset: _, ptr, memory } => {
                     self.execute_i32_store_imm16(&mut store.inner, ptr, memory)?
                 }
-                Instr::I32StoreOffset16 { ptr, offset, value } => {
+                Instr::I32StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i32_store_offset16(ptr, offset, value)?
                 }
-                Instr::I32StoreOffset16Imm16 { ptr, offset, value } => {
+                Instr::I32StoreOffset16Imm16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i32_store_offset16_imm16(ptr, offset, value)?
                 }
-                Instr::I32StoreAt { address, value } => {
+                Instr::I32StoreAt { instr_offset: _, address, value } => {
                     self.execute_i32_store_at(&mut store.inner, address, value)?
                 }
-                Instr::I32StoreAtImm16 { address, value } => {
+                Instr::I32StoreAtImm16 { instr_offset: _, address, value } => {
                     self.execute_i32_store_at_imm16(&mut store.inner, address, value)?
                 }
-                Instr::I32Store8 { ptr, memory } => {
+                Instr::I32Store8 { instr_offset: _, ptr, memory } => {
                     self.execute_i32_store8(&mut store.inner, ptr, memory)?
                 }
-                Instr::I32Store8Imm { ptr, memory } => {
+                Instr::I32Store8Imm { instr_offset: _, ptr, memory } => {
                     self.execute_i32_store8_imm(&mut store.inner, ptr, memory)?
                 }
-                Instr::I32Store8Offset16 { ptr, offset, value } => {
+                Instr::I32Store8Offset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i32_store8_offset16(ptr, offset, value)?
                 }
-                Instr::I32Store8Offset16Imm { ptr, offset, value } => {
+                Instr::I32Store8Offset16Imm { instr_offset: _, ptr, offset, value } => {
                     self.execute_i32_store8_offset16_imm(ptr, offset, value)?
                 }
-                Instr::I32Store8At { address, value } => {
+                Instr::I32Store8At { instr_offset: _, address, value } => {
                     self.execute_i32_store8_at(&mut store.inner, address, value)?
                 }
-                Instr::I32Store8AtImm { address, value } => {
+                Instr::I32Store8AtImm { instr_offset: _, address, value } => {
                     self.execute_i32_store8_at_imm(&mut store.inner, address, value)?
                 }
-                Instr::I32Store16 { ptr, memory } => {
+                Instr::I32Store16 { instr_offset: _, ptr, memory } => {
                     self.execute_i32_store16(&mut store.inner, ptr, memory)?
                 }
-                Instr::I32Store16Imm { ptr, memory } => {
+                Instr::I32Store16Imm { instr_offset: _, ptr, memory } => {
                     self.execute_i32_store16_imm(&mut store.inner, ptr, memory)?
                 }
-                Instr::I32Store16Offset16 { ptr, offset, value } => {
+                Instr::I32Store16Offset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i32_store16_offset16(ptr, offset, value)?
                 }
-                Instr::I32Store16Offset16Imm { ptr, offset, value } => {
+                Instr::I32Store16Offset16Imm { instr_offset: _, ptr, offset, value } => {
                     self.execute_i32_store16_offset16_imm(ptr, offset, value)?
                 }
-                Instr::I32Store16At { address, value } => {
+                Instr::I32Store16At { instr_offset: _, address, value } => {
                     self.execute_i32_store16_at(&mut store.inner, address, value)?
                 }
-                Instr::I32Store16AtImm { address, value } => {
+                Instr::I32Store16AtImm { instr_offset: _, address, value } => {
                     self.execute_i32_store16_at_imm(&mut store.inner, address, value)?
                 }
-                Instr::I64Store { ptr, memory } => {
+                Instr::I64Store { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64StoreImm16 { ptr, memory } => {
+                Instr::I64StoreImm16 { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store_imm16(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64StoreOffset16 { ptr, offset, value } => {
+                Instr::I64StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store_offset16(ptr, offset, value)?
                 }
-                Instr::I64StoreOffset16Imm16 { ptr, offset, value } => {
+                Instr::I64StoreOffset16Imm16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store_offset16_imm16(ptr, offset, value)?
                 }
-                Instr::I64StoreAt { address, value } => {
+                Instr::I64StoreAt { instr_offset: _, address, value } => {
                     self.execute_i64_store_at(&mut store.inner, address, value)?
                 }
-                Instr::I64StoreAtImm16 { address, value } => {
+                Instr::I64StoreAtImm16 { instr_offset: _, address, value } => {
                     self.execute_i64_store_at_imm16(&mut store.inner, address, value)?
                 }
-                Instr::I64Store8 { ptr, memory } => {
+                Instr::I64Store8 { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store8(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64Store8Imm { ptr, memory } => {
+                Instr::I64Store8Imm { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store8_imm(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64Store8Offset16 { ptr, offset, value } => {
+                Instr::I64Store8Offset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store8_offset16(ptr, offset, value)?
                 }
-                Instr::I64Store8Offset16Imm { ptr, offset, value } => {
+                Instr::I64Store8Offset16Imm { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store8_offset16_imm(ptr, offset, value)?
                 }
-                Instr::I64Store8At { address, value } => {
+                Instr::I64Store8At { instr_offset: _, address, value } => {
                     self.execute_i64_store8_at(&mut store.inner, address, value)?
                 }
-                Instr::I64Store8AtImm { address, value } => {
+                Instr::I64Store8AtImm { instr_offset: _, address, value } => {
                     self.execute_i64_store8_at_imm(&mut store.inner, address, value)?
                 }
-                Instr::I64Store16 { ptr, memory } => {
+                Instr::I64Store16 { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store16(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64Store16Imm { ptr, memory } => {
+                Instr::I64Store16Imm { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store16_imm(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64Store16Offset16 { ptr, offset, value } => {
+                Instr::I64Store16Offset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store16_offset16(ptr, offset, value)?
                 }
-                Instr::I64Store16Offset16Imm { ptr, offset, value } => {
+                Instr::I64Store16Offset16Imm { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store16_offset16_imm(ptr, offset, value)?
                 }
-                Instr::I64Store16At { address, value } => {
+                Instr::I64Store16At { instr_offset: _, address, value } => {
                     self.execute_i64_store16_at(&mut store.inner, address, value)?
                 }
-                Instr::I64Store16AtImm { address, value } => {
+                Instr::I64Store16AtImm { instr_offset: _, address, value } => {
                     self.execute_i64_store16_at_imm(&mut store.inner, address, value)?
                 }
-                Instr::I64Store32 { ptr, memory } => {
+                Instr::I64Store32 { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store32(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64Store32Imm16 { ptr, memory } => {
+                Instr::I64Store32Imm16 { instr_offset: _, ptr, memory } => {
                     self.execute_i64_store32_imm16(&mut store.inner, ptr, memory)?
                 }
-                Instr::I64Store32Offset16 { ptr, offset, value } => {
+                Instr::I64Store32Offset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store32_offset16(ptr, offset, value)?
                 }
-                Instr::I64Store32Offset16Imm16 { ptr, offset, value } => {
+                Instr::I64Store32Offset16Imm16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_i64_store32_offset16_imm16(ptr, offset, value)?
                 }
-                Instr::I64Store32At { address, value } => {
+                Instr::I64Store32At { instr_offset: _, address, value } => {
                     self.execute_i64_store32_at(&mut store.inner, address, value)?
                 }
-                Instr::I64Store32AtImm16 { address, value } => {
+                Instr::I64Store32AtImm16 { instr_offset: _, address, value } => {
                     self.execute_i64_store32_at_imm16(&mut store.inner, address, value)?
                 }
-                Instr::F32Store { ptr, memory } => {
+                Instr::F32Store { instr_offset: _, ptr, memory } => {
                     self.execute_f32_store(&mut store.inner, ptr, memory)?
                 }
-                Instr::F32StoreOffset16 { ptr, offset, value } => {
+                Instr::F32StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_f32_store_offset16(ptr, offset, value)?
                 }
-                Instr::F32StoreAt { address, value } => {
+                Instr::F32StoreAt { instr_offset: _, address, value } => {
                     self.execute_f32_store_at(&mut store.inner, address, value)?
                 }
-                Instr::F64Store { ptr, memory } => {
+                Instr::F64Store { instr_offset: _, ptr, memory } => {
                     self.execute_f64_store(&mut store.inner, ptr, memory)?
                 }
-                Instr::F64StoreOffset16 { ptr, offset, value } => {
+                Instr::F64StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                     self.execute_f64_store_offset16(ptr, offset, value)?
                 }
-                Instr::F64StoreAt { address, value } => {
+                Instr::F64StoreAt { instr_offset: _, address, value } => {
                     self.execute_f64_store_at(&mut store.inner, address, value)?
                 }
-                Instr::I32Eq { result, lhs, rhs } => self.execute_i32_eq(result, lhs, rhs),
-                Instr::I32EqImm16 { result, lhs, rhs } => {
+                Instr::I32Eq { instr_offset: _, result, lhs, rhs } => self.execute_i32_eq(result, lhs, rhs),
+                Instr::I32EqImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_eq_imm16(result, lhs, rhs)
                 }
-                Instr::I32Ne { result, lhs, rhs } => self.execute_i32_ne(result, lhs, rhs),
-                Instr::I32NeImm16 { result, lhs, rhs } => {
+                Instr::I32Ne { instr_offset: _, result, lhs, rhs } => self.execute_i32_ne(result, lhs, rhs),
+                Instr::I32NeImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_ne_imm16(result, lhs, rhs)
                 }
-                Instr::I32LtS { result, lhs, rhs } => self.execute_i32_lt_s(result, lhs, rhs),
-                Instr::I32LtSImm16 { result, lhs, rhs } => {
+                Instr::I32LtS { instr_offset: _, result, lhs, rhs } => self.execute_i32_lt_s(result, lhs, rhs),
+                Instr::I32LtSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_lt_s_imm16(result, lhs, rhs)
                 }
-                Instr::I32LtU { result, lhs, rhs } => self.execute_i32_lt_u(result, lhs, rhs),
-                Instr::I32LtUImm16 { result, lhs, rhs } => {
+                Instr::I32LtU { instr_offset: _, result, lhs, rhs } => self.execute_i32_lt_u(result, lhs, rhs),
+                Instr::I32LtUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_lt_u_imm16(result, lhs, rhs)
                 }
-                Instr::I32LeS { result, lhs, rhs } => self.execute_i32_le_s(result, lhs, rhs),
-                Instr::I32LeSImm16 { result, lhs, rhs } => {
+                Instr::I32LeS { instr_offset: _, result, lhs, rhs } => self.execute_i32_le_s(result, lhs, rhs),
+                Instr::I32LeSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_le_s_imm16(result, lhs, rhs)
                 }
-                Instr::I32LeU { result, lhs, rhs } => self.execute_i32_le_u(result, lhs, rhs),
-                Instr::I32LeUImm16 { result, lhs, rhs } => {
+                Instr::I32LeU { instr_offset: _, result, lhs, rhs } => self.execute_i32_le_u(result, lhs, rhs),
+                Instr::I32LeUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_le_u_imm16(result, lhs, rhs)
                 }
-                Instr::I32GtS { result, lhs, rhs } => self.execute_i32_gt_s(result, lhs, rhs),
-                Instr::I32GtSImm16 { result, lhs, rhs } => {
+                Instr::I32GtS { instr_offset: _, result, lhs, rhs } => self.execute_i32_gt_s(result, lhs, rhs),
+                Instr::I32GtSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_gt_s_imm16(result, lhs, rhs)
                 }
-                Instr::I32GtU { result, lhs, rhs } => self.execute_i32_gt_u(result, lhs, rhs),
-                Instr::I32GtUImm16 { result, lhs, rhs } => {
+                Instr::I32GtU { instr_offset: _, result, lhs, rhs } => self.execute_i32_gt_u(result, lhs, rhs),
+                Instr::I32GtUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_gt_u_imm16(result, lhs, rhs)
                 }
-                Instr::I32GeS { result, lhs, rhs } => self.execute_i32_ge_s(result, lhs, rhs),
-                Instr::I32GeSImm16 { result, lhs, rhs } => {
+                Instr::I32GeS { instr_offset: _, result, lhs, rhs } => self.execute_i32_ge_s(result, lhs, rhs),
+                Instr::I32GeSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_ge_s_imm16(result, lhs, rhs)
                 }
-                Instr::I32GeU { result, lhs, rhs } => self.execute_i32_ge_u(result, lhs, rhs),
-                Instr::I32GeUImm16 { result, lhs, rhs } => {
+                Instr::I32GeU { instr_offset: _, result, lhs, rhs } => self.execute_i32_ge_u(result, lhs, rhs),
+                Instr::I32GeUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_ge_u_imm16(result, lhs, rhs)
                 }
-                Instr::I64Eq { result, lhs, rhs } => self.execute_i64_eq(result, lhs, rhs),
-                Instr::I64EqImm16 { result, lhs, rhs } => {
+                Instr::I64Eq { instr_offset: _, result, lhs, rhs } => self.execute_i64_eq(result, lhs, rhs),
+                Instr::I64EqImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_eq_imm16(result, lhs, rhs)
                 }
-                Instr::I64Ne { result, lhs, rhs } => self.execute_i64_ne(result, lhs, rhs),
-                Instr::I64NeImm16 { result, lhs, rhs } => {
+                Instr::I64Ne { instr_offset: _, result, lhs, rhs } => self.execute_i64_ne(result, lhs, rhs),
+                Instr::I64NeImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_ne_imm16(result, lhs, rhs)
                 }
-                Instr::I64LtS { result, lhs, rhs } => self.execute_i64_lt_s(result, lhs, rhs),
-                Instr::I64LtSImm16 { result, lhs, rhs } => {
+                Instr::I64LtS { instr_offset: _, result, lhs, rhs } => self.execute_i64_lt_s(result, lhs, rhs),
+                Instr::I64LtSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_lt_s_imm16(result, lhs, rhs)
                 }
-                Instr::I64LtU { result, lhs, rhs } => self.execute_i64_lt_u(result, lhs, rhs),
-                Instr::I64LtUImm16 { result, lhs, rhs } => {
+                Instr::I64LtU { instr_offset: _, result, lhs, rhs } => self.execute_i64_lt_u(result, lhs, rhs),
+                Instr::I64LtUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_lt_u_imm16(result, lhs, rhs)
                 }
-                Instr::I64LeS { result, lhs, rhs } => self.execute_i64_le_s(result, lhs, rhs),
-                Instr::I64LeSImm16 { result, lhs, rhs } => {
+                Instr::I64LeS { instr_offset: _, result, lhs, rhs } => self.execute_i64_le_s(result, lhs, rhs),
+                Instr::I64LeSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_le_s_imm16(result, lhs, rhs)
                 }
-                Instr::I64LeU { result, lhs, rhs } => self.execute_i64_le_u(result, lhs, rhs),
-                Instr::I64LeUImm16 { result, lhs, rhs } => {
+                Instr::I64LeU { instr_offset: _, result, lhs, rhs } => self.execute_i64_le_u(result, lhs, rhs),
+                Instr::I64LeUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_le_u_imm16(result, lhs, rhs)
                 }
-                Instr::I64GtS { result, lhs, rhs } => self.execute_i64_gt_s(result, lhs, rhs),
-                Instr::I64GtSImm16 { result, lhs, rhs } => {
+                Instr::I64GtS { instr_offset: _, result, lhs, rhs } => self.execute_i64_gt_s(result, lhs, rhs),
+                Instr::I64GtSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_gt_s_imm16(result, lhs, rhs)
                 }
-                Instr::I64GtU { result, lhs, rhs } => self.execute_i64_gt_u(result, lhs, rhs),
-                Instr::I64GtUImm16 { result, lhs, rhs } => {
+                Instr::I64GtU { instr_offset: _, result, lhs, rhs } => self.execute_i64_gt_u(result, lhs, rhs),
+                Instr::I64GtUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_gt_u_imm16(result, lhs, rhs)
                 }
-                Instr::I64GeS { result, lhs, rhs } => self.execute_i64_ge_s(result, lhs, rhs),
-                Instr::I64GeSImm16 { result, lhs, rhs } => {
+                Instr::I64GeS { instr_offset: _, result, lhs, rhs } => self.execute_i64_ge_s(result, lhs, rhs),
+                Instr::I64GeSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_ge_s_imm16(result, lhs, rhs)
                 }
-                Instr::I64GeU { result, lhs, rhs } => self.execute_i64_ge_u(result, lhs, rhs),
-                Instr::I64GeUImm16 { result, lhs, rhs } => {
+                Instr::I64GeU { instr_offset: _, result, lhs, rhs } => self.execute_i64_ge_u(result, lhs, rhs),
+                Instr::I64GeUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_ge_u_imm16(result, lhs, rhs)
                 }
-                Instr::F32Eq { result, lhs, rhs } => self.execute_f32_eq(result, lhs, rhs),
-                Instr::F32Ne { result, lhs, rhs } => self.execute_f32_ne(result, lhs, rhs),
-                Instr::F32Lt { result, lhs, rhs } => self.execute_f32_lt(result, lhs, rhs),
-                Instr::F32Le { result, lhs, rhs } => self.execute_f32_le(result, lhs, rhs),
-                Instr::F32Gt { result, lhs, rhs } => self.execute_f32_gt(result, lhs, rhs),
-                Instr::F32Ge { result, lhs, rhs } => self.execute_f32_ge(result, lhs, rhs),
-                Instr::F64Eq { result, lhs, rhs } => self.execute_f64_eq(result, lhs, rhs),
-                Instr::F64Ne { result, lhs, rhs } => self.execute_f64_ne(result, lhs, rhs),
-                Instr::F64Lt { result, lhs, rhs } => self.execute_f64_lt(result, lhs, rhs),
-                Instr::F64Le { result, lhs, rhs } => self.execute_f64_le(result, lhs, rhs),
-                Instr::F64Gt { result, lhs, rhs } => self.execute_f64_gt(result, lhs, rhs),
-                Instr::F64Ge { result, lhs, rhs } => self.execute_f64_ge(result, lhs, rhs),
-                Instr::I32Clz { result, input } => self.execute_i32_clz(result, input),
-                Instr::I32Ctz { result, input } => self.execute_i32_ctz(result, input),
-                Instr::I32Popcnt { result, input } => self.execute_i32_popcnt(result, input),
-                Instr::I32Add { result, lhs, rhs } => self.execute_i32_add(result, lhs, rhs),
-                Instr::I32AddImm16 { result, lhs, rhs } => {
+                Instr::F32Eq { instr_offset: _, result, lhs, rhs } => self.execute_f32_eq(result, lhs, rhs),
+                Instr::F32Ne { instr_offset: _, result, lhs, rhs } => self.execute_f32_ne(result, lhs, rhs),
+                Instr::F32Lt { instr_offset: _, result, lhs, rhs } => self.execute_f32_lt(result, lhs, rhs),
+                Instr::F32Le { instr_offset: _, result, lhs, rhs } => self.execute_f32_le(result, lhs, rhs),
+                Instr::F32Gt { instr_offset: _, result, lhs, rhs } => self.execute_f32_gt(result, lhs, rhs),
+                Instr::F32Ge { instr_offset: _, result, lhs, rhs } => self.execute_f32_ge(result, lhs, rhs),
+                Instr::F64Eq { instr_offset: _, result, lhs, rhs } => self.execute_f64_eq(result, lhs, rhs),
+                Instr::F64Ne { instr_offset: _, result, lhs, rhs } => self.execute_f64_ne(result, lhs, rhs),
+                Instr::F64Lt { instr_offset: _, result, lhs, rhs } => self.execute_f64_lt(result, lhs, rhs),
+                Instr::F64Le { instr_offset: _, result, lhs, rhs } => self.execute_f64_le(result, lhs, rhs),
+                Instr::F64Gt { instr_offset: _, result, lhs, rhs } => self.execute_f64_gt(result, lhs, rhs),
+                Instr::F64Ge { instr_offset: _, result, lhs, rhs } => self.execute_f64_ge(result, lhs, rhs),
+                Instr::I32Clz { instr_offset: _, result, input } => self.execute_i32_clz(result, input),
+                Instr::I32Ctz { instr_offset: _, result, input } => self.execute_i32_ctz(result, input),
+                Instr::I32Popcnt { instr_offset: _, result, input } => self.execute_i32_popcnt(result, input),
+                Instr::I32Add { instr_offset: _, result, lhs, rhs } => self.execute_i32_add(result, lhs, rhs),
+                Instr::I32AddImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_add_imm16(result, lhs, rhs)
                 }
-                Instr::I32Sub { result, lhs, rhs } => self.execute_i32_sub(result, lhs, rhs),
-                Instr::I32SubImm16Lhs { result, lhs, rhs } => {
+                Instr::I32Sub { instr_offset: _, result, lhs, rhs } => self.execute_i32_sub(result, lhs, rhs),
+                Instr::I32SubImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_sub_imm16_lhs(result, lhs, rhs)
                 }
-                Instr::I32Mul { result, lhs, rhs } => self.execute_i32_mul(result, lhs, rhs),
-                Instr::I32MulImm16 { result, lhs, rhs } => {
+                Instr::I32Mul { instr_offset: _, result, lhs, rhs } => self.execute_i32_mul(result, lhs, rhs),
+                Instr::I32MulImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_mul_imm16(result, lhs, rhs)
                 }
-                Instr::I32DivS { result, lhs, rhs } => self.execute_i32_div_s(result, lhs, rhs)?,
-                Instr::I32DivSImm16Rhs { result, lhs, rhs } => {
+                Instr::I32DivS { instr_offset: _, result, lhs, rhs } => self.execute_i32_div_s(result, lhs, rhs)?,
+                Instr::I32DivSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_div_s_imm16_rhs(result, lhs, rhs)?
                 }
-                Instr::I32DivSImm16Lhs { result, lhs, rhs } => {
+                Instr::I32DivSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_div_s_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I32DivU { result, lhs, rhs } => self.execute_i32_div_u(result, lhs, rhs)?,
-                Instr::I32DivUImm16Rhs { result, lhs, rhs } => {
+                Instr::I32DivU { instr_offset: _, result, lhs, rhs } => self.execute_i32_div_u(result, lhs, rhs)?,
+                Instr::I32DivUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_div_u_imm16_rhs(result, lhs, rhs)
                 }
-                Instr::I32DivUImm16Lhs { result, lhs, rhs } => {
+                Instr::I32DivUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_div_u_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I32RemS { result, lhs, rhs } => self.execute_i32_rem_s(result, lhs, rhs)?,
-                Instr::I32RemSImm16Rhs { result, lhs, rhs } => {
+                Instr::I32RemS { instr_offset: _, result, lhs, rhs } => self.execute_i32_rem_s(result, lhs, rhs)?,
+                Instr::I32RemSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_rem_s_imm16_rhs(result, lhs, rhs)?
                 }
-                Instr::I32RemSImm16Lhs { result, lhs, rhs } => {
+                Instr::I32RemSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_rem_s_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I32RemU { result, lhs, rhs } => self.execute_i32_rem_u(result, lhs, rhs)?,
-                Instr::I32RemUImm16Rhs { result, lhs, rhs } => {
+                Instr::I32RemU { instr_offset: _, result, lhs, rhs } => self.execute_i32_rem_u(result, lhs, rhs)?,
+                Instr::I32RemUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_rem_u_imm16_rhs(result, lhs, rhs)
                 }
-                Instr::I32RemUImm16Lhs { result, lhs, rhs } => {
+                Instr::I32RemUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_rem_u_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I32And { result, lhs, rhs } => self.execute_i32_and(result, lhs, rhs),
-                Instr::I32AndEqz { result, lhs, rhs } => self.execute_i32_and_eqz(result, lhs, rhs),
-                Instr::I32AndEqzImm16 { result, lhs, rhs } => {
+                Instr::I32And { instr_offset: _, result, lhs, rhs } => self.execute_i32_and(result, lhs, rhs),
+                Instr::I32AndEqz { instr_offset: _, result, lhs, rhs } => self.execute_i32_and_eqz(result, lhs, rhs),
+                Instr::I32AndEqzImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_and_eqz_imm16(result, lhs, rhs)
                 }
-                Instr::I32AndImm16 { result, lhs, rhs } => {
+                Instr::I32AndImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_and_imm16(result, lhs, rhs)
                 }
-                Instr::I32Or { result, lhs, rhs } => self.execute_i32_or(result, lhs, rhs),
-                Instr::I32OrEqz { result, lhs, rhs } => self.execute_i32_or_eqz(result, lhs, rhs),
-                Instr::I32OrEqzImm16 { result, lhs, rhs } => {
+                Instr::I32Or { instr_offset: _, result, lhs, rhs } => self.execute_i32_or(result, lhs, rhs),
+                Instr::I32OrEqz { instr_offset: _, result, lhs, rhs } => self.execute_i32_or_eqz(result, lhs, rhs),
+                Instr::I32OrEqzImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_or_eqz_imm16(result, lhs, rhs)
                 }
-                Instr::I32OrImm16 { result, lhs, rhs } => {
+                Instr::I32OrImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_or_imm16(result, lhs, rhs)
                 }
-                Instr::I32Xor { result, lhs, rhs } => self.execute_i32_xor(result, lhs, rhs),
-                Instr::I32XorEqz { result, lhs, rhs } => self.execute_i32_xor_eqz(result, lhs, rhs),
-                Instr::I32XorEqzImm16 { result, lhs, rhs } => {
+                Instr::I32Xor { instr_offset: _, result, lhs, rhs } => self.execute_i32_xor(result, lhs, rhs),
+                Instr::I32XorEqz { instr_offset: _, result, lhs, rhs } => self.execute_i32_xor_eqz(result, lhs, rhs),
+                Instr::I32XorEqzImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_xor_eqz_imm16(result, lhs, rhs)
                 }
-                Instr::I32XorImm16 { result, lhs, rhs } => {
+                Instr::I32XorImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_xor_imm16(result, lhs, rhs)
                 }
-                Instr::I32Shl { result, lhs, rhs } => self.execute_i32_shl(result, lhs, rhs),
-                Instr::I32ShlBy { result, lhs, rhs } => self.execute_i32_shl_by(result, lhs, rhs),
-                Instr::I32ShlImm16 { result, lhs, rhs } => {
+                Instr::I32Shl { instr_offset: _, result, lhs, rhs } => self.execute_i32_shl(result, lhs, rhs),
+                Instr::I32ShlBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_shl_by(result, lhs, rhs),
+                Instr::I32ShlImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_shl_imm16(result, lhs, rhs)
                 }
-                Instr::I32ShrU { result, lhs, rhs } => self.execute_i32_shr_u(result, lhs, rhs),
-                Instr::I32ShrUBy { result, lhs, rhs } => {
+                Instr::I32ShrU { instr_offset: _, result, lhs, rhs } => self.execute_i32_shr_u(result, lhs, rhs),
+                Instr::I32ShrUBy { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_shr_u_by(result, lhs, rhs)
                 }
-                Instr::I32ShrUImm16 { result, lhs, rhs } => {
+                Instr::I32ShrUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_shr_u_imm16(result, lhs, rhs)
                 }
-                Instr::I32ShrS { result, lhs, rhs } => self.execute_i32_shr_s(result, lhs, rhs),
-                Instr::I32ShrSBy { result, lhs, rhs } => {
+                Instr::I32ShrS { instr_offset: _, result, lhs, rhs } => self.execute_i32_shr_s(result, lhs, rhs),
+                Instr::I32ShrSBy { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_shr_s_by(result, lhs, rhs)
                 }
-                Instr::I32ShrSImm16 { result, lhs, rhs } => {
+                Instr::I32ShrSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_shr_s_imm16(result, lhs, rhs)
                 }
-                Instr::I32Rotl { result, lhs, rhs } => self.execute_i32_rotl(result, lhs, rhs),
-                Instr::I32RotlBy { result, lhs, rhs } => self.execute_i32_rotl_by(result, lhs, rhs),
-                Instr::I32RotlImm16 { result, lhs, rhs } => {
+                Instr::I32Rotl { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotl(result, lhs, rhs),
+                Instr::I32RotlBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotl_by(result, lhs, rhs),
+                Instr::I32RotlImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_rotl_imm16(result, lhs, rhs)
                 }
-                Instr::I32Rotr { result, lhs, rhs } => self.execute_i32_rotr(result, lhs, rhs),
-                Instr::I32RotrBy { result, lhs, rhs } => self.execute_i32_rotr_by(result, lhs, rhs),
-                Instr::I32RotrImm16 { result, lhs, rhs } => {
+                Instr::I32Rotr { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotr(result, lhs, rhs),
+                Instr::I32RotrBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotr_by(result, lhs, rhs),
+                Instr::I32RotrImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i32_rotr_imm16(result, lhs, rhs)
                 }
-                Instr::I64Clz { result, input } => self.execute_i64_clz(result, input),
-                Instr::I64Ctz { result, input } => self.execute_i64_ctz(result, input),
-                Instr::I64Popcnt { result, input } => self.execute_i64_popcnt(result, input),
-                Instr::I64Add { result, lhs, rhs } => self.execute_i64_add(result, lhs, rhs),
-                Instr::I64AddImm16 { result, lhs, rhs } => {
+                Instr::I64Clz { instr_offset: _, result, input } => self.execute_i64_clz(result, input),
+                Instr::I64Ctz { instr_offset: _, result, input } => self.execute_i64_ctz(result, input),
+                Instr::I64Popcnt { instr_offset: _, result, input } => self.execute_i64_popcnt(result, input),
+                Instr::I64Add { instr_offset: _, result, lhs, rhs } => self.execute_i64_add(result, lhs, rhs),
+                Instr::I64AddImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_add_imm16(result, lhs, rhs)
                 }
-                Instr::I64Sub { result, lhs, rhs } => self.execute_i64_sub(result, lhs, rhs),
-                Instr::I64SubImm16Lhs { result, lhs, rhs } => {
+                Instr::I64Sub { instr_offset: _, result, lhs, rhs } => self.execute_i64_sub(result, lhs, rhs),
+                Instr::I64SubImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_sub_imm16_lhs(result, lhs, rhs)
                 }
-                Instr::I64Mul { result, lhs, rhs } => self.execute_i64_mul(result, lhs, rhs),
-                Instr::I64MulImm16 { result, lhs, rhs } => {
+                Instr::I64Mul { instr_offset: _, result, lhs, rhs } => self.execute_i64_mul(result, lhs, rhs),
+                Instr::I64MulImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_mul_imm16(result, lhs, rhs)
                 }
-                Instr::I64DivS { result, lhs, rhs } => self.execute_i64_div_s(result, lhs, rhs)?,
-                Instr::I64DivSImm16Rhs { result, lhs, rhs } => {
+                Instr::I64DivS { instr_offset: _, result, lhs, rhs } => self.execute_i64_div_s(result, lhs, rhs)?,
+                Instr::I64DivSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_div_s_imm16_rhs(result, lhs, rhs)?
                 }
-                Instr::I64DivSImm16Lhs { result, lhs, rhs } => {
+                Instr::I64DivSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_div_s_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I64DivU { result, lhs, rhs } => self.execute_i64_div_u(result, lhs, rhs)?,
-                Instr::I64DivUImm16Rhs { result, lhs, rhs } => {
+                Instr::I64DivU { instr_offset: _, result, lhs, rhs } => self.execute_i64_div_u(result, lhs, rhs)?,
+                Instr::I64DivUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_div_u_imm16_rhs(result, lhs, rhs)
                 }
-                Instr::I64DivUImm16Lhs { result, lhs, rhs } => {
+                Instr::I64DivUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_div_u_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I64RemS { result, lhs, rhs } => self.execute_i64_rem_s(result, lhs, rhs)?,
-                Instr::I64RemSImm16Rhs { result, lhs, rhs } => {
+                Instr::I64RemS { instr_offset: _, result, lhs, rhs } => self.execute_i64_rem_s(result, lhs, rhs)?,
+                Instr::I64RemSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_rem_s_imm16_rhs(result, lhs, rhs)?
                 }
-                Instr::I64RemSImm16Lhs { result, lhs, rhs } => {
+                Instr::I64RemSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_rem_s_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I64RemU { result, lhs, rhs } => self.execute_i64_rem_u(result, lhs, rhs)?,
-                Instr::I64RemUImm16Rhs { result, lhs, rhs } => {
+                Instr::I64RemU { instr_offset: _, result, lhs, rhs } => self.execute_i64_rem_u(result, lhs, rhs)?,
+                Instr::I64RemUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_rem_u_imm16_rhs(result, lhs, rhs)
                 }
-                Instr::I64RemUImm16Lhs { result, lhs, rhs } => {
+                Instr::I64RemUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_rem_u_imm16_lhs(result, lhs, rhs)?
                 }
-                Instr::I64And { result, lhs, rhs } => self.execute_i64_and(result, lhs, rhs),
-                Instr::I64AndImm16 { result, lhs, rhs } => {
+                Instr::I64And { instr_offset: _, result, lhs, rhs } => self.execute_i64_and(result, lhs, rhs),
+                Instr::I64AndImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_and_imm16(result, lhs, rhs)
                 }
-                Instr::I64Or { result, lhs, rhs } => self.execute_i64_or(result, lhs, rhs),
-                Instr::I64OrImm16 { result, lhs, rhs } => {
+                Instr::I64Or { instr_offset: _, result, lhs, rhs } => self.execute_i64_or(result, lhs, rhs),
+                Instr::I64OrImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_or_imm16(result, lhs, rhs)
                 }
-                Instr::I64Xor { result, lhs, rhs } => self.execute_i64_xor(result, lhs, rhs),
-                Instr::I64XorImm16 { result, lhs, rhs } => {
+                Instr::I64Xor { instr_offset: _, result, lhs, rhs } => self.execute_i64_xor(result, lhs, rhs),
+                Instr::I64XorImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_xor_imm16(result, lhs, rhs)
                 }
-                Instr::I64Shl { result, lhs, rhs } => self.execute_i64_shl(result, lhs, rhs),
-                Instr::I64ShlBy { result, lhs, rhs } => self.execute_i64_shl_by(result, lhs, rhs),
-                Instr::I64ShlImm16 { result, lhs, rhs } => {
+                Instr::I64Shl { instr_offset: _, result, lhs, rhs } => self.execute_i64_shl(result, lhs, rhs),
+                Instr::I64ShlBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_shl_by(result, lhs, rhs),
+                Instr::I64ShlImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_shl_imm16(result, lhs, rhs)
                 }
-                Instr::I64ShrU { result, lhs, rhs } => self.execute_i64_shr_u(result, lhs, rhs),
-                Instr::I64ShrUBy { result, lhs, rhs } => {
+                Instr::I64ShrU { instr_offset: _, result, lhs, rhs } => self.execute_i64_shr_u(result, lhs, rhs),
+                Instr::I64ShrUBy { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_shr_u_by(result, lhs, rhs)
                 }
-                Instr::I64ShrUImm16 { result, lhs, rhs } => {
+                Instr::I64ShrUImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_shr_u_imm16(result, lhs, rhs)
                 }
-                Instr::I64ShrS { result, lhs, rhs } => self.execute_i64_shr_s(result, lhs, rhs),
-                Instr::I64ShrSBy { result, lhs, rhs } => {
+                Instr::I64ShrS { instr_offset: _, result, lhs, rhs } => self.execute_i64_shr_s(result, lhs, rhs),
+                Instr::I64ShrSBy { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_shr_s_by(result, lhs, rhs)
                 }
-                Instr::I64ShrSImm16 { result, lhs, rhs } => {
+                Instr::I64ShrSImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_shr_s_imm16(result, lhs, rhs)
                 }
-                Instr::I64Rotl { result, lhs, rhs } => self.execute_i64_rotl(result, lhs, rhs),
-                Instr::I64RotlBy { result, lhs, rhs } => self.execute_i64_rotl_by(result, lhs, rhs),
-                Instr::I64RotlImm16 { result, lhs, rhs } => {
+                Instr::I64Rotl { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotl(result, lhs, rhs),
+                Instr::I64RotlBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotl_by(result, lhs, rhs),
+                Instr::I64RotlImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_rotl_imm16(result, lhs, rhs)
                 }
-                Instr::I64Rotr { result, lhs, rhs } => self.execute_i64_rotr(result, lhs, rhs),
-                Instr::I64RotrBy { result, lhs, rhs } => self.execute_i64_rotr_by(result, lhs, rhs),
-                Instr::I64RotrImm16 { result, lhs, rhs } => {
+                Instr::I64Rotr { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotr(result, lhs, rhs),
+                Instr::I64RotrBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotr_by(result, lhs, rhs),
+                Instr::I64RotrImm16 { instr_offset: _, result, lhs, rhs } => {
                     self.execute_i64_rotr_imm16(result, lhs, rhs)
                 }
-                Instr::I32WrapI64 { result, input } => self.execute_i32_wrap_i64(result, input),
-                Instr::I32Extend8S { result, input } => self.execute_i32_extend8_s(result, input),
-                Instr::I32Extend16S { result, input } => self.execute_i32_extend16_s(result, input),
-                Instr::I64Extend8S { result, input } => self.execute_i64_extend8_s(result, input),
-                Instr::I64Extend16S { result, input } => self.execute_i64_extend16_s(result, input),
-                Instr::I64Extend32S { result, input } => self.execute_i64_extend32_s(result, input),
-                Instr::F32Abs { result, input } => self.execute_f32_abs(result, input),
-                Instr::F32Neg { result, input } => self.execute_f32_neg(result, input),
-                Instr::F32Ceil { result, input } => self.execute_f32_ceil(result, input),
-                Instr::F32Floor { result, input } => self.execute_f32_floor(result, input),
-                Instr::F32Trunc { result, input } => self.execute_f32_trunc(result, input),
-                Instr::F32Nearest { result, input } => self.execute_f32_nearest(result, input),
-                Instr::F32Sqrt { result, input } => self.execute_f32_sqrt(result, input),
-                Instr::F32Add { result, lhs, rhs } => self.execute_f32_add(result, lhs, rhs),
-                Instr::F32Sub { result, lhs, rhs } => self.execute_f32_sub(result, lhs, rhs),
-                Instr::F32Mul { result, lhs, rhs } => self.execute_f32_mul(result, lhs, rhs),
-                Instr::F32Div { result, lhs, rhs } => self.execute_f32_div(result, lhs, rhs),
-                Instr::F32Min { result, lhs, rhs } => self.execute_f32_min(result, lhs, rhs),
-                Instr::F32Max { result, lhs, rhs } => self.execute_f32_max(result, lhs, rhs),
-                Instr::F32Copysign { result, lhs, rhs } => {
+                Instr::I32WrapI64 { instr_offset: _, result, input } => self.execute_i32_wrap_i64(result, input),
+                Instr::I32Extend8S { instr_offset: _, result, input } => self.execute_i32_extend8_s(result, input),
+                Instr::I32Extend16S { instr_offset: _, result, input } => self.execute_i32_extend16_s(result, input),
+                Instr::I64Extend8S { instr_offset: _, result, input } => self.execute_i64_extend8_s(result, input),
+                Instr::I64Extend16S { instr_offset: _, result, input } => self.execute_i64_extend16_s(result, input),
+                Instr::I64Extend32S { instr_offset: _, result, input } => self.execute_i64_extend32_s(result, input),
+                Instr::F32Abs { instr_offset: _, result, input } => self.execute_f32_abs(result, input),
+                Instr::F32Neg { instr_offset: _, result, input } => self.execute_f32_neg(result, input),
+                Instr::F32Ceil { instr_offset: _, result, input } => self.execute_f32_ceil(result, input),
+                Instr::F32Floor { instr_offset: _, result, input } => self.execute_f32_floor(result, input),
+                Instr::F32Trunc { instr_offset: _, result, input } => self.execute_f32_trunc(result, input),
+                Instr::F32Nearest { instr_offset: _, result, input } => self.execute_f32_nearest(result, input),
+                Instr::F32Sqrt { instr_offset: _, result, input } => self.execute_f32_sqrt(result, input),
+                Instr::F32Add { instr_offset: _, result, lhs, rhs } => self.execute_f32_add(result, lhs, rhs),
+                Instr::F32Sub { instr_offset: _, result, lhs, rhs } => self.execute_f32_sub(result, lhs, rhs),
+                Instr::F32Mul { instr_offset: _, result, lhs, rhs } => self.execute_f32_mul(result, lhs, rhs),
+                Instr::F32Div { instr_offset: _, result, lhs, rhs } => self.execute_f32_div(result, lhs, rhs),
+                Instr::F32Min { instr_offset: _, result, lhs, rhs } => self.execute_f32_min(result, lhs, rhs),
+                Instr::F32Max { instr_offset: _, result, lhs, rhs } => self.execute_f32_max(result, lhs, rhs),
+                Instr::F32Copysign { instr_offset: _, result, lhs, rhs } => {
                     self.execute_f32_copysign(result, lhs, rhs)
                 }
-                Instr::F32CopysignImm { result, lhs, rhs } => {
+                Instr::F32CopysignImm { instr_offset: _, result, lhs, rhs } => {
                     self.execute_f32_copysign_imm(result, lhs, rhs)
                 }
-                Instr::F64Abs { result, input } => self.execute_f64_abs(result, input),
-                Instr::F64Neg { result, input } => self.execute_f64_neg(result, input),
-                Instr::F64Ceil { result, input } => self.execute_f64_ceil(result, input),
-                Instr::F64Floor { result, input } => self.execute_f64_floor(result, input),
-                Instr::F64Trunc { result, input } => self.execute_f64_trunc(result, input),
-                Instr::F64Nearest { result, input } => self.execute_f64_nearest(result, input),
-                Instr::F64Sqrt { result, input } => self.execute_f64_sqrt(result, input),
-                Instr::F64Add { result, lhs, rhs } => self.execute_f64_add(result, lhs, rhs),
-                Instr::F64Sub { result, lhs, rhs } => self.execute_f64_sub(result, lhs, rhs),
-                Instr::F64Mul { result, lhs, rhs } => self.execute_f64_mul(result, lhs, rhs),
-                Instr::F64Div { result, lhs, rhs } => self.execute_f64_div(result, lhs, rhs),
-                Instr::F64Min { result, lhs, rhs } => self.execute_f64_min(result, lhs, rhs),
-                Instr::F64Max { result, lhs, rhs } => self.execute_f64_max(result, lhs, rhs),
-                Instr::F64Copysign { result, lhs, rhs } => {
+                Instr::F64Abs { instr_offset: _, result, input } => self.execute_f64_abs(result, input),
+                Instr::F64Neg { instr_offset: _, result, input } => self.execute_f64_neg(result, input),
+                Instr::F64Ceil { instr_offset: _, result, input } => self.execute_f64_ceil(result, input),
+                Instr::F64Floor { instr_offset: _, result, input } => self.execute_f64_floor(result, input),
+                Instr::F64Trunc { instr_offset: _, result, input } => self.execute_f64_trunc(result, input),
+                Instr::F64Nearest { instr_offset: _, result, input } => self.execute_f64_nearest(result, input),
+                Instr::F64Sqrt { instr_offset: _, result, input } => self.execute_f64_sqrt(result, input),
+                Instr::F64Add { instr_offset: _, result, lhs, rhs } => self.execute_f64_add(result, lhs, rhs),
+                Instr::F64Sub { instr_offset: _, result, lhs, rhs } => self.execute_f64_sub(result, lhs, rhs),
+                Instr::F64Mul { instr_offset: _, result, lhs, rhs } => self.execute_f64_mul(result, lhs, rhs),
+                Instr::F64Div { instr_offset: _, result, lhs, rhs } => self.execute_f64_div(result, lhs, rhs),
+                Instr::F64Min { instr_offset: _, result, lhs, rhs } => self.execute_f64_min(result, lhs, rhs),
+                Instr::F64Max { instr_offset: _, result, lhs, rhs } => self.execute_f64_max(result, lhs, rhs),
+                Instr::F64Copysign { instr_offset: _, result, lhs, rhs } => {
                     self.execute_f64_copysign(result, lhs, rhs)
                 }
-                Instr::F64CopysignImm { result, lhs, rhs } => {
+                Instr::F64CopysignImm { instr_offset: _, result, lhs, rhs } => {
                     self.execute_f64_copysign_imm(result, lhs, rhs)
                 }
-                Instr::I32TruncF32S { result, input } => {
+                Instr::I32TruncF32S { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_f32_s(result, input)?
                 }
-                Instr::I32TruncF32U { result, input } => {
+                Instr::I32TruncF32U { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_f32_u(result, input)?
                 }
-                Instr::I32TruncF64S { result, input } => {
+                Instr::I32TruncF64S { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_f64_s(result, input)?
                 }
-                Instr::I32TruncF64U { result, input } => {
+                Instr::I32TruncF64U { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_f64_u(result, input)?
                 }
-                Instr::I64TruncF32S { result, input } => {
+                Instr::I64TruncF32S { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_f32_s(result, input)?
                 }
-                Instr::I64TruncF32U { result, input } => {
+                Instr::I64TruncF32U { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_f32_u(result, input)?
                 }
-                Instr::I64TruncF64S { result, input } => {
+                Instr::I64TruncF64S { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_f64_s(result, input)?
                 }
-                Instr::I64TruncF64U { result, input } => {
+                Instr::I64TruncF64U { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_f64_u(result, input)?
                 }
-                Instr::I32TruncSatF32S { result, input } => {
+                Instr::I32TruncSatF32S { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_sat_f32_s(result, input)
                 }
-                Instr::I32TruncSatF32U { result, input } => {
+                Instr::I32TruncSatF32U { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_sat_f32_u(result, input)
                 }
-                Instr::I32TruncSatF64S { result, input } => {
+                Instr::I32TruncSatF64S { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_sat_f64_s(result, input)
                 }
-                Instr::I32TruncSatF64U { result, input } => {
+                Instr::I32TruncSatF64U { instr_offset: _, result, input } => {
                     self.execute_i32_trunc_sat_f64_u(result, input)
                 }
-                Instr::I64TruncSatF32S { result, input } => {
+                Instr::I64TruncSatF32S { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_sat_f32_s(result, input)
                 }
-                Instr::I64TruncSatF32U { result, input } => {
+                Instr::I64TruncSatF32U { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_sat_f32_u(result, input)
                 }
-                Instr::I64TruncSatF64S { result, input } => {
+                Instr::I64TruncSatF64S { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_sat_f64_s(result, input)
                 }
-                Instr::I64TruncSatF64U { result, input } => {
+                Instr::I64TruncSatF64U { instr_offset: _, result, input } => {
                     self.execute_i64_trunc_sat_f64_u(result, input)
                 }
-                Instr::F32DemoteF64 { result, input } => self.execute_f32_demote_f64(result, input),
-                Instr::F64PromoteF32 { result, input } => {
+                Instr::F32DemoteF64 { instr_offset: _, result, input } => self.execute_f32_demote_f64(result, input),
+                Instr::F64PromoteF32 { instr_offset: _, result, input } => {
                     self.execute_f64_promote_f32(result, input)
                 }
-                Instr::F32ConvertI32S { result, input } => {
+                Instr::F32ConvertI32S { instr_offset: _, result, input } => {
                     self.execute_f32_convert_i32_s(result, input)
                 }
-                Instr::F32ConvertI32U { result, input } => {
+                Instr::F32ConvertI32U { instr_offset: _, result, input } => {
                     self.execute_f32_convert_i32_u(result, input)
                 }
-                Instr::F32ConvertI64S { result, input } => {
+                Instr::F32ConvertI64S { instr_offset: _, result, input } => {
                     self.execute_f32_convert_i64_s(result, input)
                 }
-                Instr::F32ConvertI64U { result, input } => {
+                Instr::F32ConvertI64U { instr_offset: _, result, input } => {
                     self.execute_f32_convert_i64_u(result, input)
                 }
-                Instr::F64ConvertI32S { result, input } => {
+                Instr::F64ConvertI32S { instr_offset: _, result, input } => {
                     self.execute_f64_convert_i32_s(result, input)
                 }
-                Instr::F64ConvertI32U { result, input } => {
+                Instr::F64ConvertI32U { instr_offset: _, result, input } => {
                     self.execute_f64_convert_i32_u(result, input)
                 }
-                Instr::F64ConvertI64S { result, input } => {
+                Instr::F64ConvertI64S { instr_offset: _, result, input } => {
                     self.execute_f64_convert_i64_s(result, input)
                 }
-                Instr::F64ConvertI64U { result, input } => {
+                Instr::F64ConvertI64U { instr_offset: _, result, input } => {
                     self.execute_f64_convert_i64_u(result, input)
                 }
-                Instr::TableGet { result, index } => {
+                Instr::TableGet { instr_offset: _, result, index } => {
                     self.execute_table_get(&store.inner, result, index)?
                 }
-                Instr::TableGetImm { result, index } => {
+                Instr::TableGetImm { instr_offset: _, result, index } => {
                     self.execute_table_get_imm(&store.inner, result, index)?
                 }
-                Instr::TableSize { result, table } => {
+                Instr::TableSize { instr_offset: _, result, table } => {
                     self.execute_table_size(&store.inner, result, table)
                 }
-                Instr::TableSet { index, value } => {
+                Instr::TableSet { instr_offset: _, index, value } => {
                     self.execute_table_set(&mut store.inner, index, value)?
                 }
-                Instr::TableSetAt { index, value } => {
+                Instr::TableSetAt { instr_offset: _, index, value } => {
                     self.execute_table_set_at(&mut store.inner, index, value)?
                 }
-                Instr::TableCopy { dst, src, len } => {
+                Instr::TableCopy { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyTo { dst, src, len } => {
+                Instr::TableCopyTo { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyFrom { dst, src, len } => {
+                Instr::TableCopyFrom { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_from(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyFromTo { dst, src, len } => {
+                Instr::TableCopyFromTo { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_from_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyExact { dst, src, len } => {
+                Instr::TableCopyExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyToExact { dst, src, len } => {
+                Instr::TableCopyToExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyFromExact { dst, src, len } => {
+                Instr::TableCopyFromExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_from_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableCopyFromToExact { dst, src, len } => {
+                Instr::TableCopyFromToExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_copy_from_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInit { dst, src, len } => {
+                Instr::TableInit { instr_offset: _, dst, src, len } => {
                     self.execute_table_init(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitTo { dst, src, len } => {
+                Instr::TableInitTo { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitFrom { dst, src, len } => {
+                Instr::TableInitFrom { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_from(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitFromTo { dst, src, len } => {
+                Instr::TableInitFromTo { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_from_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitExact { dst, src, len } => {
+                Instr::TableInitExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitToExact { dst, src, len } => {
+                Instr::TableInitToExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitFromExact { dst, src, len } => {
+                Instr::TableInitFromExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_from_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableInitFromToExact { dst, src, len } => {
+                Instr::TableInitFromToExact { instr_offset: _, dst, src, len } => {
                     self.execute_table_init_from_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::TableFill { dst, len, value } => {
+                Instr::TableFill { instr_offset: _, dst, len, value } => {
                     self.execute_table_fill(&mut store.inner, dst, len, value)?
                 }
-                Instr::TableFillAt { dst, len, value } => {
+                Instr::TableFillAt { instr_offset: _, dst, len, value } => {
                     self.execute_table_fill_at(&mut store.inner, dst, len, value)?
                 }
-                Instr::TableFillExact { dst, len, value } => {
+                Instr::TableFillExact { instr_offset: _, dst, len, value } => {
                     self.execute_table_fill_exact(&mut store.inner, dst, len, value)?
                 }
-                Instr::TableFillAtExact { dst, len, value } => {
+                Instr::TableFillAtExact { instr_offset: _, dst, len, value } => {
                     self.execute_table_fill_at_exact(&mut store.inner, dst, len, value)?
                 }
                 Instr::TableGrow {
+                    instr_offset: _,
                     result,
                     delta,
                     value,
                 } => self.execute_table_grow(store, result, delta, value)?,
                 Instr::TableGrowImm {
+                    instr_offset: _,
                     result,
                     delta,
                     value,
                 } => self.execute_table_grow_imm(store, result, delta, value)?,
-                Instr::ElemDrop { index } => self.execute_element_drop(&mut store.inner, index),
-                Instr::DataDrop { index } => self.execute_data_drop(&mut store.inner, index),
-                Instr::MemorySize { result, memory } => {
+                Instr::ElemDrop { instr_offset: _, index } => self.execute_element_drop(&mut store.inner, index),
+                Instr::DataDrop { instr_offset: _, index } => self.execute_data_drop(&mut store.inner, index),
+                Instr::MemorySize { instr_offset: _, result, memory } => {
                     self.execute_memory_size(&store.inner, result, memory)
                 }
-                Instr::MemoryGrow { result, delta } => {
+                Instr::MemoryGrow { instr_offset: _, result, delta } => {
                     self.execute_memory_grow(store, result, delta)?
                 }
-                Instr::MemoryGrowBy { result, delta } => {
+                Instr::MemoryGrowBy { instr_offset: _, result, delta } => {
                     self.execute_memory_grow_by(store, result, delta)?
                 }
-                Instr::MemoryCopy { dst, src, len } => {
+                Instr::MemoryCopy { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyTo { dst, src, len } => {
+                Instr::MemoryCopyTo { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyFrom { dst, src, len } => {
+                Instr::MemoryCopyFrom { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_from(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyFromTo { dst, src, len } => {
+                Instr::MemoryCopyFromTo { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_from_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyExact { dst, src, len } => {
+                Instr::MemoryCopyExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyToExact { dst, src, len } => {
+                Instr::MemoryCopyToExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyFromExact { dst, src, len } => {
+                Instr::MemoryCopyFromExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_from_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryCopyFromToExact { dst, src, len } => {
+                Instr::MemoryCopyFromToExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_copy_from_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryFill { dst, value, len } => {
+                Instr::MemoryFill { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillAt { dst, value, len } => {
+                Instr::MemoryFillAt { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_at(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillImm { dst, value, len } => {
+                Instr::MemoryFillImm { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_imm(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillExact { dst, value, len } => {
+                Instr::MemoryFillExact { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_exact(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillAtImm { dst, value, len } => {
+                Instr::MemoryFillAtImm { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_at_imm(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillAtExact { dst, value, len } => {
+                Instr::MemoryFillAtExact { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_at_exact(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillImmExact { dst, value, len } => {
+                Instr::MemoryFillImmExact { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_imm_exact(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryFillAtImmExact { dst, value, len } => {
+                Instr::MemoryFillAtImmExact { instr_offset: _, dst, value, len } => {
                     self.execute_memory_fill_at_imm_exact(&mut store.inner, dst, value, len)?
                 }
-                Instr::MemoryInit { dst, src, len } => {
+                Instr::MemoryInit { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitTo { dst, src, len } => {
+                Instr::MemoryInitTo { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitFrom { dst, src, len } => {
+                Instr::MemoryInitFrom { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_from(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitFromTo { dst, src, len } => {
+                Instr::MemoryInitFromTo { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_from_to(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitExact { dst, src, len } => {
+                Instr::MemoryInitExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitToExact { dst, src, len } => {
+                Instr::MemoryInitToExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_to_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitFromExact { dst, src, len } => {
+                Instr::MemoryInitFromExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_from_exact(&mut store.inner, dst, src, len)?
                 }
-                Instr::MemoryInitFromToExact { dst, src, len } => {
+                Instr::MemoryInitFromToExact { instr_offset: _, dst, src, len } => {
                     self.execute_memory_init_from_to_exact(&mut store.inner, dst, src, len)?
                 }
                 Instr::TableIndex { .. }
@@ -1412,16 +1432,32 @@ impl<'engine> Executor<'engine> {
         store: &mut Store<T>,
         interceptor: &I,
     ) -> Result<Signal, Error> {
-        if let Some(frame) = self.stack.calls.frames.last_mut() {
+        let signal_inst = if let Some(frame) = self.stack.calls.frames.last_mut() {
             frame.instr_count += 1;
-        }
+            
+            let func = frame.func.clone();
+            let compiled_func = self.code_map.get(None, EngineFunc::from_usize(func as usize))?;
+            let offsets = compiled_func.offsets();
+            if let Some(offset) = offsets.get(frame.instr_count as usize) {
+                interceptor.execute_inst(offset.clone() as u32)
+            } else {
+                Signal::Next
+            }
+        } else {
+            Signal::Next
+        };
+        
+        let mut call_idx = -1;
+        let mut table_idx = None;
+        let result = self.execute_instr(store, &mut call_idx, &mut table_idx)?;
 
-        let signal_inst = interceptor.execute_inst(self.ip.get());
-        let mut call_idx = 0;
-        let result = self.execute_instr(store, &mut call_idx)?;
-
-        let signal_call = if call_idx != 0 {
-            interceptor.invoke_func(call_idx)
+        let signal_call = if call_idx != -1 {
+            if let Some(table_idx) = table_idx {
+                let table = self.get_table(table_idx);
+                interceptor.invoke_func(call_idx, Some(table))
+            } else {
+                interceptor.invoke_func(call_idx, None)
+            }
         } else {
             Signal::Next
         };
@@ -1435,1166 +1471,1192 @@ impl<'engine> Executor<'engine> {
     }
 
     #[inline(always)]
-    pub fn execute_instr<T>(&mut self, store: &mut Store<T>, call_idx: &mut u32) -> Result<Signal, Error> {
+    pub fn execute_instr<T>(&mut self, store: &mut Store<T>, call_idx: &mut i32, table_idx: &mut Option<index::Table>) -> Result<Signal, Error> {
         use Instruction as Instr;
 
         match *self.ip.get() {
-            Instr::Trap { trap_code } => self.execute_trap(trap_code)?,
-            Instr::ConsumeFuel { block_fuel } => {
+            Instr::Trap { instr_offset: _, trap_code } => self.execute_trap(trap_code)?,
+            Instr::ConsumeFuel { instr_offset: _, block_fuel } => {
                 self.execute_consume_fuel(&mut store.inner, block_fuel)?
             }
-            Instr::Return => {
+            Instr::Return { instr_offset: _ } => {
                 forward_return_dbg!(self, self.execute_return(&mut store.inner))
             }
-            Instr::ReturnReg { value } => {
+            Instr::ReturnReg { instr_offset: _, value } => {
                 forward_return_dbg!(self, self.execute_return_reg(&mut store.inner, value))
             }
-            Instr::ReturnReg2 { values } => {
+            Instr::ReturnReg2 { instr_offset: _, values } => {
                 forward_return_dbg!(self, self.execute_return_reg2(&mut store.inner, values))
             }
-            Instr::ReturnReg3 { values } => {
+            Instr::ReturnReg3 { instr_offset: _, values } => {
                 forward_return_dbg!(self, self.execute_return_reg3(&mut store.inner, values))
             }
-            Instr::ReturnImm32 { value } => {
+            Instr::ReturnImm32 { instr_offset: _, value } => {
                 forward_return_dbg!(self, self.execute_return_imm32(&mut store.inner, value))
             }
-            Instr::ReturnI64Imm32 { value } => {
+            Instr::ReturnI64Imm32 { instr_offset: _, value } => {
                 forward_return_dbg!(self, self.execute_return_i64imm32(&mut store.inner, value))
             }
-            Instr::ReturnF64Imm32 { value } => {
+            Instr::ReturnF64Imm32 { instr_offset: _, value } => {
                 forward_return_dbg!(self, self.execute_return_f64imm32(&mut store.inner, value))
             }
-            Instr::ReturnSpan { values } => {
+            Instr::ReturnSpan { instr_offset: _, values } => {
                 forward_return_dbg!(self, self.execute_return_span(&mut store.inner, values))
             }
-            Instr::ReturnMany { values } => {
+            Instr::ReturnMany { instr_offset: _, values } => {
                 forward_return_dbg!(self, self.execute_return_many(&mut store.inner, values))
             }
-            Instr::ReturnNez { condition } => {
+            Instr::ReturnNez { instr_offset: _, condition } => {
                 forward_return_dbg!(self, self.execute_return_nez(&mut store.inner, condition))
             }
-            Instr::ReturnNezReg { condition, value } => {
+            Instr::ReturnNezReg { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_reg(&mut store.inner, condition, value)
                 )
             }
-            Instr::ReturnNezReg2 { condition, values } => {
+            Instr::ReturnNezReg2 { instr_offset: _, condition, values } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_reg2(&mut store.inner, condition, values)
                 )
             }
-            Instr::ReturnNezImm32 { condition, value } => {
+            Instr::ReturnNezImm32 { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_imm32(&mut store.inner, condition, value)
                 )
             }
-            Instr::ReturnNezI64Imm32 { condition, value } => {
+            Instr::ReturnNezI64Imm32 { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_i64imm32(&mut store.inner, condition, value)
                 )
             }
-            Instr::ReturnNezF64Imm32 { condition, value } => {
+            Instr::ReturnNezF64Imm32 { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_f64imm32(&mut store.inner, condition, value)
                 )
             }
-            Instr::ReturnNezSpan { condition, values } => {
+            Instr::ReturnNezSpan { instr_offset: _, condition, values } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_span(&mut store.inner, condition, values)
                 )
             }
-            Instr::ReturnNezMany { condition, values } => {
+            Instr::ReturnNezMany { instr_offset: _, condition, values } => {
                 forward_return_dbg!(
                     self,
                     self.execute_return_nez_many(&mut store.inner, condition, values)
                 )
             }
-            Instr::Branch { offset } => self.execute_branch(offset),
-            Instr::BranchTable0 { index, len_targets } => {
+            Instr::Branch { instr_offset: _, offset } => self.execute_branch(offset),
+            Instr::BranchTable0 { instr_offset: _, index, len_targets } => {
                 self.execute_branch_table_0(index, len_targets)
             }
-            Instr::BranchTable1 { index, len_targets } => {
+            Instr::BranchTable1 { instr_offset: _, index, len_targets } => {
                 self.execute_branch_table_1(index, len_targets)
             }
-            Instr::BranchTable2 { index, len_targets } => {
+            Instr::BranchTable2 { instr_offset: _, index, len_targets } => {
                 self.execute_branch_table_2(index, len_targets)
             }
-            Instr::BranchTable3 { index, len_targets } => {
+            Instr::BranchTable3 { instr_offset: _, index, len_targets } => {
                 self.execute_branch_table_3(index, len_targets)
             }
-            Instr::BranchTableSpan { index, len_targets } => {
+            Instr::BranchTableSpan { instr_offset: _, index, len_targets } => {
                 self.execute_branch_table_span(index, len_targets)
             }
-            Instr::BranchTableMany { index, len_targets } => {
+            Instr::BranchTableMany { instr_offset: _, index, len_targets } => {
                 self.execute_branch_table_many(index, len_targets)
             }
-            Instr::BranchCmpFallback { lhs, rhs, params } => {
+            Instr::BranchCmpFallback { instr_offset: _, lhs, rhs, params } => {
                 self.execute_branch_cmp_fallback(lhs, rhs, params)
             }
-            Instr::BranchI32And { lhs, rhs, offset } => {
+            Instr::BranchI32And { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_and(lhs, rhs, offset)
             }
-            Instr::BranchI32AndImm { lhs, rhs, offset } => {
+            Instr::BranchI32AndImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_and_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32Or { lhs, rhs, offset } => self.execute_branch_i32_or(lhs, rhs, offset),
-            Instr::BranchI32OrImm { lhs, rhs, offset } => {
+            Instr::BranchI32Or { instr_offset: _, lhs, rhs, offset } => self.execute_branch_i32_or(lhs, rhs, offset),
+            Instr::BranchI32OrImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_or_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32Xor { lhs, rhs, offset } => {
+            Instr::BranchI32Xor { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_xor(lhs, rhs, offset)
             }
-            Instr::BranchI32XorImm { lhs, rhs, offset } => {
+            Instr::BranchI32XorImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_xor_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32AndEqz { lhs, rhs, offset } => {
+            Instr::BranchI32AndEqz { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_and_eqz(lhs, rhs, offset)
             }
-            Instr::BranchI32AndEqzImm { lhs, rhs, offset } => {
+            Instr::BranchI32AndEqzImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_and_eqz_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32OrEqz { lhs, rhs, offset } => {
+            Instr::BranchI32OrEqz { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_or_eqz(lhs, rhs, offset)
             }
-            Instr::BranchI32OrEqzImm { lhs, rhs, offset } => {
+            Instr::BranchI32OrEqzImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_or_eqz_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32XorEqz { lhs, rhs, offset } => {
+            Instr::BranchI32XorEqz { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_xor_eqz(lhs, rhs, offset)
             }
-            Instr::BranchI32XorEqzImm { lhs, rhs, offset } => {
+            Instr::BranchI32XorEqzImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_xor_eqz_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32Eq { lhs, rhs, offset } => self.execute_branch_i32_eq(lhs, rhs, offset),
-            Instr::BranchI32EqImm { lhs, rhs, offset } => {
+            Instr::BranchI32Eq { instr_offset: _, lhs, rhs, offset } => self.execute_branch_i32_eq(lhs, rhs, offset),
+            Instr::BranchI32EqImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_eq_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32Ne { lhs, rhs, offset } => self.execute_branch_i32_ne(lhs, rhs, offset),
-            Instr::BranchI32NeImm { lhs, rhs, offset } => {
+            Instr::BranchI32Ne { instr_offset: _, lhs, rhs, offset } => self.execute_branch_i32_ne(lhs, rhs, offset),
+            Instr::BranchI32NeImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_ne_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32LtS { lhs, rhs, offset } => {
+            Instr::BranchI32LtS { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_lt_s(lhs, rhs, offset)
             }
-            Instr::BranchI32LtSImm { lhs, rhs, offset } => {
+            Instr::BranchI32LtSImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_lt_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32LtU { lhs, rhs, offset } => {
+            Instr::BranchI32LtU { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_lt_u(lhs, rhs, offset)
             }
-            Instr::BranchI32LtUImm { lhs, rhs, offset } => {
+            Instr::BranchI32LtUImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_lt_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32LeS { lhs, rhs, offset } => {
+            Instr::BranchI32LeS { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_le_s(lhs, rhs, offset)
             }
-            Instr::BranchI32LeSImm { lhs, rhs, offset } => {
+            Instr::BranchI32LeSImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_le_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32LeU { lhs, rhs, offset } => {
+            Instr::BranchI32LeU { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_le_u(lhs, rhs, offset)
             }
-            Instr::BranchI32LeUImm { lhs, rhs, offset } => {
+            Instr::BranchI32LeUImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_le_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32GtS { lhs, rhs, offset } => {
+            Instr::BranchI32GtS { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_gt_s(lhs, rhs, offset)
             }
-            Instr::BranchI32GtSImm { lhs, rhs, offset } => {
+            Instr::BranchI32GtSImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_gt_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32GtU { lhs, rhs, offset } => {
+            Instr::BranchI32GtU { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_gt_u(lhs, rhs, offset)
             }
-            Instr::BranchI32GtUImm { lhs, rhs, offset } => {
+            Instr::BranchI32GtUImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_gt_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32GeS { lhs, rhs, offset } => {
+            Instr::BranchI32GeS { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_ge_s(lhs, rhs, offset)
             }
-            Instr::BranchI32GeSImm { lhs, rhs, offset } => {
+            Instr::BranchI32GeSImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i32_ge_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI32GeU { lhs, rhs, offset } => {
+            Instr::BranchI32GeU { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i32_ge_u(lhs, rhs, offset)
             }
-            Instr::BranchI32GeUImm { lhs, rhs, offset } => {
+            Instr::BranchI32GeUImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i32_ge_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64Eq { lhs, rhs, offset } => self.execute_branch_i64_eq(lhs, rhs, offset),
-            Instr::BranchI64EqImm { lhs, rhs, offset } => {
+            Instr::BranchI64Eq { instr_offset: _, lhs, rhs, offset } => self.execute_branch_i64_eq(lhs, rhs, offset),
+            Instr::BranchI64EqImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i64_eq_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64Ne { lhs, rhs, offset } => self.execute_branch_i64_ne(lhs, rhs, offset),
-            Instr::BranchI64NeImm { lhs, rhs, offset } => {
+            Instr::BranchI64Ne { instr_offset: _, lhs, rhs, offset } => self.execute_branch_i64_ne(lhs, rhs, offset),
+            Instr::BranchI64NeImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i64_ne_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64LtS { lhs, rhs, offset } => {
+            Instr::BranchI64LtS { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i64_lt_s(lhs, rhs, offset)
             }
-            Instr::BranchI64LtSImm { lhs, rhs, offset } => {
+            Instr::BranchI64LtSImm { instr_offset: _, lhs, rhs, offset } => {
                 self.execute_branch_i64_lt_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64LtU { lhs, rhs, offset } => {
+            Instr::BranchI64LtU { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_lt_u(lhs, rhs, offset)
             }
-            Instr::BranchI64LtUImm { lhs, rhs, offset } => {
+            Instr::BranchI64LtUImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_lt_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64LeS { lhs, rhs, offset } => {
+            Instr::BranchI64LeS { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_le_s(lhs, rhs, offset)
             }
-            Instr::BranchI64LeSImm { lhs, rhs, offset } => {
+            Instr::BranchI64LeSImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_le_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64LeU { lhs, rhs, offset } => {
+            Instr::BranchI64LeU { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_le_u(lhs, rhs, offset)
             }
-            Instr::BranchI64LeUImm { lhs, rhs, offset } => {
+            Instr::BranchI64LeUImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_le_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64GtS { lhs, rhs, offset } => {
+            Instr::BranchI64GtS { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_gt_s(lhs, rhs, offset)
             }
-            Instr::BranchI64GtSImm { lhs, rhs, offset } => {
+            Instr::BranchI64GtSImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_gt_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64GtU { lhs, rhs, offset } => {
+            Instr::BranchI64GtU { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_gt_u(lhs, rhs, offset)
             }
-            Instr::BranchI64GtUImm { lhs, rhs, offset } => {
+            Instr::BranchI64GtUImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_gt_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64GeS { lhs, rhs, offset } => {
+            Instr::BranchI64GeS { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_ge_s(lhs, rhs, offset)
             }
-            Instr::BranchI64GeSImm { lhs, rhs, offset } => {
+            Instr::BranchI64GeSImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_ge_s_imm(lhs, rhs, offset)
             }
-            Instr::BranchI64GeU { lhs, rhs, offset } => {
+            Instr::BranchI64GeU { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_ge_u(lhs, rhs, offset)
             }
-            Instr::BranchI64GeUImm { lhs, rhs, offset } => {
+            Instr::BranchI64GeUImm { instr_offset: _,lhs, rhs, offset } => {
                 self.execute_branch_i64_ge_u_imm(lhs, rhs, offset)
             }
-            Instr::BranchF32Eq { lhs, rhs, offset } => self.execute_branch_f32_eq(lhs, rhs, offset),
-            Instr::BranchF32Ne { lhs, rhs, offset } => self.execute_branch_f32_ne(lhs, rhs, offset),
-            Instr::BranchF32Lt { lhs, rhs, offset } => self.execute_branch_f32_lt(lhs, rhs, offset),
-            Instr::BranchF32Le { lhs, rhs, offset } => self.execute_branch_f32_le(lhs, rhs, offset),
-            Instr::BranchF32Gt { lhs, rhs, offset } => self.execute_branch_f32_gt(lhs, rhs, offset),
-            Instr::BranchF32Ge { lhs, rhs, offset } => self.execute_branch_f32_ge(lhs, rhs, offset),
-            Instr::BranchF64Eq { lhs, rhs, offset } => self.execute_branch_f64_eq(lhs, rhs, offset),
-            Instr::BranchF64Ne { lhs, rhs, offset } => self.execute_branch_f64_ne(lhs, rhs, offset),
-            Instr::BranchF64Lt { lhs, rhs, offset } => self.execute_branch_f64_lt(lhs, rhs, offset),
-            Instr::BranchF64Le { lhs, rhs, offset } => self.execute_branch_f64_le(lhs, rhs, offset),
-            Instr::BranchF64Gt { lhs, rhs, offset } => self.execute_branch_f64_gt(lhs, rhs, offset),
-            Instr::BranchF64Ge { lhs, rhs, offset } => self.execute_branch_f64_ge(lhs, rhs, offset),
-            Instr::Copy { result, value } => self.execute_copy(result, value),
-            Instr::Copy2 { results, values } => self.execute_copy_2(results, values),
-            Instr::CopyImm32 { result, value } => self.execute_copy_imm32(result, value),
-            Instr::CopyI64Imm32 { result, value } => self.execute_copy_i64imm32(result, value),
-            Instr::CopyF64Imm32 { result, value } => self.execute_copy_f64imm32(result, value),
+            Instr::BranchF32Eq { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f32_eq(lhs, rhs, offset),
+            Instr::BranchF32Ne { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f32_ne(lhs, rhs, offset),
+            Instr::BranchF32Lt { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f32_lt(lhs, rhs, offset),
+            Instr::BranchF32Le { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f32_le(lhs, rhs, offset),
+            Instr::BranchF32Gt { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f32_gt(lhs, rhs, offset),
+            Instr::BranchF32Ge { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f32_ge(lhs, rhs, offset),
+            Instr::BranchF64Eq { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f64_eq(lhs, rhs, offset),
+            Instr::BranchF64Ne { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f64_ne(lhs, rhs, offset),
+            Instr::BranchF64Lt { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f64_lt(lhs, rhs, offset),
+            Instr::BranchF64Le { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f64_le(lhs, rhs, offset),
+            Instr::BranchF64Gt { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f64_gt(lhs, rhs, offset),
+            Instr::BranchF64Ge { instr_offset: _, lhs, rhs, offset } => self.execute_branch_f64_ge(lhs, rhs, offset),
+            Instr::Copy { instr_offset: _, result, value } => self.execute_copy(result, value),
+            Instr::Copy2 { instr_offset: _, results, values } => self.execute_copy_2(results, values),
+            Instr::CopyImm32 { instr_offset: _, result, value } => self.execute_copy_imm32(result, value),
+            Instr::CopyI64Imm32 { instr_offset: _, result, value } => self.execute_copy_i64imm32(result, value),
+            Instr::CopyF64Imm32 { instr_offset: _, result, value } => self.execute_copy_f64imm32(result, value),
             Instr::CopySpan {
+                instr_offset: _,
                 results,
                 values,
                 len,
             } => self.execute_copy_span(results, values, len),
             Instr::CopySpanNonOverlapping {
+                instr_offset: _,
                 results,
                 values,
                 len,
             } => self.execute_copy_span_non_overlapping(results, values, len),
-            Instr::CopyMany { results, values } => self.execute_copy_many(results, values),
-            Instr::CopyManyNonOverlapping { results, values } => {
+            Instr::CopyMany { instr_offset: _, results, values } => self.execute_copy_many(results, values),
+            Instr::CopyManyNonOverlapping { instr_offset: _, results, values } => {
                 self.execute_copy_many_non_overlapping(results, values)
             }
-            Instr::ReturnCallInternal0 { func } => {
+            Instr::ReturnCallInternal0 { instr_offset: _, func } => {
                 self.execute_return_call_internal_0(&mut store.inner, EngineFunc::from(func))?
             }
-            Instr::ReturnCallInternal { func } => {
+            Instr::ReturnCallInternal { instr_offset: _, func } => {
                 self.execute_return_call_internal(&mut store.inner, EngineFunc::from(func))?
             }
-            Instr::ReturnCallImported0 { func } => {
+            Instr::ReturnCallImported0 { instr_offset: _, func } => {
                 self.execute_return_call_imported_0::<T>(store, func)?
             }
-            Instr::ReturnCallImported { func } => {
+            Instr::ReturnCallImported { instr_offset: _, func } => {
                 self.execute_return_call_imported::<T>(store, func)?
             }
-            Instr::ReturnCallIndirect0 { func_type } => {
+            Instr::ReturnCallIndirect0 { instr_offset: _, func_type } => {
                 self.execute_return_call_indirect_0::<T>(store, func_type)?
             }
-            Instr::ReturnCallIndirect0Imm16 { func_type } => {
+            Instr::ReturnCallIndirect0Imm16 { instr_offset: _, func_type } => {
                 self.execute_return_call_indirect_0_imm16::<T>(store, func_type)?
             }
-            Instr::ReturnCallIndirect { func_type } => {
+            Instr::ReturnCallIndirect { instr_offset: _,func_type } => {
                 self.execute_return_call_indirect::<T>(store, func_type)?
             }
-            Instr::ReturnCallIndirectImm16 { func_type } => {
+            Instr::ReturnCallIndirectImm16 { instr_offset: _,func_type } => {
                 self.execute_return_call_indirect_imm16::<T>(store, func_type)?
             }
-            Instr::CallInternal0 { results, func } => {
-                *call_idx = u32::from(func);
+            Instr::CallInternal0 { instr_offset: _,results, func } => {
+                *call_idx = u32::from(func).try_into().unwrap_or_default();
                 self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
                 // return Ok(Signal::Breakpoint);
             }
-            Instr::CallInternal { results, func } => {
-                *call_idx = u32::from(func);
+            Instr::CallInternal { instr_offset: _,results, func } => {
+                *call_idx = u32::from(func).try_into().unwrap_or_default();;
                 self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
             }
-            Instr::CallImported0 { results, func } => {
+            Instr::CallImported0 { instr_offset: _,results, func } => {
                 self.execute_call_imported_0::<T>(store, results, func)?;
-                *call_idx = u32::from(func);
+                *call_idx = u32::from(func).try_into().unwrap_or_default();;
             }
-            Instr::CallImported { results, func } => {
+            Instr::CallImported { instr_offset: _,results, func } => {
                 self.execute_call_imported::<T>(store, results, func)?;
-                *call_idx = u32::from(func);
+                *call_idx = u32::from(func).try_into().unwrap_or_default();;
             }
-            Instr::CallIndirect0 { results, func_type } => {
-                *call_idx = self.execute_call_indirect_0::<T>(store, results, func_type)?;
+            Instr::CallIndirect0 { instr_offset: _,results, func_type } => {
+                let (c_idx, tab) = self.execute_call_indirect_0::<T>(store, results, func_type)?;
+                *call_idx = c_idx.try_into().unwrap_or_default();
+                *table_idx = Some(tab);
             }
-            Instr::CallIndirect0Imm16 { results, func_type } => {
-                *call_idx = self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?;
+            Instr::CallIndirect0Imm16 { instr_offset: _,results, func_type } => {
+                let (c_idx, tab) = self.execute_call_indirect_0_imm16::<T>(store, results, func_type)?;
+                *call_idx = c_idx.try_into().unwrap_or_default();
+                *table_idx = Some(tab);
             }
-            Instr::CallIndirect { results, func_type } => {
-                *call_idx = self.execute_call_indirect::<T>(store, results, func_type)?;
+            Instr::CallIndirect { instr_offset: _,results, func_type } => {
+                let (c_idx, tab) = self.execute_call_indirect::<T>(store, results, func_type)?;
+                *call_idx = c_idx.try_into().unwrap_or_default();
+                *table_idx = Some(tab);
             }
-            Instr::CallIndirectImm16 { results, func_type } => {
-                *call_idx = self.execute_call_indirect_imm16::<T>(store, results, func_type)?;
+            Instr::CallIndirectImm16 { instr_offset: _,results, func_type } => {
+                let (c_idx, tab) =  self.execute_call_indirect_imm16::<T>(store, results, func_type)?;
+                *call_idx = c_idx.try_into().unwrap_or_default();
+                *table_idx = Some(tab);
             }
-            Instr::Select { result, lhs } => self.execute_select(result, lhs),
-            Instr::SelectImm32Rhs { result, lhs } => self.execute_select_imm32_rhs(result, lhs),
-            Instr::SelectImm32Lhs { result, lhs } => self.execute_select_imm32_lhs(result, lhs),
-            Instr::SelectImm32 { result, lhs } => self.execute_select_imm32(result, lhs),
-            Instr::SelectI64Imm32Rhs { result, lhs } => {
+            Instr::Select { instr_offset: _,result, lhs } => self.execute_select(result, lhs),
+            Instr::SelectImm32Rhs { instr_offset: _, result, lhs } => self.execute_select_imm32_rhs(result, lhs),
+            Instr::SelectImm32Lhs { instr_offset: _, result, lhs } => self.execute_select_imm32_lhs(result, lhs),
+            Instr::SelectImm32 { instr_offset: _, result, lhs } => self.execute_select_imm32(result, lhs),
+            Instr::SelectI64Imm32Rhs { instr_offset: _, result, lhs } => {
                 self.execute_select_i64imm32_rhs(result, lhs)
             }
-            Instr::SelectI64Imm32Lhs { result, lhs } => {
+            Instr::SelectI64Imm32Lhs { instr_offset: _, result, lhs } => {
                 self.execute_select_i64imm32_lhs(result, lhs)
             }
-            Instr::SelectI64Imm32 { result, lhs } => self.execute_select_i64imm32(result, lhs),
-            Instr::SelectF64Imm32Rhs { result, lhs } => {
+            Instr::SelectI64Imm32 { instr_offset: _, result, lhs } => self.execute_select_i64imm32(result, lhs),
+            Instr::SelectF64Imm32Rhs { instr_offset: _, result, lhs } => {
                 self.execute_select_f64imm32_rhs(result, lhs)
             }
-            Instr::SelectF64Imm32Lhs { result, lhs } => {
+            Instr::SelectF64Imm32Lhs { instr_offset: _, result, lhs } => {
                 self.execute_select_f64imm32_lhs(result, lhs)
             }
-            Instr::SelectF64Imm32 { result, lhs } => self.execute_select_f64imm32(result, lhs),
-            Instr::RefFunc { result, func } => self.execute_ref_func(result, func),
-            Instr::GlobalGet { result, global } => {
+            Instr::SelectF64Imm32 { instr_offset: _, result, lhs } => self.execute_select_f64imm32(result, lhs),
+            Instr::RefFunc { instr_offset: _, result, func } => self.execute_ref_func(result, func),
+            Instr::GlobalGet { instr_offset: _, result, global } => {
                 self.execute_global_get(&store.inner, result, global)
             }
-            Instr::GlobalSet { global, input } => {
+            Instr::GlobalSet { instr_offset: _, global, input } => {
                 self.execute_global_set(&mut store.inner, global, input)
             }
-            Instr::GlobalSetI32Imm16 { global, input } => {
+            Instr::GlobalSetI32Imm16 { instr_offset: _, global, input } => {
                 self.execute_global_set_i32imm16(&mut store.inner, global, input)
             }
-            Instr::GlobalSetI64Imm16 { global, input } => {
+            Instr::GlobalSetI64Imm16 { instr_offset: _, global, input } => {
                 self.execute_global_set_i64imm16(&mut store.inner, global, input)
             }
-            Instr::I32Load { result, memory } => {
+            Instr::I32Load { instr_offset: _, result, memory } => {
                 self.execute_i32_load(&store.inner, result, memory)?
             }
-            Instr::I32LoadAt { result, address } => {
+            Instr::I32LoadAt { instr_offset: _, result, address } => {
                 self.execute_i32_load_at(&store.inner, result, address)?
             }
             Instr::I32LoadOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i32_load_offset16(result, ptr, offset)?,
-            Instr::I64Load { result, memory } => {
+            Instr::I64Load { instr_offset: _, result, memory } => {
                 self.execute_i64_load(&store.inner, result, memory)?
             }
-            Instr::I64LoadAt { result, address } => {
+            Instr::I64LoadAt { instr_offset: _, result, address } => {
                 self.execute_i64_load_at(&store.inner, result, address)?
             }
             Instr::I64LoadOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load_offset16(result, ptr, offset)?,
-            Instr::F32Load { result, memory } => {
+            Instr::F32Load { instr_offset: _, result, memory } => {
                 self.execute_f32_load(&store.inner, result, memory)?
             }
-            Instr::F32LoadAt { result, address } => {
+            Instr::F32LoadAt { instr_offset: _, result, address } => {
                 self.execute_f32_load_at(&store.inner, result, address)?
             }
             Instr::F32LoadOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_f32_load_offset16(result, ptr, offset)?,
-            Instr::F64Load { result, memory } => {
+            Instr::F64Load { instr_offset: _, result, memory } => {
                 self.execute_f64_load(&store.inner, result, memory)?
             }
-            Instr::F64LoadAt { result, address } => {
+            Instr::F64LoadAt { instr_offset: _, result, address } => {
                 self.execute_f64_load_at(&store.inner, result, address)?
             }
             Instr::F64LoadOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_f64_load_offset16(result, ptr, offset)?,
-            Instr::I32Load8s { result, memory } => {
+            Instr::I32Load8s { instr_offset: _, result, memory } => {
                 self.execute_i32_load8_s(&store.inner, result, memory)?
             }
-            Instr::I32Load8sAt { result, address } => {
+            Instr::I32Load8sAt { instr_offset: _, result, address } => {
                 self.execute_i32_load8_s_at(&store.inner, result, address)?
             }
             Instr::I32Load8sOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i32_load8_s_offset16(result, ptr, offset)?,
-            Instr::I32Load8u { result, memory } => {
+            Instr::I32Load8u { instr_offset: _, result, memory } => {
                 self.execute_i32_load8_u(&store.inner, result, memory)?
             }
-            Instr::I32Load8uAt { result, address } => {
+            Instr::I32Load8uAt { instr_offset: _, result, address } => {
                 self.execute_i32_load8_u_at(&store.inner, result, address)?
             }
             Instr::I32Load8uOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i32_load8_u_offset16(result, ptr, offset)?,
-            Instr::I32Load16s { result, memory } => {
+            Instr::I32Load16s { instr_offset: _, result, memory } => {
                 self.execute_i32_load16_s(&store.inner, result, memory)?
             }
-            Instr::I32Load16sAt { result, address } => {
+            Instr::I32Load16sAt { instr_offset: _, result, address } => {
                 self.execute_i32_load16_s_at(&store.inner, result, address)?
             }
             Instr::I32Load16sOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i32_load16_s_offset16(result, ptr, offset)?,
-            Instr::I32Load16u { result, memory } => {
+            Instr::I32Load16u { instr_offset: _, result, memory } => {
                 self.execute_i32_load16_u(&store.inner, result, memory)?
             }
-            Instr::I32Load16uAt { result, address } => {
+            Instr::I32Load16uAt { instr_offset: _, result, address } => {
                 self.execute_i32_load16_u_at(&store.inner, result, address)?
             }
             Instr::I32Load16uOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i32_load16_u_offset16(result, ptr, offset)?,
-            Instr::I64Load8s { result, memory } => {
+            Instr::I64Load8s { instr_offset: _, result, memory } => {
                 self.execute_i64_load8_s(&store.inner, result, memory)?
             }
-            Instr::I64Load8sAt { result, address } => {
+            Instr::I64Load8sAt { instr_offset: _, result, address } => {
                 self.execute_i64_load8_s_at(&store.inner, result, address)?
             }
             Instr::I64Load8sOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load8_s_offset16(result, ptr, offset)?,
-            Instr::I64Load8u { result, memory } => {
+            Instr::I64Load8u { instr_offset: _, result, memory } => {
                 self.execute_i64_load8_u(&store.inner, result, memory)?
             }
-            Instr::I64Load8uAt { result, address } => {
+            Instr::I64Load8uAt { instr_offset: _, result, address } => {
                 self.execute_i64_load8_u_at(&store.inner, result, address)?
             }
             Instr::I64Load8uOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load8_u_offset16(result, ptr, offset)?,
-            Instr::I64Load16s { result, memory } => {
+            Instr::I64Load16s { instr_offset: _, result, memory } => {
                 self.execute_i64_load16_s(&store.inner, result, memory)?
             }
-            Instr::I64Load16sAt { result, address } => {
+            Instr::I64Load16sAt { instr_offset: _, result, address } => {
                 self.execute_i64_load16_s_at(&store.inner, result, address)?
             }
             Instr::I64Load16sOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load16_s_offset16(result, ptr, offset)?,
-            Instr::I64Load16u { result, memory } => {
+            Instr::I64Load16u { instr_offset: _, result, memory } => {
                 self.execute_i64_load16_u(&store.inner, result, memory)?
             }
-            Instr::I64Load16uAt { result, address } => {
+            Instr::I64Load16uAt { instr_offset: _, result, address } => {
                 self.execute_i64_load16_u_at(&store.inner, result, address)?
             }
             Instr::I64Load16uOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load16_u_offset16(result, ptr, offset)?,
-            Instr::I64Load32s { result, memory } => {
+            Instr::I64Load32s { instr_offset: _, result, memory } => {
                 self.execute_i64_load32_s(&store.inner, result, memory)?
             }
-            Instr::I64Load32sAt { result, address } => {
+            Instr::I64Load32sAt { instr_offset: _, result, address } => {
                 self.execute_i64_load32_s_at(&store.inner, result, address)?
             }
             Instr::I64Load32sOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load32_s_offset16(result, ptr, offset)?,
-            Instr::I64Load32u { result, memory } => {
+            Instr::I64Load32u { instr_offset: _, result, memory } => {
                 self.execute_i64_load32_u(&store.inner, result, memory)?
             }
-            Instr::I64Load32uAt { result, address } => {
+            Instr::I64Load32uAt { instr_offset: _, result, address } => {
                 self.execute_i64_load32_u_at(&store.inner, result, address)?
             }
             Instr::I64Load32uOffset16 {
+                instr_offset: _,
                 result,
                 ptr,
                 offset,
             } => self.execute_i64_load32_u_offset16(result, ptr, offset)?,
-            Instr::I32Store { ptr, memory } => {
+            Instr::I32Store { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store(&mut store.inner, ptr, memory)?
             }
-            Instr::I32StoreImm16 { ptr, memory } => {
+            Instr::I32StoreImm16 { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store_imm16(&mut store.inner, ptr, memory)?
             }
-            Instr::I32StoreOffset16 { ptr, offset, value } => {
+            Instr::I32StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store_offset16(ptr, offset, value)?
             }
-            Instr::I32StoreOffset16Imm16 { ptr, offset, value } => {
+            Instr::I32StoreOffset16Imm16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store_offset16_imm16(ptr, offset, value)?
             }
-            Instr::I32StoreAt { address, value } => {
+            Instr::I32StoreAt { instr_offset: _, address, value } => {
                 self.execute_i32_store_at(&mut store.inner, address, value)?
             }
-            Instr::I32StoreAtImm16 { address, value } => {
+            Instr::I32StoreAtImm16 { instr_offset: _, address, value } => {
                 self.execute_i32_store_at_imm16(&mut store.inner, address, value)?
             }
-            Instr::I32Store8 { ptr, memory } => {
+            Instr::I32Store8 { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store8(&mut store.inner, ptr, memory)?
             }
-            Instr::I32Store8Imm { ptr, memory } => {
+            Instr::I32Store8Imm { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store8_imm(&mut store.inner, ptr, memory)?
             }
-            Instr::I32Store8Offset16 { ptr, offset, value } => {
+            Instr::I32Store8Offset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store8_offset16(ptr, offset, value)?
             }
-            Instr::I32Store8Offset16Imm { ptr, offset, value } => {
+            Instr::I32Store8Offset16Imm { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store8_offset16_imm(ptr, offset, value)?
             }
-            Instr::I32Store8At { address, value } => {
+            Instr::I32Store8At { instr_offset: _, address, value } => {
                 self.execute_i32_store8_at(&mut store.inner, address, value)?
             }
-            Instr::I32Store8AtImm { address, value } => {
+            Instr::I32Store8AtImm { instr_offset: _, address, value } => {
                 self.execute_i32_store8_at_imm(&mut store.inner, address, value)?
             }
-            Instr::I32Store16 { ptr, memory } => {
+            Instr::I32Store16 { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store16(&mut store.inner, ptr, memory)?
             }
-            Instr::I32Store16Imm { ptr, memory } => {
+            Instr::I32Store16Imm { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store16_imm(&mut store.inner, ptr, memory)?
             }
-            Instr::I32Store16Offset16 { ptr, offset, value } => {
+            Instr::I32Store16Offset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store16_offset16(ptr, offset, value)?
             }
-            Instr::I32Store16Offset16Imm { ptr, offset, value } => {
+            Instr::I32Store16Offset16Imm { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store16_offset16_imm(ptr, offset, value)?
             }
-            Instr::I32Store16At { address, value } => {
+            Instr::I32Store16At { instr_offset: _, address, value } => {
                 self.execute_i32_store16_at(&mut store.inner, address, value)?
             }
-            Instr::I32Store16AtImm { address, value } => {
+            Instr::I32Store16AtImm { instr_offset: _, address, value } => {
                 self.execute_i32_store16_at_imm(&mut store.inner, address, value)?
             }
-            Instr::I64Store { ptr, memory } => {
+            Instr::I64Store { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store(&mut store.inner, ptr, memory)?
             }
-            Instr::I64StoreImm16 { ptr, memory } => {
+            Instr::I64StoreImm16 { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store_imm16(&mut store.inner, ptr, memory)?
             }
-            Instr::I64StoreOffset16 { ptr, offset, value } => {
+            Instr::I64StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store_offset16(ptr, offset, value)?
             }
-            Instr::I64StoreOffset16Imm16 { ptr, offset, value } => {
+            Instr::I64StoreOffset16Imm16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store_offset16_imm16(ptr, offset, value)?
             }
-            Instr::I64StoreAt { address, value } => {
+            Instr::I64StoreAt { instr_offset: _, address, value } => {
                 self.execute_i64_store_at(&mut store.inner, address, value)?
             }
-            Instr::I64StoreAtImm16 { address, value } => {
+            Instr::I64StoreAtImm16 { instr_offset: _, address, value } => {
                 self.execute_i64_store_at_imm16(&mut store.inner, address, value)?
             }
-            Instr::I64Store8 { ptr, memory } => {
+            Instr::I64Store8 { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store8(&mut store.inner, ptr, memory)?
             }
-            Instr::I64Store8Imm { ptr, memory } => {
+            Instr::I64Store8Imm { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store8_imm(&mut store.inner, ptr, memory)?
             }
-            Instr::I64Store8Offset16 { ptr, offset, value } => {
+            Instr::I64Store8Offset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store8_offset16(ptr, offset, value)?
             }
-            Instr::I64Store8Offset16Imm { ptr, offset, value } => {
+            Instr::I64Store8Offset16Imm { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store8_offset16_imm(ptr, offset, value)?
             }
-            Instr::I64Store8At { address, value } => {
+            Instr::I64Store8At { instr_offset: _, address, value } => {
                 self.execute_i64_store8_at(&mut store.inner, address, value)?
             }
-            Instr::I64Store8AtImm { address, value } => {
+            Instr::I64Store8AtImm { instr_offset: _, address, value } => {
                 self.execute_i64_store8_at_imm(&mut store.inner, address, value)?
             }
-            Instr::I64Store16 { ptr, memory } => {
+            Instr::I64Store16 { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store16(&mut store.inner, ptr, memory)?
             }
-            Instr::I64Store16Imm { ptr, memory } => {
+            Instr::I64Store16Imm { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store16_imm(&mut store.inner, ptr, memory)?
             }
-            Instr::I64Store16Offset16 { ptr, offset, value } => {
+            Instr::I64Store16Offset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store16_offset16(ptr, offset, value)?
             }
-            Instr::I64Store16Offset16Imm { ptr, offset, value } => {
+            Instr::I64Store16Offset16Imm { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store16_offset16_imm(ptr, offset, value)?
             }
-            Instr::I64Store16At { address, value } => {
+            Instr::I64Store16At { instr_offset: _, address, value } => {
                 self.execute_i64_store16_at(&mut store.inner, address, value)?
             }
-            Instr::I64Store16AtImm { address, value } => {
+            Instr::I64Store16AtImm { instr_offset: _, address, value } => {
                 self.execute_i64_store16_at_imm(&mut store.inner, address, value)?
             }
-            Instr::I64Store32 { ptr, memory } => {
+            Instr::I64Store32 { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store32(&mut store.inner, ptr, memory)?
             }
-            Instr::I64Store32Imm16 { ptr, memory } => {
+            Instr::I64Store32Imm16 { instr_offset: _, ptr, memory } => {
                 self.execute_i64_store32_imm16(&mut store.inner, ptr, memory)?
             }
-            Instr::I64Store32Offset16 { ptr, offset, value } => {
+            Instr::I64Store32Offset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store32_offset16(ptr, offset, value)?
             }
-            Instr::I64Store32Offset16Imm16 { ptr, offset, value } => {
+            Instr::I64Store32Offset16Imm16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i64_store32_offset16_imm16(ptr, offset, value)?
             }
-            Instr::I64Store32At { address, value } => {
+            Instr::I64Store32At { instr_offset: _, address, value } => {
                 self.execute_i64_store32_at(&mut store.inner, address, value)?
             }
-            Instr::I64Store32AtImm16 { address, value } => {
+            Instr::I64Store32AtImm16 { instr_offset: _, address, value } => {
                 self.execute_i64_store32_at_imm16(&mut store.inner, address, value)?
             }
-            Instr::F32Store { ptr, memory } => {
+            Instr::F32Store { instr_offset: _, ptr, memory } => {
                 self.execute_f32_store(&mut store.inner, ptr, memory)?
             }
-            Instr::F32StoreOffset16 { ptr, offset, value } => {
+            Instr::F32StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_f32_store_offset16(ptr, offset, value)?
             }
-            Instr::F32StoreAt { address, value } => {
+            Instr::F32StoreAt { instr_offset: _, address, value } => {
                 self.execute_f32_store_at(&mut store.inner, address, value)?
             }
-            Instr::F64Store { ptr, memory } => {
+            Instr::F64Store { instr_offset: _, ptr, memory } => {
                 self.execute_f64_store(&mut store.inner, ptr, memory)?
             }
-            Instr::F64StoreOffset16 { ptr, offset, value } => {
+            Instr::F64StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_f64_store_offset16(ptr, offset, value)?
             }
-            Instr::F64StoreAt { address, value } => {
+            Instr::F64StoreAt { instr_offset: _, address, value } => {
                 self.execute_f64_store_at(&mut store.inner, address, value)?
             }
-            Instr::I32Eq { result, lhs, rhs } => self.execute_i32_eq(result, lhs, rhs),
-            Instr::I32EqImm16 { result, lhs, rhs } => self.execute_i32_eq_imm16(result, lhs, rhs),
-            Instr::I32Ne { result, lhs, rhs } => self.execute_i32_ne(result, lhs, rhs),
-            Instr::I32NeImm16 { result, lhs, rhs } => self.execute_i32_ne_imm16(result, lhs, rhs),
-            Instr::I32LtS { result, lhs, rhs } => self.execute_i32_lt_s(result, lhs, rhs),
-            Instr::I32LtSImm16 { result, lhs, rhs } => {
+            Instr::I32Eq { instr_offset: _, result, lhs, rhs } => self.execute_i32_eq(result, lhs, rhs),
+            Instr::I32EqImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_eq_imm16(result, lhs, rhs),
+            Instr::I32Ne { instr_offset: _, result, lhs, rhs } => self.execute_i32_ne(result, lhs, rhs),
+            Instr::I32NeImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_ne_imm16(result, lhs, rhs),
+            Instr::I32LtS { instr_offset: _, result, lhs, rhs } => self.execute_i32_lt_s(result, lhs, rhs),
+            Instr::I32LtSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_lt_s_imm16(result, lhs, rhs)
             }
-            Instr::I32LtU { result, lhs, rhs } => self.execute_i32_lt_u(result, lhs, rhs),
-            Instr::I32LtUImm16 { result, lhs, rhs } => {
+            Instr::I32LtU { instr_offset: _, result, lhs, rhs } => self.execute_i32_lt_u(result, lhs, rhs),
+            Instr::I32LtUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_lt_u_imm16(result, lhs, rhs)
             }
-            Instr::I32LeS { result, lhs, rhs } => self.execute_i32_le_s(result, lhs, rhs),
-            Instr::I32LeSImm16 { result, lhs, rhs } => {
+            Instr::I32LeS { instr_offset: _, result, lhs, rhs } => self.execute_i32_le_s(result, lhs, rhs),
+            Instr::I32LeSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_le_s_imm16(result, lhs, rhs)
             }
-            Instr::I32LeU { result, lhs, rhs } => self.execute_i32_le_u(result, lhs, rhs),
-            Instr::I32LeUImm16 { result, lhs, rhs } => {
+            Instr::I32LeU { instr_offset: _, result, lhs, rhs } => self.execute_i32_le_u(result, lhs, rhs),
+            Instr::I32LeUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_le_u_imm16(result, lhs, rhs)
             }
-            Instr::I32GtS { result, lhs, rhs } => self.execute_i32_gt_s(result, lhs, rhs),
-            Instr::I32GtSImm16 { result, lhs, rhs } => {
+            Instr::I32GtS { instr_offset: _, result, lhs, rhs } => self.execute_i32_gt_s(result, lhs, rhs),
+            Instr::I32GtSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_gt_s_imm16(result, lhs, rhs)
             }
-            Instr::I32GtU { result, lhs, rhs } => self.execute_i32_gt_u(result, lhs, rhs),
-            Instr::I32GtUImm16 { result, lhs, rhs } => {
+            Instr::I32GtU { instr_offset: _, result, lhs, rhs } => self.execute_i32_gt_u(result, lhs, rhs),
+            Instr::I32GtUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_gt_u_imm16(result, lhs, rhs)
             }
-            Instr::I32GeS { result, lhs, rhs } => self.execute_i32_ge_s(result, lhs, rhs),
-            Instr::I32GeSImm16 { result, lhs, rhs } => {
+            Instr::I32GeS { instr_offset: _, result, lhs, rhs } => self.execute_i32_ge_s(result, lhs, rhs),
+            Instr::I32GeSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_ge_s_imm16(result, lhs, rhs)
             }
-            Instr::I32GeU { result, lhs, rhs } => self.execute_i32_ge_u(result, lhs, rhs),
-            Instr::I32GeUImm16 { result, lhs, rhs } => {
+            Instr::I32GeU { instr_offset: _, result, lhs, rhs } => self.execute_i32_ge_u(result, lhs, rhs),
+            Instr::I32GeUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_ge_u_imm16(result, lhs, rhs)
             }
-            Instr::I64Eq { result, lhs, rhs } => self.execute_i64_eq(result, lhs, rhs),
-            Instr::I64EqImm16 { result, lhs, rhs } => self.execute_i64_eq_imm16(result, lhs, rhs),
-            Instr::I64Ne { result, lhs, rhs } => self.execute_i64_ne(result, lhs, rhs),
-            Instr::I64NeImm16 { result, lhs, rhs } => self.execute_i64_ne_imm16(result, lhs, rhs),
-            Instr::I64LtS { result, lhs, rhs } => self.execute_i64_lt_s(result, lhs, rhs),
-            Instr::I64LtSImm16 { result, lhs, rhs } => {
+            Instr::I64Eq { instr_offset: _, result, lhs, rhs } => self.execute_i64_eq(result, lhs, rhs),
+            Instr::I64EqImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_eq_imm16(result, lhs, rhs),
+            Instr::I64Ne { instr_offset: _, result, lhs, rhs } => self.execute_i64_ne(result, lhs, rhs),
+            Instr::I64NeImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_ne_imm16(result, lhs, rhs),
+            Instr::I64LtS { instr_offset: _, result, lhs, rhs } => self.execute_i64_lt_s(result, lhs, rhs),
+            Instr::I64LtSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_lt_s_imm16(result, lhs, rhs)
             }
-            Instr::I64LtU { result, lhs, rhs } => self.execute_i64_lt_u(result, lhs, rhs),
-            Instr::I64LtUImm16 { result, lhs, rhs } => {
+            Instr::I64LtU { instr_offset: _, result, lhs, rhs } => self.execute_i64_lt_u(result, lhs, rhs),
+            Instr::I64LtUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_lt_u_imm16(result, lhs, rhs)
             }
-            Instr::I64LeS { result, lhs, rhs } => self.execute_i64_le_s(result, lhs, rhs),
-            Instr::I64LeSImm16 { result, lhs, rhs } => {
+            Instr::I64LeS { instr_offset: _, result, lhs, rhs } => self.execute_i64_le_s(result, lhs, rhs),
+            Instr::I64LeSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_le_s_imm16(result, lhs, rhs)
             }
-            Instr::I64LeU { result, lhs, rhs } => self.execute_i64_le_u(result, lhs, rhs),
-            Instr::I64LeUImm16 { result, lhs, rhs } => {
+            Instr::I64LeU { instr_offset: _, result, lhs, rhs } => self.execute_i64_le_u(result, lhs, rhs),
+            Instr::I64LeUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_le_u_imm16(result, lhs, rhs)
             }
-            Instr::I64GtS { result, lhs, rhs } => self.execute_i64_gt_s(result, lhs, rhs),
-            Instr::I64GtSImm16 { result, lhs, rhs } => {
+            Instr::I64GtS { instr_offset: _, result, lhs, rhs } => self.execute_i64_gt_s(result, lhs, rhs),
+            Instr::I64GtSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_gt_s_imm16(result, lhs, rhs)
             }
-            Instr::I64GtU { result, lhs, rhs } => self.execute_i64_gt_u(result, lhs, rhs),
-            Instr::I64GtUImm16 { result, lhs, rhs } => {
+            Instr::I64GtU { instr_offset: _, result, lhs, rhs } => self.execute_i64_gt_u(result, lhs, rhs),
+            Instr::I64GtUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_gt_u_imm16(result, lhs, rhs)
             }
-            Instr::I64GeS { result, lhs, rhs } => self.execute_i64_ge_s(result, lhs, rhs),
-            Instr::I64GeSImm16 { result, lhs, rhs } => {
+            Instr::I64GeS { instr_offset: _, result, lhs, rhs } => self.execute_i64_ge_s(result, lhs, rhs),
+            Instr::I64GeSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_ge_s_imm16(result, lhs, rhs)
             }
-            Instr::I64GeU { result, lhs, rhs } => self.execute_i64_ge_u(result, lhs, rhs),
-            Instr::I64GeUImm16 { result, lhs, rhs } => {
+            Instr::I64GeU { instr_offset: _, result, lhs, rhs } => self.execute_i64_ge_u(result, lhs, rhs),
+            Instr::I64GeUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_ge_u_imm16(result, lhs, rhs)
             }
-            Instr::F32Eq { result, lhs, rhs } => self.execute_f32_eq(result, lhs, rhs),
-            Instr::F32Ne { result, lhs, rhs } => self.execute_f32_ne(result, lhs, rhs),
-            Instr::F32Lt { result, lhs, rhs } => self.execute_f32_lt(result, lhs, rhs),
-            Instr::F32Le { result, lhs, rhs } => self.execute_f32_le(result, lhs, rhs),
-            Instr::F32Gt { result, lhs, rhs } => self.execute_f32_gt(result, lhs, rhs),
-            Instr::F32Ge { result, lhs, rhs } => self.execute_f32_ge(result, lhs, rhs),
-            Instr::F64Eq { result, lhs, rhs } => self.execute_f64_eq(result, lhs, rhs),
-            Instr::F64Ne { result, lhs, rhs } => self.execute_f64_ne(result, lhs, rhs),
-            Instr::F64Lt { result, lhs, rhs } => self.execute_f64_lt(result, lhs, rhs),
-            Instr::F64Le { result, lhs, rhs } => self.execute_f64_le(result, lhs, rhs),
-            Instr::F64Gt { result, lhs, rhs } => self.execute_f64_gt(result, lhs, rhs),
-            Instr::F64Ge { result, lhs, rhs } => self.execute_f64_ge(result, lhs, rhs),
-            Instr::I32Clz { result, input } => self.execute_i32_clz(result, input),
-            Instr::I32Ctz { result, input } => self.execute_i32_ctz(result, input),
-            Instr::I32Popcnt { result, input } => self.execute_i32_popcnt(result, input),
-            Instr::I32Add { result, lhs, rhs } => {
+            Instr::F32Eq { instr_offset: _, result, lhs, rhs } => self.execute_f32_eq(result, lhs, rhs),
+            Instr::F32Ne { instr_offset: _, result, lhs, rhs } => self.execute_f32_ne(result, lhs, rhs),
+            Instr::F32Lt { instr_offset: _, result, lhs, rhs } => self.execute_f32_lt(result, lhs, rhs),
+            Instr::F32Le { instr_offset: _, result, lhs, rhs } => self.execute_f32_le(result, lhs, rhs),
+            Instr::F32Gt { instr_offset: _, result, lhs, rhs } => self.execute_f32_gt(result, lhs, rhs),
+            Instr::F32Ge { instr_offset: _, result, lhs, rhs } => self.execute_f32_ge(result, lhs, rhs),
+            Instr::F64Eq { instr_offset: _, result, lhs, rhs } => self.execute_f64_eq(result, lhs, rhs),
+            Instr::F64Ne { instr_offset: _, result, lhs, rhs } => self.execute_f64_ne(result, lhs, rhs),
+            Instr::F64Lt { instr_offset: _, result, lhs, rhs } => self.execute_f64_lt(result, lhs, rhs),
+            Instr::F64Le { instr_offset: _, result, lhs, rhs } => self.execute_f64_le(result, lhs, rhs),
+            Instr::F64Gt { instr_offset: _, result, lhs, rhs } => self.execute_f64_gt(result, lhs, rhs),
+            Instr::F64Ge { instr_offset: _, result, lhs, rhs } => self.execute_f64_ge(result, lhs, rhs),
+            Instr::I32Clz { instr_offset: _, result, input } => self.execute_i32_clz(result, input),
+            Instr::I32Ctz { instr_offset: _, result, input } => self.execute_i32_ctz(result, input),
+            Instr::I32Popcnt { instr_offset: _, result, input } => self.execute_i32_popcnt(result, input),
+            Instr::I32Add { instr_offset: _, result, lhs, rhs } => {
                 // println!("result: {:?}, lhs: {:?}, rhs: {:?}", result, lhs, rhs);
                 self.execute_i32_add(result, lhs, rhs)
             },
-            Instr::I32AddImm16 { result, lhs, rhs } => self.execute_i32_add_imm16(result, lhs, rhs),
-            Instr::I32Sub { result, lhs, rhs } => self.execute_i32_sub(result, lhs, rhs),
-            Instr::I32SubImm16Lhs { result, lhs, rhs } => {
+            Instr::I32AddImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_add_imm16(result, lhs, rhs),
+            Instr::I32Sub { instr_offset: _, result, lhs, rhs } => self.execute_i32_sub(result, lhs, rhs),
+            Instr::I32SubImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_sub_imm16_lhs(result, lhs, rhs)
             }
-            Instr::I32Mul { result, lhs, rhs } => self.execute_i32_mul(result, lhs, rhs),
-            Instr::I32MulImm16 { result, lhs, rhs } => self.execute_i32_mul_imm16(result, lhs, rhs),
-            Instr::I32DivS { result, lhs, rhs } => self.execute_i32_div_s(result, lhs, rhs)?,
-            Instr::I32DivSImm16Rhs { result, lhs, rhs } => {
+            Instr::I32Mul { instr_offset: _, result, lhs, rhs } => self.execute_i32_mul(result, lhs, rhs),
+            Instr::I32MulImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_mul_imm16(result, lhs, rhs),
+            Instr::I32DivS { instr_offset: _, result, lhs, rhs } => self.execute_i32_div_s(result, lhs, rhs)?,
+            Instr::I32DivSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_div_s_imm16_rhs(result, lhs, rhs)?
             }
-            Instr::I32DivSImm16Lhs { result, lhs, rhs } => {
+            Instr::I32DivSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_div_s_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I32DivU { result, lhs, rhs } => self.execute_i32_div_u(result, lhs, rhs)?,
-            Instr::I32DivUImm16Rhs { result, lhs, rhs } => {
+            Instr::I32DivU { instr_offset: _, result, lhs, rhs } => self.execute_i32_div_u(result, lhs, rhs)?,
+            Instr::I32DivUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_div_u_imm16_rhs(result, lhs, rhs)
             }
-            Instr::I32DivUImm16Lhs { result, lhs, rhs } => {
+            Instr::I32DivUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_div_u_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I32RemS { result, lhs, rhs } => self.execute_i32_rem_s(result, lhs, rhs)?,
-            Instr::I32RemSImm16Rhs { result, lhs, rhs } => {
+            Instr::I32RemS { instr_offset: _, result, lhs, rhs } => self.execute_i32_rem_s(result, lhs, rhs)?,
+            Instr::I32RemSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_rem_s_imm16_rhs(result, lhs, rhs)?
             }
-            Instr::I32RemSImm16Lhs { result, lhs, rhs } => {
+            Instr::I32RemSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_rem_s_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I32RemU { result, lhs, rhs } => self.execute_i32_rem_u(result, lhs, rhs)?,
-            Instr::I32RemUImm16Rhs { result, lhs, rhs } => {
+            Instr::I32RemU { instr_offset: _, result, lhs, rhs } => self.execute_i32_rem_u(result, lhs, rhs)?,
+            Instr::I32RemUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_rem_u_imm16_rhs(result, lhs, rhs)
             }
-            Instr::I32RemUImm16Lhs { result, lhs, rhs } => {
+            Instr::I32RemUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_rem_u_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I32And { result, lhs, rhs } => self.execute_i32_and(result, lhs, rhs),
-            Instr::I32AndEqz { result, lhs, rhs } => self.execute_i32_and_eqz(result, lhs, rhs),
-            Instr::I32AndEqzImm16 { result, lhs, rhs } => {
+            Instr::I32And { instr_offset: _, result, lhs, rhs } => self.execute_i32_and(result, lhs, rhs),
+            Instr::I32AndEqz { instr_offset: _, result, lhs, rhs } => self.execute_i32_and_eqz(result, lhs, rhs),
+            Instr::I32AndEqzImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_and_eqz_imm16(result, lhs, rhs)
             }
-            Instr::I32AndImm16 { result, lhs, rhs } => self.execute_i32_and_imm16(result, lhs, rhs),
-            Instr::I32Or { result, lhs, rhs } => self.execute_i32_or(result, lhs, rhs),
-            Instr::I32OrEqz { result, lhs, rhs } => self.execute_i32_or_eqz(result, lhs, rhs),
-            Instr::I32OrEqzImm16 { result, lhs, rhs } => {
+            Instr::I32AndImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_and_imm16(result, lhs, rhs),
+            Instr::I32Or { instr_offset: _, result, lhs, rhs } => self.execute_i32_or(result, lhs, rhs),
+            Instr::I32OrEqz { instr_offset: _, result, lhs, rhs } => self.execute_i32_or_eqz(result, lhs, rhs),
+            Instr::I32OrEqzImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_or_eqz_imm16(result, lhs, rhs)
             }
-            Instr::I32OrImm16 { result, lhs, rhs } => self.execute_i32_or_imm16(result, lhs, rhs),
-            Instr::I32Xor { result, lhs, rhs } => self.execute_i32_xor(result, lhs, rhs),
-            Instr::I32XorEqz { result, lhs, rhs } => self.execute_i32_xor_eqz(result, lhs, rhs),
-            Instr::I32XorEqzImm16 { result, lhs, rhs } => {
+            Instr::I32OrImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_or_imm16(result, lhs, rhs),
+            Instr::I32Xor { instr_offset: _, result, lhs, rhs } => self.execute_i32_xor(result, lhs, rhs),
+            Instr::I32XorEqz { instr_offset: _, result, lhs, rhs } => self.execute_i32_xor_eqz(result, lhs, rhs),
+            Instr::I32XorEqzImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_xor_eqz_imm16(result, lhs, rhs)
             }
-            Instr::I32XorImm16 { result, lhs, rhs } => self.execute_i32_xor_imm16(result, lhs, rhs),
-            Instr::I32Shl { result, lhs, rhs } => self.execute_i32_shl(result, lhs, rhs),
-            Instr::I32ShlBy { result, lhs, rhs } => self.execute_i32_shl_by(result, lhs, rhs),
-            Instr::I32ShlImm16 { result, lhs, rhs } => self.execute_i32_shl_imm16(result, lhs, rhs),
-            Instr::I32ShrU { result, lhs, rhs } => self.execute_i32_shr_u(result, lhs, rhs),
-            Instr::I32ShrUBy { result, lhs, rhs } => self.execute_i32_shr_u_by(result, lhs, rhs),
-            Instr::I32ShrUImm16 { result, lhs, rhs } => {
+            Instr::I32XorImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_xor_imm16(result, lhs, rhs),
+            Instr::I32Shl { instr_offset: _, result, lhs, rhs } => self.execute_i32_shl(result, lhs, rhs),
+            Instr::I32ShlBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_shl_by(result, lhs, rhs),
+            Instr::I32ShlImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_shl_imm16(result, lhs, rhs),
+            Instr::I32ShrU { instr_offset: _, result, lhs, rhs } => self.execute_i32_shr_u(result, lhs, rhs),
+            Instr::I32ShrUBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_shr_u_by(result, lhs, rhs),
+            Instr::I32ShrUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_shr_u_imm16(result, lhs, rhs)
             }
-            Instr::I32ShrS { result, lhs, rhs } => self.execute_i32_shr_s(result, lhs, rhs),
-            Instr::I32ShrSBy { result, lhs, rhs } => self.execute_i32_shr_s_by(result, lhs, rhs),
-            Instr::I32ShrSImm16 { result, lhs, rhs } => {
+            Instr::I32ShrS { instr_offset: _, result, lhs, rhs } => self.execute_i32_shr_s(result, lhs, rhs),
+            Instr::I32ShrSBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_shr_s_by(result, lhs, rhs),
+            Instr::I32ShrSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_shr_s_imm16(result, lhs, rhs)
             }
-            Instr::I32Rotl { result, lhs, rhs } => self.execute_i32_rotl(result, lhs, rhs),
-            Instr::I32RotlBy { result, lhs, rhs } => self.execute_i32_rotl_by(result, lhs, rhs),
-            Instr::I32RotlImm16 { result, lhs, rhs } => {
+            Instr::I32Rotl { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotl(result, lhs, rhs),
+            Instr::I32RotlBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotl_by(result, lhs, rhs),
+            Instr::I32RotlImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_rotl_imm16(result, lhs, rhs)
             }
-            Instr::I32Rotr { result, lhs, rhs } => self.execute_i32_rotr(result, lhs, rhs),
-            Instr::I32RotrBy { result, lhs, rhs } => self.execute_i32_rotr_by(result, lhs, rhs),
-            Instr::I32RotrImm16 { result, lhs, rhs } => {
+            Instr::I32Rotr { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotr(result, lhs, rhs),
+            Instr::I32RotrBy { instr_offset: _, result, lhs, rhs } => self.execute_i32_rotr_by(result, lhs, rhs),
+            Instr::I32RotrImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i32_rotr_imm16(result, lhs, rhs)
             }
-            Instr::I64Clz { result, input } => self.execute_i64_clz(result, input),
-            Instr::I64Ctz { result, input } => self.execute_i64_ctz(result, input),
-            Instr::I64Popcnt { result, input } => self.execute_i64_popcnt(result, input),
-            Instr::I64Add { result, lhs, rhs } => self.execute_i64_add(result, lhs, rhs),
-            Instr::I64AddImm16 { result, lhs, rhs } => self.execute_i64_add_imm16(result, lhs, rhs),
-            Instr::I64Sub { result, lhs, rhs } => self.execute_i64_sub(result, lhs, rhs),
-            Instr::I64SubImm16Lhs { result, lhs, rhs } => {
+            Instr::I64Clz { instr_offset: _, result, input } => self.execute_i64_clz(result, input),
+            Instr::I64Ctz { instr_offset: _, result, input } => self.execute_i64_ctz(result, input),
+            Instr::I64Popcnt { instr_offset: _, result, input } => self.execute_i64_popcnt(result, input),
+            Instr::I64Add { instr_offset: _, result, lhs, rhs } => self.execute_i64_add(result, lhs, rhs),
+            Instr::I64AddImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_add_imm16(result, lhs, rhs),
+            Instr::I64Sub { instr_offset: _, result, lhs, rhs } => self.execute_i64_sub(result, lhs, rhs),
+            Instr::I64SubImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_sub_imm16_lhs(result, lhs, rhs)
             }
-            Instr::I64Mul { result, lhs, rhs } => self.execute_i64_mul(result, lhs, rhs),
-            Instr::I64MulImm16 { result, lhs, rhs } => self.execute_i64_mul_imm16(result, lhs, rhs),
-            Instr::I64DivS { result, lhs, rhs } => self.execute_i64_div_s(result, lhs, rhs)?,
-            Instr::I64DivSImm16Rhs { result, lhs, rhs } => {
+            Instr::I64Mul { instr_offset: _, result, lhs, rhs } => self.execute_i64_mul(result, lhs, rhs),
+            Instr::I64MulImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_mul_imm16(result, lhs, rhs),
+            Instr::I64DivS { instr_offset: _, result, lhs, rhs } => self.execute_i64_div_s(result, lhs, rhs)?,
+            Instr::I64DivSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_div_s_imm16_rhs(result, lhs, rhs)?
             }
-            Instr::I64DivSImm16Lhs { result, lhs, rhs } => {
+            Instr::I64DivSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_div_s_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I64DivU { result, lhs, rhs } => self.execute_i64_div_u(result, lhs, rhs)?,
-            Instr::I64DivUImm16Rhs { result, lhs, rhs } => {
+            Instr::I64DivU { instr_offset: _, result, lhs, rhs } => self.execute_i64_div_u(result, lhs, rhs)?,
+            Instr::I64DivUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_div_u_imm16_rhs(result, lhs, rhs)
             }
-            Instr::I64DivUImm16Lhs { result, lhs, rhs } => {
+            Instr::I64DivUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_div_u_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I64RemS { result, lhs, rhs } => self.execute_i64_rem_s(result, lhs, rhs)?,
-            Instr::I64RemSImm16Rhs { result, lhs, rhs } => {
+            Instr::I64RemS { instr_offset: _, result, lhs, rhs } => self.execute_i64_rem_s(result, lhs, rhs)?,
+            Instr::I64RemSImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_rem_s_imm16_rhs(result, lhs, rhs)?
             }
-            Instr::I64RemSImm16Lhs { result, lhs, rhs } => {
+            Instr::I64RemSImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_rem_s_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I64RemU { result, lhs, rhs } => self.execute_i64_rem_u(result, lhs, rhs)?,
-            Instr::I64RemUImm16Rhs { result, lhs, rhs } => {
+            Instr::I64RemU { instr_offset: _, result, lhs, rhs } => self.execute_i64_rem_u(result, lhs, rhs)?,
+            Instr::I64RemUImm16Rhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_rem_u_imm16_rhs(result, lhs, rhs)
             }
-            Instr::I64RemUImm16Lhs { result, lhs, rhs } => {
+            Instr::I64RemUImm16Lhs { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_rem_u_imm16_lhs(result, lhs, rhs)?
             }
-            Instr::I64And { result, lhs, rhs } => self.execute_i64_and(result, lhs, rhs),
-            Instr::I64AndImm16 { result, lhs, rhs } => self.execute_i64_and_imm16(result, lhs, rhs),
-            Instr::I64Or { result, lhs, rhs } => self.execute_i64_or(result, lhs, rhs),
-            Instr::I64OrImm16 { result, lhs, rhs } => self.execute_i64_or_imm16(result, lhs, rhs),
-            Instr::I64Xor { result, lhs, rhs } => self.execute_i64_xor(result, lhs, rhs),
-            Instr::I64XorImm16 { result, lhs, rhs } => self.execute_i64_xor_imm16(result, lhs, rhs),
-            Instr::I64Shl { result, lhs, rhs } => self.execute_i64_shl(result, lhs, rhs),
-            Instr::I64ShlBy { result, lhs, rhs } => self.execute_i64_shl_by(result, lhs, rhs),
-            Instr::I64ShlImm16 { result, lhs, rhs } => self.execute_i64_shl_imm16(result, lhs, rhs),
-            Instr::I64ShrU { result, lhs, rhs } => self.execute_i64_shr_u(result, lhs, rhs),
-            Instr::I64ShrUBy { result, lhs, rhs } => self.execute_i64_shr_u_by(result, lhs, rhs),
-            Instr::I64ShrUImm16 { result, lhs, rhs } => {
+            Instr::I64And { instr_offset: _, result, lhs, rhs } => self.execute_i64_and(result, lhs, rhs),
+            Instr::I64AndImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_and_imm16(result, lhs, rhs),
+            Instr::I64Or { instr_offset: _, result, lhs, rhs } => self.execute_i64_or(result, lhs, rhs),
+            Instr::I64OrImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_or_imm16(result, lhs, rhs),
+            Instr::I64Xor { instr_offset: _, result, lhs, rhs } => self.execute_i64_xor(result, lhs, rhs),
+            Instr::I64XorImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_xor_imm16(result, lhs, rhs),
+            Instr::I64Shl { instr_offset: _, result, lhs, rhs } => self.execute_i64_shl(result, lhs, rhs),
+            Instr::I64ShlBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_shl_by(result, lhs, rhs),
+            Instr::I64ShlImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i64_shl_imm16(result, lhs, rhs),
+            Instr::I64ShrU { instr_offset: _, result, lhs, rhs } => self.execute_i64_shr_u(result, lhs, rhs),
+            Instr::I64ShrUBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_shr_u_by(result, lhs, rhs),
+            Instr::I64ShrUImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_shr_u_imm16(result, lhs, rhs)
             }
-            Instr::I64ShrS { result, lhs, rhs } => self.execute_i64_shr_s(result, lhs, rhs),
-            Instr::I64ShrSBy { result, lhs, rhs } => self.execute_i64_shr_s_by(result, lhs, rhs),
-            Instr::I64ShrSImm16 { result, lhs, rhs } => {
+            Instr::I64ShrS { instr_offset: _, result, lhs, rhs } => self.execute_i64_shr_s(result, lhs, rhs),
+            Instr::I64ShrSBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_shr_s_by(result, lhs, rhs),
+            Instr::I64ShrSImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_shr_s_imm16(result, lhs, rhs)
             }
-            Instr::I64Rotl { result, lhs, rhs } => self.execute_i64_rotl(result, lhs, rhs),
-            Instr::I64RotlBy { result, lhs, rhs } => self.execute_i64_rotl_by(result, lhs, rhs),
-            Instr::I64RotlImm16 { result, lhs, rhs } => {
+            Instr::I64Rotl { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotl(result, lhs, rhs),
+            Instr::I64RotlBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotl_by(result, lhs, rhs),
+            Instr::I64RotlImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_rotl_imm16(result, lhs, rhs)
             }
-            Instr::I64Rotr { result, lhs, rhs } => self.execute_i64_rotr(result, lhs, rhs),
-            Instr::I64RotrBy { result, lhs, rhs } => self.execute_i64_rotr_by(result, lhs, rhs),
-            Instr::I64RotrImm16 { result, lhs, rhs } => {
+            Instr::I64Rotr { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotr(result, lhs, rhs),
+            Instr::I64RotrBy { instr_offset: _, result, lhs, rhs } => self.execute_i64_rotr_by(result, lhs, rhs),
+            Instr::I64RotrImm16 { instr_offset: _, result, lhs, rhs } => {
                 self.execute_i64_rotr_imm16(result, lhs, rhs)
             }
-            Instr::I32WrapI64 { result, input } => self.execute_i32_wrap_i64(result, input),
-            Instr::I32Extend8S { result, input } => self.execute_i32_extend8_s(result, input),
-            Instr::I32Extend16S { result, input } => self.execute_i32_extend16_s(result, input),
-            Instr::I64Extend8S { result, input } => self.execute_i64_extend8_s(result, input),
-            Instr::I64Extend16S { result, input } => self.execute_i64_extend16_s(result, input),
-            Instr::I64Extend32S { result, input } => self.execute_i64_extend32_s(result, input),
-            Instr::F32Abs { result, input } => self.execute_f32_abs(result, input),
-            Instr::F32Neg { result, input } => self.execute_f32_neg(result, input),
-            Instr::F32Ceil { result, input } => self.execute_f32_ceil(result, input),
-            Instr::F32Floor { result, input } => self.execute_f32_floor(result, input),
-            Instr::F32Trunc { result, input } => self.execute_f32_trunc(result, input),
-            Instr::F32Nearest { result, input } => self.execute_f32_nearest(result, input),
-            Instr::F32Sqrt { result, input } => self.execute_f32_sqrt(result, input),
-            Instr::F32Add { result, lhs, rhs } => self.execute_f32_add(result, lhs, rhs),
-            Instr::F32Sub { result, lhs, rhs } => self.execute_f32_sub(result, lhs, rhs),
-            Instr::F32Mul { result, lhs, rhs } => self.execute_f32_mul(result, lhs, rhs),
-            Instr::F32Div { result, lhs, rhs } => self.execute_f32_div(result, lhs, rhs),
-            Instr::F32Min { result, lhs, rhs } => self.execute_f32_min(result, lhs, rhs),
-            Instr::F32Max { result, lhs, rhs } => self.execute_f32_max(result, lhs, rhs),
-            Instr::F32Copysign { result, lhs, rhs } => self.execute_f32_copysign(result, lhs, rhs),
-            Instr::F32CopysignImm { result, lhs, rhs } => {
+            Instr::I32WrapI64 { instr_offset: _, result, input } => self.execute_i32_wrap_i64(result, input),
+            Instr::I32Extend8S { instr_offset: _, result, input } => self.execute_i32_extend8_s(result, input),
+            Instr::I32Extend16S { instr_offset: _, result, input } => self.execute_i32_extend16_s(result, input),
+            Instr::I64Extend8S { instr_offset: _, result, input } => self.execute_i64_extend8_s(result, input),
+            Instr::I64Extend16S { instr_offset: _, result, input } => self.execute_i64_extend16_s(result, input),
+            Instr::I64Extend32S { instr_offset: _, result, input } => self.execute_i64_extend32_s(result, input),
+            Instr::F32Abs { instr_offset: _, result, input } => self.execute_f32_abs(result, input),
+            Instr::F32Neg { instr_offset: _, result, input } => self.execute_f32_neg(result, input),
+            Instr::F32Ceil { instr_offset: _, result, input } => self.execute_f32_ceil(result, input),
+            Instr::F32Floor { instr_offset: _, result, input } => self.execute_f32_floor(result, input),
+            Instr::F32Trunc { instr_offset: _, result, input } => self.execute_f32_trunc(result, input),
+            Instr::F32Nearest { instr_offset: _, result, input } => self.execute_f32_nearest(result, input),
+            Instr::F32Sqrt { instr_offset: _, result, input } => self.execute_f32_sqrt(result, input),
+            Instr::F32Add { instr_offset: _, result, lhs, rhs } => self.execute_f32_add(result, lhs, rhs),
+            Instr::F32Sub { instr_offset: _, result, lhs, rhs } => self.execute_f32_sub(result, lhs, rhs),
+            Instr::F32Mul { instr_offset: _, result, lhs, rhs } => self.execute_f32_mul(result, lhs, rhs),
+            Instr::F32Div { instr_offset: _, result, lhs, rhs } => self.execute_f32_div(result, lhs, rhs),
+            Instr::F32Min { instr_offset: _, result, lhs, rhs } => self.execute_f32_min(result, lhs, rhs),
+            Instr::F32Max { instr_offset: _, result, lhs, rhs } => self.execute_f32_max(result, lhs, rhs),
+            Instr::F32Copysign { instr_offset: _, result, lhs, rhs } => self.execute_f32_copysign(result, lhs, rhs),
+            Instr::F32CopysignImm { instr_offset: _, result, lhs, rhs } => {
                 self.execute_f32_copysign_imm(result, lhs, rhs)
             }
-            Instr::F64Abs { result, input } => self.execute_f64_abs(result, input),
-            Instr::F64Neg { result, input } => self.execute_f64_neg(result, input),
-            Instr::F64Ceil { result, input } => self.execute_f64_ceil(result, input),
-            Instr::F64Floor { result, input } => self.execute_f64_floor(result, input),
-            Instr::F64Trunc { result, input } => self.execute_f64_trunc(result, input),
-            Instr::F64Nearest { result, input } => self.execute_f64_nearest(result, input),
-            Instr::F64Sqrt { result, input } => self.execute_f64_sqrt(result, input),
-            Instr::F64Add { result, lhs, rhs } => self.execute_f64_add(result, lhs, rhs),
-            Instr::F64Sub { result, lhs, rhs } => self.execute_f64_sub(result, lhs, rhs),
-            Instr::F64Mul { result, lhs, rhs } => self.execute_f64_mul(result, lhs, rhs),
-            Instr::F64Div { result, lhs, rhs } => self.execute_f64_div(result, lhs, rhs),
-            Instr::F64Min { result, lhs, rhs } => self.execute_f64_min(result, lhs, rhs),
-            Instr::F64Max { result, lhs, rhs } => self.execute_f64_max(result, lhs, rhs),
-            Instr::F64Copysign { result, lhs, rhs } => self.execute_f64_copysign(result, lhs, rhs),
-            Instr::F64CopysignImm { result, lhs, rhs } => {
+            Instr::F64Abs { instr_offset: _, result, input } => self.execute_f64_abs(result, input),
+            Instr::F64Neg { instr_offset: _, result, input } => self.execute_f64_neg(result, input),
+            Instr::F64Ceil { instr_offset: _, result, input } => self.execute_f64_ceil(result, input),
+            Instr::F64Floor { instr_offset: _, result, input } => self.execute_f64_floor(result, input),
+            Instr::F64Trunc { instr_offset: _, result, input } => self.execute_f64_trunc(result, input),
+            Instr::F64Nearest { instr_offset: _, result, input } => self.execute_f64_nearest(result, input),
+            Instr::F64Sqrt { instr_offset: _, result, input } => self.execute_f64_sqrt(result, input),
+            Instr::F64Add { instr_offset: _, result, lhs, rhs } => self.execute_f64_add(result, lhs, rhs),
+            Instr::F64Sub { instr_offset: _, result, lhs, rhs } => self.execute_f64_sub(result, lhs, rhs),
+            Instr::F64Mul { instr_offset: _, result, lhs, rhs } => self.execute_f64_mul(result, lhs, rhs),
+            Instr::F64Div { instr_offset: _, result, lhs, rhs } => self.execute_f64_div(result, lhs, rhs),
+            Instr::F64Min { instr_offset: _, result, lhs, rhs } => self.execute_f64_min(result, lhs, rhs),
+            Instr::F64Max { instr_offset: _, result, lhs, rhs } => self.execute_f64_max(result, lhs, rhs),
+            Instr::F64Copysign { instr_offset: _, result, lhs, rhs } => self.execute_f64_copysign(result, lhs, rhs),
+            Instr::F64CopysignImm { instr_offset: _, result, lhs, rhs } => {
                 self.execute_f64_copysign_imm(result, lhs, rhs)
             }
-            Instr::I32TruncF32S { result, input } => self.execute_i32_trunc_f32_s(result, input)?,
-            Instr::I32TruncF32U { result, input } => self.execute_i32_trunc_f32_u(result, input)?,
-            Instr::I32TruncF64S { result, input } => self.execute_i32_trunc_f64_s(result, input)?,
-            Instr::I32TruncF64U { result, input } => self.execute_i32_trunc_f64_u(result, input)?,
-            Instr::I64TruncF32S { result, input } => self.execute_i64_trunc_f32_s(result, input)?,
-            Instr::I64TruncF32U { result, input } => self.execute_i64_trunc_f32_u(result, input)?,
-            Instr::I64TruncF64S { result, input } => self.execute_i64_trunc_f64_s(result, input)?,
-            Instr::I64TruncF64U { result, input } => self.execute_i64_trunc_f64_u(result, input)?,
-            Instr::I32TruncSatF32S { result, input } => {
+            Instr::I32TruncF32S { instr_offset: _, result, input } => self.execute_i32_trunc_f32_s(result, input)?,
+            Instr::I32TruncF32U { instr_offset: _, result, input } => self.execute_i32_trunc_f32_u(result, input)?,
+            Instr::I32TruncF64S { instr_offset: _, result, input } => self.execute_i32_trunc_f64_s(result, input)?,
+            Instr::I32TruncF64U { instr_offset: _, result, input } => self.execute_i32_trunc_f64_u(result, input)?,
+            Instr::I64TruncF32S { instr_offset: _, result, input } => self.execute_i64_trunc_f32_s(result, input)?,
+            Instr::I64TruncF32U { instr_offset: _, result, input } => self.execute_i64_trunc_f32_u(result, input)?,
+            Instr::I64TruncF64S { instr_offset: _, result, input } => self.execute_i64_trunc_f64_s(result, input)?,
+            Instr::I64TruncF64U { instr_offset: _, result, input } => self.execute_i64_trunc_f64_u(result, input)?,
+            Instr::I32TruncSatF32S { instr_offset: _, result, input } => {
                 self.execute_i32_trunc_sat_f32_s(result, input)
             }
-            Instr::I32TruncSatF32U { result, input } => {
+            Instr::I32TruncSatF32U { instr_offset: _, result, input } => {
                 self.execute_i32_trunc_sat_f32_u(result, input)
             }
-            Instr::I32TruncSatF64S { result, input } => {
+            Instr::I32TruncSatF64S { instr_offset: _, result, input } => {
                 self.execute_i32_trunc_sat_f64_s(result, input)
             }
-            Instr::I32TruncSatF64U { result, input } => {
+            Instr::I32TruncSatF64U { instr_offset: _, result, input } => {
                 self.execute_i32_trunc_sat_f64_u(result, input)
             }
-            Instr::I64TruncSatF32S { result, input } => {
+            Instr::I64TruncSatF32S { instr_offset: _, result, input } => {
                 self.execute_i64_trunc_sat_f32_s(result, input)
             }
-            Instr::I64TruncSatF32U { result, input } => {
+            Instr::I64TruncSatF32U { instr_offset: _, result, input } => {
                 self.execute_i64_trunc_sat_f32_u(result, input)
             }
-            Instr::I64TruncSatF64S { result, input } => {
+            Instr::I64TruncSatF64S { instr_offset: _, result, input } => {
                 self.execute_i64_trunc_sat_f64_s(result, input)
             }
-            Instr::I64TruncSatF64U { result, input } => {
+            Instr::I64TruncSatF64U { instr_offset: _, result, input } => {
                 self.execute_i64_trunc_sat_f64_u(result, input)
             }
-            Instr::F32DemoteF64 { result, input } => self.execute_f32_demote_f64(result, input),
-            Instr::F64PromoteF32 { result, input } => self.execute_f64_promote_f32(result, input),
-            Instr::F32ConvertI32S { result, input } => {
+            Instr::F32DemoteF64 { instr_offset: _, result, input } => self.execute_f32_demote_f64(result, input),
+            Instr::F64PromoteF32 { instr_offset: _, result, input } => self.execute_f64_promote_f32(result, input),
+            Instr::F32ConvertI32S { instr_offset: _, result, input } => {
                 self.execute_f32_convert_i32_s(result, input)
             }
-            Instr::F32ConvertI32U { result, input } => {
+            Instr::F32ConvertI32U { instr_offset: _, result, input } => {
                 self.execute_f32_convert_i32_u(result, input)
             }
-            Instr::F32ConvertI64S { result, input } => {
+            Instr::F32ConvertI64S { instr_offset: _, result, input } => {
                 self.execute_f32_convert_i64_s(result, input)
             }
-            Instr::F32ConvertI64U { result, input } => {
+            Instr::F32ConvertI64U { instr_offset: _, result, input } => {
                 self.execute_f32_convert_i64_u(result, input)
             }
-            Instr::F64ConvertI32S { result, input } => {
+            Instr::F64ConvertI32S { instr_offset: _, result, input } => {
                 self.execute_f64_convert_i32_s(result, input)
             }
-            Instr::F64ConvertI32U { result, input } => {
+            Instr::F64ConvertI32U { instr_offset: _, result, input } => {
                 self.execute_f64_convert_i32_u(result, input)
             }
-            Instr::F64ConvertI64S { result, input } => {
+            Instr::F64ConvertI64S { instr_offset: _, result, input } => {
                 self.execute_f64_convert_i64_s(result, input)
             }
-            Instr::F64ConvertI64U { result, input } => {
+            Instr::F64ConvertI64U { instr_offset: _, result, input } => {
                 self.execute_f64_convert_i64_u(result, input)
             }
-            Instr::TableGet { result, index } => {
+            Instr::TableGet { instr_offset: _, result, index } => {
                 self.execute_table_get(&store.inner, result, index)?
             }
-            Instr::TableGetImm { result, index } => {
+            Instr::TableGetImm { instr_offset: _, result, index } => {
                 self.execute_table_get_imm(&store.inner, result, index)?
             }
-            Instr::TableSize { result, table } => {
+            Instr::TableSize { instr_offset: _, result, table } => {
                 self.execute_table_size(&store.inner, result, table)
             }
-            Instr::TableSet { index, value } => {
+            Instr::TableSet { instr_offset: _, index, value } => {
                 self.execute_table_set(&mut store.inner, index, value)?
             }
-            Instr::TableSetAt { index, value } => {
+            Instr::TableSetAt { instr_offset: _, index, value } => {
                 self.execute_table_set_at(&mut store.inner, index, value)?
             }
-            Instr::TableCopy { dst, src, len } => {
+            Instr::TableCopy { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyTo { dst, src, len } => {
+            Instr::TableCopyTo { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_to(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyFrom { dst, src, len } => {
+            Instr::TableCopyFrom { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_from(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyFromTo { dst, src, len } => {
+            Instr::TableCopyFromTo { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_from_to(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyExact { dst, src, len } => {
+            Instr::TableCopyExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyToExact { dst, src, len } => {
+            Instr::TableCopyToExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyFromExact { dst, src, len } => {
+            Instr::TableCopyFromExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_from_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableCopyFromToExact { dst, src, len } => {
+            Instr::TableCopyFromToExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_copy_from_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInit { dst, src, len } => {
+            Instr::TableInit { instr_offset: _, dst, src, len } => {
                 self.execute_table_init(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitTo { dst, src, len } => {
+            Instr::TableInitTo { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_to(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitFrom { dst, src, len } => {
+            Instr::TableInitFrom { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_from(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitFromTo { dst, src, len } => {
+            Instr::TableInitFromTo { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_from_to(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitExact { dst, src, len } => {
+            Instr::TableInitExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitToExact { dst, src, len } => {
+            Instr::TableInitToExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitFromExact { dst, src, len } => {
+            Instr::TableInitFromExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_from_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableInitFromToExact { dst, src, len } => {
+            Instr::TableInitFromToExact { instr_offset: _, dst, src, len } => {
                 self.execute_table_init_from_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::TableFill { dst, len, value } => {
+            Instr::TableFill { instr_offset: _, dst, len, value } => {
                 self.execute_table_fill(&mut store.inner, dst, len, value)?
             }
-            Instr::TableFillAt { dst, len, value } => {
+            Instr::TableFillAt { instr_offset: _, dst, len, value } => {
                 self.execute_table_fill_at(&mut store.inner, dst, len, value)?
             }
-            Instr::TableFillExact { dst, len, value } => {
+            Instr::TableFillExact { instr_offset: _, dst, len, value } => {
                 self.execute_table_fill_exact(&mut store.inner, dst, len, value)?
             }
-            Instr::TableFillAtExact { dst, len, value } => {
+            Instr::TableFillAtExact { instr_offset: _, dst, len, value } => {
                 self.execute_table_fill_at_exact(&mut store.inner, dst, len, value)?
             }
             Instr::TableGrow {
+                instr_offset: _,
                 result,
                 delta,
                 value,
             } => self.execute_table_grow(store, result, delta, value)?,
             Instr::TableGrowImm {
+                instr_offset: _,
                 result,
                 delta,
                 value,
             } => self.execute_table_grow_imm(store, result, delta, value)?,
-            Instr::ElemDrop { index } => self.execute_element_drop(&mut store.inner, index),
-            Instr::DataDrop { index } => self.execute_data_drop(&mut store.inner, index),
-            Instr::MemorySize { result, memory } => {
+            Instr::ElemDrop { instr_offset: _, index } => self.execute_element_drop(&mut store.inner, index),
+            Instr::DataDrop { instr_offset: _, index } => self.execute_data_drop(&mut store.inner, index),
+            Instr::MemorySize { instr_offset: _, result, memory } => {
                 self.execute_memory_size(&store.inner, result, memory)
             }
-            Instr::MemoryGrow { result, delta } => {
+            Instr::MemoryGrow { instr_offset: _, result, delta } => {
                 self.execute_memory_grow(store, result, delta)?
             }
-            Instr::MemoryGrowBy { result, delta } => {
+            Instr::MemoryGrowBy { instr_offset: _, result, delta } => {
                 self.execute_memory_grow_by(store, result, delta)?
             }
-            Instr::MemoryCopy { dst, src, len } => {
+            Instr::MemoryCopy { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyTo { dst, src, len } => {
+            Instr::MemoryCopyTo { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_to(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyFrom { dst, src, len } => {
+            Instr::MemoryCopyFrom { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_from(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyFromTo { dst, src, len } => {
+            Instr::MemoryCopyFromTo { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_from_to(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyExact { dst, src, len } => {
+            Instr::MemoryCopyExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyToExact { dst, src, len } => {
+            Instr::MemoryCopyToExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyFromExact { dst, src, len } => {
+            Instr::MemoryCopyFromExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_from_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryCopyFromToExact { dst, src, len } => {
+            Instr::MemoryCopyFromToExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_copy_from_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryFill { dst, value, len } => {
+            Instr::MemoryFill { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillAt { dst, value, len } => {
+            Instr::MemoryFillAt { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_at(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillImm { dst, value, len } => {
+            Instr::MemoryFillImm { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_imm(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillExact { dst, value, len } => {
+            Instr::MemoryFillExact { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_exact(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillAtImm { dst, value, len } => {
+            Instr::MemoryFillAtImm { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_at_imm(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillAtExact { dst, value, len } => {
+            Instr::MemoryFillAtExact { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_at_exact(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillImmExact { dst, value, len } => {
+            Instr::MemoryFillImmExact { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_imm_exact(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryFillAtImmExact { dst, value, len } => {
+            Instr::MemoryFillAtImmExact { instr_offset: _, dst, value, len } => {
                 self.execute_memory_fill_at_imm_exact(&mut store.inner, dst, value, len)?
             }
-            Instr::MemoryInit { dst, src, len } => {
+            Instr::MemoryInit { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitTo { dst, src, len } => {
+            Instr::MemoryInitTo { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_to(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitFrom { dst, src, len } => {
+            Instr::MemoryInitFrom { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_from(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitFromTo { dst, src, len } => {
+            Instr::MemoryInitFromTo { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_from_to(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitExact { dst, src, len } => {
+            Instr::MemoryInitExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitToExact { dst, src, len } => {
+            Instr::MemoryInitToExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_to_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitFromExact { dst, src, len } => {
+            Instr::MemoryInitFromExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_from_exact(&mut store.inner, dst, src, len)?
             }
-            Instr::MemoryInitFromToExact { dst, src, len } => {
+            Instr::MemoryInitFromToExact { instr_offset: _, dst, src, len } => {
                 self.execute_memory_init_from_to_exact(&mut store.inner, dst, src, len)?
             }
             Instr::TableIndex { .. }
@@ -2622,8 +2684,8 @@ impl<'engine> Executor<'engine> {
 }
 
 pub trait Interceptor {
-    fn invoke_func(&self, func_idx: u32) -> Signal;
-    fn execute_inst(&self, inst: &Instruction) -> Signal;
+    fn invoke_func(&self, func_idx: i32, table: Option<Table>) -> Signal;
+    fn execute_inst(&self, instr_offset: u32) -> Signal;
 }
 
 macro_rules! get_entity {
@@ -2961,7 +3023,7 @@ impl Executor<'_> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(1);
         match *addr.get() {
-            Instruction::MemoryIndex { index } => {
+            Instruction::MemoryIndex { instr_offset: _, index } => {
                 hint::cold();
                 self.ip = addr;
                 index

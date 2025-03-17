@@ -89,25 +89,25 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
     let mut sourcemaps = Vec::new();
     let mut subroutines = Vec::new();
     let mut count = 0;
-    // while let Some(header) = headers.next()? {
-    //     count += 1;
-    //     let unit = dwarf.unit(header)?;
-    //     let mut entries = unit.entries();
-    //     let root = match entries.next_dfs()? {
-    //         Some((_, entry)) => entry,
-    //         None => continue,
-    //     };
-    //     sourcemaps.push(transform_debug_line(
-    //         &unit,
-    //         root,
-    //         &dwarf,
-    //         &dwarf.debug_line,
-    //     )?);
-    //     subroutines.append(&mut transform_subprogram(&dwarf, &unit, header.offset())?);
-    // }
+    while let Some(header) = headers.next()? {
+        count += 1;
+        let unit = dwarf.unit(header)?;
+        let mut entries = unit.entries();
+        let root = match entries.next_dfs()? {
+            Some((_, entry)) => entry,
+            None => continue,
+        };
+        sourcemaps.push(transform_debug_line(
+            &unit,
+            root,
+            &dwarf,
+            &dwarf.debug_line,
+        )?);
+        subroutines.append(&mut transform_subprogram(&dwarf, &unit, header.offset())?);
+    }
 
     if count == 0 {
-        transform_debug_line_without_debug_info( &dwarf,&dwarf.debug_line);
+        sourcemaps.push(transform_debug_line_without_debug_info( &dwarf,&dwarf.debug_line)?);
     }
 
     Ok(DwarfDebugInfo {
@@ -118,6 +118,8 @@ pub fn transform_dwarf(buffer: &[u8]) -> Result<DwarfDebugInfo> {
         },
     })
 }
+
+
 
 #[derive(Clone)]
 pub struct SymbolVariable<R>
@@ -447,7 +449,6 @@ pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
         files.push(path);
     }
 
-
     let mut rows = program.rows();
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
@@ -491,20 +492,27 @@ impl DwarfUnitSourceMap {
 use std::cell::RefCell;
 pub struct DwarfSourceMap {
     pub address_sorted_rows: Vec<(u64, sourcemap::LineInfo)>,
+    pub inst_in_file_0: Vec<u64>,
     directory_map: RefCell<HashMap<String, String>>,
 }
 
 impl DwarfSourceMap {
     fn new(units: Vec<DwarfUnitSourceMap>) -> Self {
         let mut rows = BTreeMap::new();
+        let mut inst_in_file_0 = vec![];
         for unit in &units {
             for (addr, row) in &unit.address_sorted_rows {
                 let line_info = unit.transform_lineinfo(row);
                 rows.insert(*addr, line_info);
+
+                if row.file_index() == 0 {
+                    inst_in_file_0.push(*addr);
+                }
             }
         }
         Self {
             address_sorted_rows: rows.into_iter().collect(),
+            inst_in_file_0: inst_in_file_0,
             directory_map: RefCell::new(HashMap::new()),
         }
     }
@@ -532,6 +540,9 @@ impl sourcemap::SourceMap for DwarfSourceMap {
             line_info.filepath = line_info.filepath.replace(from, to);
         }
         Some(line_info)
+    }
+    fn inst_in_file_0(&self) -> Vec<u64> {
+        self.inst_in_file_0.clone()
     }
 }
 

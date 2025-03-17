@@ -21,7 +21,7 @@ impl Executor<'_> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(offset);
         match *addr.get() {
-            Instruction::TableIndex { index } => index,
+            Instruction::TableIndex { instr_offset: _, index } => index,
             unexpected => {
                 // Safety: Wasmi translation guarantees that [`Instruction::TableIndex`] exists.
                 unsafe {
@@ -38,7 +38,7 @@ impl Executor<'_> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(offset);
         match *addr.get() {
-            Instruction::ElemIndex { index } => index,
+            Instruction::ElemIndex { instr_offset: _, index } => index,
             unexpected => {
                 // Safety: Wasmi translation guarantees that [`Instruction::ElemIndex`] exists.
                 unsafe {

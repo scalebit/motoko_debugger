@@ -88,7 +88,7 @@ impl ProcessCommand {
                 return Ok(None);
             }
         }
-        debugger.instantiate()?;
+        debugger.instantiate(context.sourcemap.inst_in_file_0())?;
 
         let args = convert_to_val(wasi_args)?;
 

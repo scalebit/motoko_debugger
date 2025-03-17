@@ -53,7 +53,7 @@ pub trait Debugger {
     ///
     /// - If parsing, validating, compiling or instantiating the Wasm module failed.
     /// - If adding WASI defintions to the linker failed.
-    fn instantiate(&mut self) -> Result<(), Error>;
+    fn instantiate(&mut self, inst_in_file_0: Vec<u64>) -> Result<(), Error>;
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult>;
     fn is_running(&self) -> bool;

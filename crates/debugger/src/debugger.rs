@@ -11,6 +11,8 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{usize, vec};
+
+
 use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
@@ -21,7 +23,7 @@ use wasmi::{
     func::FuncEntity,
     Val,
 };
-use wasmi_collections::arena::ArenaIndex;
+use wasmi_collections::arena::{ArenaIndex, GuardedEntity};
 use wasmi_core::UntypedVal;
 use wasmi_ir::{Instruction, Reg, RegSpan};
 use wasmi_wasi::{WasiCtx, WasiCtxBuilder};
@@ -62,6 +64,7 @@ pub struct MainDebugger<'engine> {
 struct Breakpoints {
     function_map: HashMap<String, debugger::Breakpoint>,
     inst_map: HashMap<usize, debugger::Breakpoint>,
+    inst_in_file_0: Vec<u64>, // instr in file 0 for interrupt in first instr of file 0
 }
 
 impl Breakpoints {
@@ -72,7 +75,7 @@ impl Breakpoints {
             .any(|k| name.contains(Clone::clone(&k)))
     }
 
-    fn should_break_inst(&self, inst: &Instruction) -> bool {
+    fn should_break_inst(&self, inst: u32) -> bool {
         // self.inst_map.contains_key(&inst.offset)
         false
     }
@@ -100,7 +103,7 @@ impl<'engine> MainDebugger<'engine> {
     }
 
     pub fn new(preopen_dirs: Vec<(String, String)>, envs: Vec<(String, String)>) -> Result<Self> {
-        let is_interrupted = Arc::new(AtomicBool::new(false));
+        let is_interrupted = Arc::new(AtomicBool::new(true));
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
@@ -504,7 +507,6 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         let executor = self.executor()?;
         self.get_instr_offset()?;
         loop {
-            
             match executor.borrow_mut().execute_step(store, self)? {
                 Signal::Next => continue,
                 Signal::Breakpoint => return Ok(RunResult::Breakpoint),
@@ -517,6 +519,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     }
 
     fn run(&mut self, name: Option<&str>, args: Vec<Val>) -> Result<RunResult> {
+        self.is_interrupted.swap(true, Ordering::SeqCst);
         let func = if let Some(name) = name {
             let f = if let std::result::Result::Ok(index) =  name.parse::<u32>() {
                 self.lookup_func_by_index(index)
@@ -533,17 +536,12 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         }
 
         let func = func.unwrap();
-        // if let Some(func_idx  ) = func.as_inner().entity_index(StoreIdx::from_usize(0)) {
-        //     println!("run func: {:?}, name: {:?}", func, self.get_func_name_by_idx(func_idx.into_usize() as u32));
-        // }
         self.run_func = Some(func);
         self.execute_func(func, &args)?;
-        let a = self.process();
-
-        return a;
+        self.process()
     }
 
-    fn instantiate(&mut self) -> Result<(), Error> {
+    fn instantiate(&mut self, inst_in_file_0: Vec<u64>) -> Result<(), Error> {
         let mut wasi_ctx_builder = WasiCtxBuilder::new();
         let wasi_ctx = wasi_ctx_builder.build();
 
@@ -589,6 +587,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             pre.initialize_instance(&mut store)
         })?;
 
+        self.breakpoints.inst_in_file_0 = inst_in_file_0;
         self.instance = Some(InstanceWithName {
             inner: instance,
             func_names: module.name_custom_sections().functions.clone(),
@@ -606,10 +605,20 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
 
 impl<'engine> Interceptor for MainDebugger<'engine> {
     
-    fn invoke_func(&self, func_idx: u32) -> Signal {
-        // println!("run func: {:?}", func_idx);
+    fn invoke_func(&self, func_idx: i32, table: Option<wasmi::Table>) -> Signal {
+        let mut func_idx = func_idx as u32;
+        if let Some(table) = table {
+            let funcref = get_store()
+                .inner
+                .resolve_table(&table)
+                .get_untyped(func_idx as u32)
+                .map(wasmi::FuncRef::from)
+                .unwrap();
+            let func = funcref.func().unwrap();
+            func_idx = func.as_inner().entity_idx.into_usize() as u32;
+        } 
+        
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
-            // println!("  its name: {:?}", name);
             if self.breakpoints.should_break_func(&name) {
                 Signal::Breakpoint
             } else {
@@ -620,12 +629,16 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         }
     }
 
-    fn execute_inst(&self, inst: &Instruction) -> Signal {
-        if self.breakpoints.should_break_inst(inst) {
-            Signal::Breakpoint
-        } else {
-            Signal::Next
-        }
+    fn execute_inst(&self, instr_offset: u32) -> Signal {
+        // if self.is_interrupted.load(Ordering::SeqCst) && self.breakpoints.inst_in_file_0.contains(&(instr_offset as u64)) {
+        //     self.is_interrupted.store(false, Ordering::SeqCst);
+        //     Signal::Breakpoint
+        // } else if self.breakpoints.should_break_inst(instr_offset) {
+        //     Signal::Breakpoint
+        // } else {
+        //     Signal::Next
+        // }
+        Signal::Next
     }
 }
 

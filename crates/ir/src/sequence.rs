@@ -146,6 +146,7 @@ macro_rules! define_builder {
                 ) -> Instr {
                     let pos = Instr::from_usize(self.instrs.len());
                     self.instrs.push(Instruction::$name {
+                        instr_offset: pos.into_usize(),
                         $( $( $field_name: $field_name.into() ),* )?
                     });
                     pos

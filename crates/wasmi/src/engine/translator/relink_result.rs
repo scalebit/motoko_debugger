@@ -76,7 +76,7 @@ impl RelinkResult for Instruction {
         // Note: for call instructions we have to infer with special handling if they return
         //       a single value which allows us to relink the single result register.
         match self {
-            Self::CallInternal0 { results, func } | Self::CallInternal { results, func } => {
+            Self::CallInternal0 { instr_offset: _, results, func } | Self::CallInternal { instr_offset: _, results, func } => {
                 relink_call_internal(
                     results,
                     EngineFunc::from(*func),
@@ -85,13 +85,13 @@ impl RelinkResult for Instruction {
                     old_result,
                 )
             }
-            Self::CallImported0 { results, func } | Self::CallImported { results, func } => {
+            Self::CallImported0 { instr_offset: _, results, func } | Self::CallImported {instr_offset: _,  results, func } => {
                 relink_call_imported(results, *func, module, new_result, old_result)
             }
-            Self::CallIndirect0 { results, func_type }
-            | Self::CallIndirect0Imm16 { results, func_type }
-            | Self::CallIndirect { results, func_type }
-            | Self::CallIndirectImm16 { results, func_type } => {
+            Self::CallIndirect0 { instr_offset: _, results, func_type}
+            | Self::CallIndirect0Imm16 {  instr_offset: _, results, func_type,  }
+            | Self::CallIndirect { instr_offset: _, results, func_type,  }
+            | Self::CallIndirectImm16 { instr_offset: _, results, func_type} => {
                 relink_call_indirect(results, *func_type, module, new_result, old_result)
             }
             instr => {

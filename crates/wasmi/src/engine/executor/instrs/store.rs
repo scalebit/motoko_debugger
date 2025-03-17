@@ -21,7 +21,7 @@ impl Executor<'_> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(1);
         match *addr.get() {
-            Instruction::RegisterAndImm32 { reg, imm } => (reg, u32::from(imm)),
+            Instruction::RegisterAndImm32 { instr_offset: _, reg, imm } => (reg, u32::from(imm)),
             unexpected => {
                 // Safety: Wasmi translation guarantees that [`Instruction::RegisterAndImm32`] exists.
                 unsafe {
@@ -41,7 +41,7 @@ impl Executor<'_> {
         let mut addr: InstructionPtr = self.ip;
         addr.add(1);
         match *addr.get() {
-            Instruction::Imm16AndImm32 { imm16, imm32 } => (T::from(imm16), u32::from(imm32)),
+            Instruction::Imm16AndImm32 { instr_offset: _, imm16, imm32 } => (T::from(imm16), u32::from(imm32)),
             unexpected => {
                 // Safety: Wasmi translation guarantees that [`Instruction::Imm16AndImm32`] exists.
                 unsafe {

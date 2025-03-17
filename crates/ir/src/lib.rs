@@ -16,8 +16,6 @@ mod sequence;
 mod span;
 mod visit_regs;
 
-pub use r#enum::ZaxInstruction;
-
 #[cfg(test)]
 mod tests;
 
