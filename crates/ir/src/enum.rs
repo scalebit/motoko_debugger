@@ -89,6 +89,14 @@ macro_rules! define_enum {
                     ptr::write(data_ptr, value);
                 }
             }
+
+            pub fn get_offset(&self) -> usize {
+                match self {
+                    $(
+                        Instruction::$name { instr_offset, .. } => instr_offset.clone()
+                    ),*
+                }
+            }
         }
     };
 }
@@ -96,11 +104,6 @@ for_each_op::for_each_op!(define_enum);
 
 use wasmi_inst_macro::*;
 use wasmparser::{for_each_operator, BrTable, OperatorsReader};
-
-pub struct ZaxInstruction {
-    pub kind: InstructionKind,
-    pub offset: usize,
-}
 
 #[derive(Debug, Clone)]
 pub struct BrTableData {
