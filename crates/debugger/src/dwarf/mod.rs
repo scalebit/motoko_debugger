@@ -453,9 +453,9 @@ pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
         if let Some(_line) = row.line() {
-            if row.file_index() == 0 {
+            // if row.file_index() == 0 {
                 println!(" file: {:?}, line: {:?}, column: {:?}",  files[0], row.line(), row.column());
-            }
+            // }
             sorted_rows.insert(row.address(), *row);
         }
     }

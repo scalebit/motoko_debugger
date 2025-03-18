@@ -27,20 +27,21 @@ impl<D: Debugger> Command<D> for ListCommand {
         context: &CommandContext,
         _args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
-        let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
-        display_source(line_info, context.printer.as_ref())?;
+        if let Some(line_info) = next_line_info(debugger, context.sourcemap.as_ref())? {
+            display_source(line_info, context.printer.as_ref())?;
+        }
         Ok(None)
     }
 }
 
-pub fn next_line_info<D: Debugger>(debugger: &D, sourcemap: &dyn SourceMap) -> Result<LineInfo> {
+pub fn next_line_info<D: Debugger>(debugger: &D, sourcemap: &dyn SourceMap) -> Result<Option<LineInfo>> {
     if let Some(instr_offset) = debugger.selected_instr_offset()? {
         match sourcemap.find_line_info(instr_offset) {
-            Some(info) => Ok(info),
-            None => Err(anyhow!("Source info not found")),
+            Some(info) => Ok(Some(info)),
+            None => Ok(None),
         }
     } else {
-        Err(anyhow!("No instruction offset found"))
+        Ok(None)
     }
 }
 
