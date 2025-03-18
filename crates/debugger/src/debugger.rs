@@ -627,6 +627,7 @@ pub fn get_store() -> &'static mut Store<WasiCtx> {
     // SAFETY: Within Wasm bytecode execution we are guaranteed by
     //         Wasm validation and Wasmi codegen to never run out
     //         of valid bounds using this method.
+    #[allow(unsafe_code)]
     unsafe { WASM_STORE.as_mut().unwrap() }
 }
 
@@ -634,6 +635,7 @@ pub fn get_engine() -> &'static mut Engine {
     // SAFETY: Within Wasm bytecode execution we are guaranteed by
     //         Wasm validation and Wasmi codegen to never run out
     //         of valid bounds using this method.
+    #[allow(unsafe_code)]
     unsafe { WASM_ENGINE.as_mut().unwrap() }
 }
 
