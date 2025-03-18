@@ -810,7 +810,7 @@ impl InstrEncoder {
         ));
         let TypedProvider::Register(returned_value) = value else {
             // Cannot apply the optimization for `local.set C` where `C` is a constant value.
-            return fallback_case(self, stack, local, value, preserved, fuel_info);
+            return fallback_case(self, instr_offset, stack, local, value, preserved, fuel_info);
         };
         if matches!(
             stack.get_register_space(returned_value),
@@ -818,12 +818,12 @@ impl InstrEncoder {
         ) {
             // Can only apply the optimization if the returned value of `last_instr`
             // is _NOT_ itself a local register due to observable behavior or already preserved.
-            return fallback_case(self, stack, local, value, preserved, fuel_info);
+            return fallback_case(self, instr_offset, stack, local, value, preserved, fuel_info);
         }
         let Some(last_instr) = self.last_instr else {
             // Can only apply the optimization if there is a previous instruction
             // to replace its result register instead of emitting a copy.
-            return fallback_case(self, stack, local, value, preserved, fuel_info);
+            return fallback_case(self, instr_offset, stack, local, value, preserved, fuel_info);
         };
         if preserved.is_some() && last_instr.distance(self.instrs.next_instr()) >= 4 {
             // We avoid applying the optimization if the last instruction
@@ -832,7 +832,7 @@ impl InstrEncoder {
             // preserving a local register requires costly shifting all
             // instruction words of the last instruction.
             // Thankfully most instructions are small enough.
-            return fallback_case(self, stack, local, value, preserved, fuel_info);
+            return fallback_case(self, instr_offset, stack, local, value, preserved, fuel_info);
         }
         if let Some(preserved) = preserved {
             let mut last_instr_uses_preserved = false;
@@ -846,7 +846,7 @@ impl InstrEncoder {
             if last_instr_uses_preserved {
                 // Note: we cannot apply the local.set preservation optimization since this would
                 //       siltently overwrite inputs of the last encoded instruction.
-                return fallback_case(self, stack, local, value, Some(preserved), fuel_info);
+                return fallback_case(self, instr_offset, stack, local, value, Some(preserved), fuel_info);
             }
         }
         if !self
@@ -855,7 +855,7 @@ impl InstrEncoder {
             .relink_result(res, local, returned_value)?
         {
             // It was not possible to relink the result of `last_instr` therefore we fallback.
-            return fallback_case(self, stack, local, value, preserved, fuel_info);
+            return fallback_case(self, instr_offset, stack, local, value, preserved, fuel_info);
         }
         if let Some(preserved) = preserved {
             // We were able to apply the optimization.
@@ -1095,7 +1095,7 @@ impl InstrEncoder {
             Ok(offset) => make_instr(instr_offset, lhs, rhs, offset),
             Err(_) => {
                 let rhs = stack.alloc_const(T::from(rhs))?;
-                InstrEncoder::make_branch_cmp_fallback(stack, cmp, lhs, rhs, offset)?
+                InstrEncoder::make_branch_cmp_fallback(instr_offset, stack, cmp, lhs, rhs, offset)?
             }
         };
         Ok(Some(instr))
@@ -1246,7 +1246,7 @@ impl InstrEncoder {
             | I::I32LeSImm16 { instr_offset, result, lhs, rhs }
             | I::I32GtSImm16 { instr_offset, result, lhs, rhs }
             | I::I32GeSImm16 { instr_offset, result, lhs, rhs } => self.try_fuse_branch_cmp_imm::<i32>(
-                stack, instr, condition, result, lhs, rhs, label, comparator,
+                instr_offset, stack, instr, condition, result, lhs, rhs, label, comparator,
             )?,
             I::I32LtUImm16 { instr_offset, result, lhs, rhs }
             | I::I32LeUImm16 { instr_offset, result, lhs, rhs }
