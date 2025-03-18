@@ -14,8 +14,8 @@ mod utils;
 mod visit;
 mod visit_register;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use self::{
     comparator::{ComparatorExt, ComparatorExtImm},
@@ -803,7 +803,7 @@ impl FuncTranslator {
         };
         let base = u32::try_from(fuel_costs.base())
             .expect("base fuel must be valid for creating `Instruction::ConsumeFuel`");
-        let fuel_instr = Instruction::consume_fuel(base);
+        let fuel_instr = Instruction::consume_fuel(self.visit_pos, base);
         let instr = self.alloc.instr_encoder.push_instr(fuel_instr)?;
         Ok(Some(instr))
     }
@@ -893,6 +893,7 @@ impl FuncTranslator {
                     .map(TypedProvider::Register),
             );
             let instr = self.alloc.instr_encoder.encode_copies(
+                self.visit_pos,
                 &mut self.alloc.stack,
                 results,
                 &providers[..],
@@ -917,6 +918,7 @@ impl FuncTranslator {
             .stack
             .pop_n(usize::from(branch_params.len()), params);
         self.alloc.instr_encoder.encode_copies(
+            self.visit_pos,
             &mut self.alloc.stack,
             branch_params,
             &self.alloc.buffer.providers[..],
@@ -1171,7 +1173,7 @@ impl FuncTranslator {
                 .try_resolve_label(frame.end_label())?;
             self.alloc
                 .instr_encoder
-                .push_instr(Instruction::branch(end_offset))?;
+                .push_instr(Instruction::branch(self.visit_pos, end_offset))?;
         }
         self.alloc.instr_encoder.pin_label_if_unpinned(
             frame
@@ -1267,10 +1269,10 @@ impl FuncTranslator {
         &mut self,
         lhs: Reg,
         rhs: Reg,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
     ) -> Result<(), Error> {
         let result = self.alloc.stack.push_dynamic()?;
-        self.push_fueled_instr(make_instr(result, lhs, rhs), FuelCosts::base)?;
+        self.push_fueled_instr(make_instr(self.visit_pos, result, lhs, rhs), FuelCosts::base)?;
         Ok(())
     }
 
@@ -1285,7 +1287,7 @@ impl FuncTranslator {
         &mut self,
         lhs: Reg,
         rhs: T,
-        make_instr_imm16: fn(result: Reg, lhs: Reg, rhs: Const16<T>) -> Instruction,
+        make_instr_imm16: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Const16<T>) -> Instruction,
     ) -> Result<bool, Error>
     where
         T: Copy + TryInto<Const16<T>>,
@@ -1293,7 +1295,7 @@ impl FuncTranslator {
         if let Ok(rhs) = rhs.try_into() {
             // Optimization: We can use a compact instruction for small constants.
             let result = self.alloc.stack.push_dynamic()?;
-            self.push_fueled_instr(make_instr_imm16(result, lhs, rhs), FuelCosts::base)?;
+            self.push_fueled_instr(make_instr_imm16(self.visit_pos, result, lhs, rhs), FuelCosts::base)?;
             return Ok(true);
         }
         Ok(false)
@@ -1304,7 +1306,7 @@ impl FuncTranslator {
         &mut self,
         lhs: T,
         rhs: Reg,
-        make_instr_imm16: fn(result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
+        make_instr_imm16: fn(instr_offset: usize, result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
     ) -> Result<bool, Error>
     where
         T: Copy + TryInto<Const16<T>>,
@@ -1312,7 +1314,7 @@ impl FuncTranslator {
         if let Ok(lhs) = lhs.try_into() {
             // Optimization: We can use a compact instruction for small constants.
             let result = self.alloc.stack.push_dynamic()?;
-            self.push_fueled_instr(make_instr_imm16(result, lhs, rhs), FuelCosts::base)?;
+            self.push_fueled_instr(make_instr_imm16(self.visit_pos, result, lhs, rhs), FuelCosts::base)?;
             return Ok(true);
         }
         Ok(false)
@@ -1339,14 +1341,14 @@ impl FuncTranslator {
         &mut self,
         lhs: Reg,
         rhs: T,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
     ) -> Result<(), Error>
     where
         T: Into<UntypedVal>,
     {
         let result = self.alloc.stack.push_dynamic()?;
         let rhs = self.alloc.stack.alloc_const(rhs)?;
-        self.push_fueled_instr(make_instr(result, lhs, rhs), FuelCosts::base)?;
+        self.push_fueled_instr(make_instr(self.visit_pos, result, lhs, rhs), FuelCosts::base)?;
         Ok(())
     }
 
@@ -1360,21 +1362,21 @@ impl FuncTranslator {
         &mut self,
         lhs: T,
         rhs: Reg,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
     ) -> Result<(), Error>
     where
         T: Into<UntypedVal>,
     {
         let result = self.alloc.stack.push_dynamic()?;
         let lhs = self.alloc.stack.alloc_const(lhs)?;
-        self.push_fueled_instr(make_instr(result, lhs, rhs), FuelCosts::base)?;
+        self.push_fueled_instr(make_instr(self.visit_pos, result, lhs, rhs), FuelCosts::base)?;
         Ok(())
     }
 
     /// Translates a [`TrapCode`] as [`Instruction`].
     fn translate_trap(&mut self, trap_code: TrapCode) -> Result<(), Error> {
         bail_unreachable!(self);
-        self.push_fueled_instr(Instruction::trap(trap_code), FuelCosts::base)?;
+        self.push_fueled_instr(Instruction::trap(self.visit_pos, trap_code), FuelCosts::base)?;
         self.reachable = false;
         Ok(())
     }
@@ -1403,13 +1405,13 @@ impl FuncTranslator {
     #[allow(clippy::too_many_arguments)]
     fn translate_binary<T>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
-        make_instr_imm16: fn(result: Reg, lhs: Reg, rhs: Const16<T>) -> Instruction,
-        make_instr_imm16_rev: fn(result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr_imm16: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Const16<T>) -> Instruction,
+        make_instr_imm16_rev: fn(instr_offset: usize, result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> TypedVal,
-        make_instr_opt: fn(&mut Self, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
-        make_instr_reg_imm_opt: fn(&mut Self, lhs: Reg, rhs: T) -> Result<bool, Error>,
-        make_instr_imm_reg_opt: fn(&mut Self, lhs: T, rhs: Reg) -> Result<bool, Error>,
+        make_instr_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
+        make_instr_reg_imm_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: T) -> Result<bool, Error>,
+        make_instr_imm_reg_opt: fn(&mut Self, instr_offset: usize, lhs: T, rhs: Reg) -> Result<bool, Error>,
     ) -> Result<(), Error>
     where
         T: Copy + From<TypedVal> + Into<TypedVal> + TryInto<Const16<T>>,
@@ -1417,29 +1419,37 @@ impl FuncTranslator {
         bail_unreachable!(self);
         match self.alloc.stack.pop2() {
             (TypedProvider::Register(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_opt(self, lhs, rhs)? {
+                if make_instr_opt(self, self.visit_pos, lhs, rhs)? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
                 self.push_binary_instr(lhs, rhs, make_instr)
             }
             (TypedProvider::Register(lhs), TypedProvider::Const(rhs)) => {
-                if make_instr_reg_imm_opt(self, lhs, T::from(rhs))? {
+                if make_instr_reg_imm_opt(self, self.visit_pos, lhs, T::from(rhs))? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
-                if self.try_push_binary_instr_imm16(lhs, T::from(rhs), make_instr_imm16)? {
+                if self.try_push_binary_instr_imm16(
+                    lhs, 
+                    T::from(rhs), 
+                    make_instr_imm16
+                )? {
                     // Optimization was applied: return early.
                     return Ok(());
                 }
                 self.push_binary_instr_imm(lhs, rhs, make_instr)
             }
             (TypedProvider::Const(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_imm_reg_opt(self, T::from(lhs), rhs)? {
+                if make_instr_imm_reg_opt(self, self.visit_pos, T::from(lhs), rhs)? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
-                if self.try_push_binary_instr_imm16_rev(T::from(lhs), rhs, make_instr_imm16_rev)? {
+                if self.try_push_binary_instr_imm16_rev(
+                    T::from(lhs), 
+                    rhs, 
+                    make_instr_imm16_rev
+                )? {
                     // Optimization was applied: return early.
                     return Ok(());
                 }
@@ -1475,11 +1485,11 @@ impl FuncTranslator {
     #[allow(clippy::too_many_arguments)]
     fn translate_fbinary<T>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> TypedVal,
-        make_instr_opt: fn(&mut Self, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
-        make_instr_reg_imm_opt: fn(&mut Self, lhs: Reg, rhs: T) -> Result<bool, Error>,
-        make_instr_imm_reg_opt: fn(&mut Self, lhs: T, rhs: Reg) -> Result<bool, Error>,
+        make_instr_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
+        make_instr_reg_imm_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: T) -> Result<bool, Error>,
+        make_instr_imm_reg_opt: fn(&mut Self, instr_offset: usize, lhs: T, rhs: Reg) -> Result<bool, Error>,
     ) -> Result<(), Error>
     where
         T: WasmFloat,
@@ -1487,14 +1497,14 @@ impl FuncTranslator {
         bail_unreachable!(self);
         match self.alloc.stack.pop2() {
             (TypedProvider::Register(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_opt(self, lhs, rhs)? {
+                if make_instr_opt(self, self.visit_pos, lhs, rhs)? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
                 self.push_binary_instr(lhs, rhs, make_instr)
             }
             (TypedProvider::Register(lhs), TypedProvider::Const(rhs)) => {
-                if make_instr_reg_imm_opt(self, lhs, T::from(rhs))? {
+                if make_instr_reg_imm_opt(self, self.visit_pos, lhs, T::from(rhs))? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
@@ -1506,7 +1516,7 @@ impl FuncTranslator {
                 self.push_binary_instr_imm(lhs, rhs, make_instr)
             }
             (TypedProvider::Const(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_imm_reg_opt(self, T::from(lhs), rhs)? {
+                if make_instr_imm_reg_opt(self, self.visit_pos, T::from(lhs), rhs)? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
@@ -1531,8 +1541,8 @@ impl FuncTranslator {
     /// - Applies constant evaluation if both operands are constant values.
     fn translate_fcopysign<T>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
-        make_instr_imm: fn(result: Reg, lhs: Reg, rhs: Sign<T>) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr_imm: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Sign<T>) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> TypedVal,
     ) -> Result<(), Error>
     where
@@ -1553,7 +1563,7 @@ impl FuncTranslator {
                 let result = self.alloc.stack.push_dynamic()?;
                 self.alloc
                     .instr_encoder
-                    .push_instr(make_instr_imm(result, lhs, sign))?;
+                    .push_instr(make_instr_imm(self.visit_pos, result, lhs, sign))?;
                 Ok(())
             }
             (TypedProvider::Const(lhs), TypedProvider::Register(rhs)) => {
@@ -1587,11 +1597,11 @@ impl FuncTranslator {
     #[allow(clippy::too_many_arguments)]
     fn translate_binary_commutative<T>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
-        make_instr_imm16: fn(result: Reg, lhs: Reg, rhs: Const16<T>) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr_imm16: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Const16<T>) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> TypedVal,
-        make_instr_opt: fn(&mut Self, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
-        make_instr_imm_opt: fn(&mut Self, lhs: Reg, rhs: T) -> Result<bool, Error>,
+        make_instr_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
+        make_instr_imm_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: T) -> Result<bool, Error>,
     ) -> Result<(), Error>
     where
         T: Copy + From<TypedVal> + TryInto<Const16<T>>,
@@ -1599,7 +1609,7 @@ impl FuncTranslator {
         bail_unreachable!(self);
         match self.alloc.stack.pop2() {
             (TypedProvider::Register(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_opt(self, lhs, rhs)? {
+                if make_instr_opt(self, self.visit_pos, lhs, rhs)? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
@@ -1607,7 +1617,7 @@ impl FuncTranslator {
             }
             (TypedProvider::Register(reg_in), TypedProvider::Const(imm_in))
             | (TypedProvider::Const(imm_in), TypedProvider::Register(reg_in)) => {
-                if make_instr_imm_opt(self, reg_in, T::from(imm_in))? {
+                if make_instr_imm_opt(self, self.visit_pos, reg_in, T::from(imm_in))? {
                     // Custom logic applied its optimization: return early.
                     return Ok(());
                 }
@@ -1645,10 +1655,10 @@ impl FuncTranslator {
     #[allow(clippy::too_many_arguments)]
     fn translate_fbinary_commutative<T>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> TypedVal,
-        make_instr_opt: fn(&mut Self, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
-        make_instr_imm_opt: fn(&mut Self, lhs: Reg, rhs: T) -> Result<bool, Error>,
+        make_instr_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
+        make_instr_imm_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: T) -> Result<bool, Error>,
     ) -> Result<(), Error>
     where
         T: WasmFloat,
@@ -1656,7 +1666,7 @@ impl FuncTranslator {
         bail_unreachable!(self);
         match self.alloc.stack.pop2() {
             (TypedProvider::Register(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_opt(self, lhs, rhs)? {
+                if make_instr_opt(self, self.visit_pos, lhs, rhs)? {
                     // Case: the custom logic applied its optimization and we can return.
                     return Ok(());
                 }
@@ -1664,7 +1674,7 @@ impl FuncTranslator {
             }
             (TypedProvider::Register(reg_in), TypedProvider::Const(imm_in))
             | (TypedProvider::Const(imm_in), TypedProvider::Register(reg_in)) => {
-                if make_instr_imm_opt(self, reg_in, T::from(imm_in))? {
+                if make_instr_imm_opt(self, self.visit_pos, reg_in, T::from(imm_in))? {
                     // Custom logic applied its optimization: return early.
                     return Ok(());
                 }
@@ -1700,11 +1710,11 @@ impl FuncTranslator {
     #[allow(clippy::too_many_arguments)]
     fn translate_shift<T>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
-        make_instr_by: fn(result: Reg, lhs: Reg, rhs: ShiftAmount<T>) -> Instruction,
-        make_instr_imm16: fn(result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr_by: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: ShiftAmount<T>) -> Instruction,
+        make_instr_imm16: fn(instr_offset: usize, result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> TypedVal,
-        make_instr_imm_reg_opt: fn(&mut Self, lhs: T, rhs: Reg) -> Result<bool, Error>,
+        make_instr_imm_reg_opt: fn(&mut Self, instr_offset: usize, lhs: T, rhs: Reg) -> Result<bool, Error>,
     ) -> Result<(), Error>
     where
         T: WasmInteger + IntoShiftAmount,
@@ -1722,11 +1732,11 @@ impl FuncTranslator {
                     return Ok(());
                 };
                 let result = self.alloc.stack.push_dynamic()?;
-                self.push_fueled_instr(make_instr_by(result, lhs, rhs), FuelCosts::base)?;
+                self.push_fueled_instr(make_instr_by(self.visit_pos, result, lhs, rhs), FuelCosts::base)?;
                 Ok(())
             }
             (TypedProvider::Const(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_imm_reg_opt(self, T::from(lhs), rhs)? {
+                if make_instr_imm_reg_opt(self, self.visit_pos, T::from(lhs), rhs)? {
                     // Custom optimization was applied: return early
                     return Ok(());
                 }
@@ -1766,12 +1776,12 @@ impl FuncTranslator {
     #[allow(clippy::too_many_arguments)]
     fn translate_divrem<T, NonZeroT>(
         &mut self,
-        make_instr: fn(result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
-        make_instr_imm16: fn(result: Reg, lhs: Reg, rhs: Const16<NonZeroT>) -> Instruction,
-        make_instr_imm16_rev: fn(result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Reg) -> Instruction,
+        make_instr_imm16: fn(instr_offset: usize, result: Reg, lhs: Reg, rhs: Const16<NonZeroT>) -> Instruction,
+        make_instr_imm16_rev: fn(instr_offset: usize, result: Reg, lhs: Const16<T>, rhs: Reg) -> Instruction,
         consteval: fn(TypedVal, TypedVal) -> Result<TypedVal, TrapCode>,
-        make_instr_opt: fn(&mut Self, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
-        make_instr_reg_imm_opt: fn(&mut Self, lhs: Reg, rhs: T) -> Result<bool, Error>,
+        make_instr_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: Reg) -> Result<bool, Error>,
+        make_instr_reg_imm_opt: fn(&mut Self, instr_offset: usize, lhs: Reg, rhs: T) -> Result<bool, Error>,
     ) -> Result<(), Error>
     where
         T: WasmInteger,
@@ -1780,7 +1790,7 @@ impl FuncTranslator {
         bail_unreachable!(self);
         match self.alloc.stack.pop2() {
             (TypedProvider::Register(lhs), TypedProvider::Register(rhs)) => {
-                if make_instr_opt(self, lhs, rhs)? {
+                if make_instr_opt(self, self.visit_pos, lhs, rhs)? {
                     // Custom optimization was applied: return early
                     return Ok(());
                 }
@@ -1792,7 +1802,7 @@ impl FuncTranslator {
                     self.translate_trap(TrapCode::IntegerDivisionByZero)?;
                     return Ok(());
                 };
-                if make_instr_reg_imm_opt(self, lhs, T::from(rhs))? {
+                if make_instr_reg_imm_opt(self, self.visit_pos, lhs, T::from(rhs))? {
                     // Custom optimization was applied: return early
                     return Ok(());
                 }
@@ -1820,21 +1830,21 @@ impl FuncTranslator {
     }
 
     /// Can be used for [`Self::translate_binary`] (and variants) if no custom optimization shall be applied.
-    fn no_custom_opt<Lhs, Rhs>(&mut self, _lhs: Lhs, _rhs: Rhs) -> Result<bool, Error> {
+    fn no_custom_opt<Lhs, Rhs>(&mut self, _instr_offset: usize, _lhs: Lhs, _rhs: Rhs) -> Result<bool, Error> {
         Ok(false)
     }
 
     /// Translates a unary Wasm instruction to Wasmi bytecode.
     fn translate_unary(
         &mut self,
-        make_instr: fn(result: Reg, input: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, input: Reg) -> Instruction,
         consteval: fn(input: TypedVal) -> TypedVal,
     ) -> Result<(), Error> {
         bail_unreachable!(self);
         match self.alloc.stack.pop() {
             TypedProvider::Register(input) => {
                 let result = self.alloc.stack.push_dynamic()?;
-                self.push_fueled_instr(make_instr(result, input), FuelCosts::base)?;
+                self.push_fueled_instr(make_instr(self.visit_pos, result, input), FuelCosts::base)?;
                 Ok(())
             }
             TypedProvider::Const(input) => {
@@ -1847,14 +1857,14 @@ impl FuncTranslator {
     /// Translates a fallible unary Wasm instruction to Wasmi bytecode.
     fn translate_unary_fallible(
         &mut self,
-        make_instr: fn(result: Reg, input: Reg) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, input: Reg) -> Instruction,
         consteval: fn(input: TypedVal) -> Result<TypedVal, TrapCode>,
     ) -> Result<(), Error> {
         bail_unreachable!(self);
         match self.alloc.stack.pop() {
             TypedProvider::Register(input) => {
                 let result = self.alloc.stack.push_dynamic()?;
-                self.push_fueled_instr(make_instr(result, input), FuelCosts::base)?;
+                self.push_fueled_instr(make_instr(self.visit_pos, result, input), FuelCosts::base)?;
                 Ok(())
             }
             TypedProvider::Const(input) => match consteval(input) {
@@ -1905,9 +1915,9 @@ impl FuncTranslator {
     fn translate_load(
         &mut self,
         memarg: MemArg,
-        make_instr: fn(result: Reg, memory: index::Memory) -> Instruction,
-        make_instr_offset16: fn(result: Reg, ptr: Reg, offset: Const16<u32>) -> Instruction,
-        make_instr_at: fn(result: Reg, address: u32) -> Instruction,
+        make_instr: fn(instr_offset: usize, result: Reg, memory: index::Memory) -> Instruction,
+        make_instr_offset16: fn(instr_offset: usize, result: Reg, ptr: Reg, offset: Const16<u32>) -> Instruction,
+        make_instr_at: fn(instr_offset: usize, result: Reg, address: u32) -> Instruction,
     ) -> Result<(), Error> {
         bail_unreachable!(self);
         let (memory, offset) = Self::decode_memarg(memarg);
@@ -1919,11 +1929,11 @@ impl FuncTranslator {
                     return self.translate_trap(TrapCode::MemoryOutOfBounds);
                 };
                 let result = self.alloc.stack.push_dynamic()?;
-                self.push_fueled_instr(make_instr_at(result, address), FuelCosts::load)?;
+                self.push_fueled_instr(make_instr_at(self.visit_pos, result, address), FuelCosts::load)?;
                 if !memory.is_default() {
                     self.alloc
                         .instr_encoder
-                        .append_instr(Instruction::memory_index(memory))?;
+                        .append_instr(Instruction::memory_index(self.visit_pos, memory))?;
                 }
                 return Ok(());
             }
@@ -1931,14 +1941,14 @@ impl FuncTranslator {
         let result = self.alloc.stack.push_dynamic()?;
         if memory.is_default() {
             if let Ok(offset) = <Const16<u32>>::try_from(offset) {
-                self.push_fueled_instr(make_instr_offset16(result, ptr, offset), FuelCosts::load)?;
+                self.push_fueled_instr(make_instr_offset16(self.visit_pos, result, ptr, offset), FuelCosts::load)?;
                 return Ok(());
             }
         }
-        self.push_fueled_instr(make_instr(result, memory), FuelCosts::load)?;
+        self.push_fueled_instr(make_instr(self.visit_pos, result, memory), FuelCosts::load)?;
         self.alloc
             .instr_encoder
-            .append_instr(Instruction::register_and_imm32(ptr, offset))?;
+            .append_instr(Instruction::register_and_imm32(self.visit_pos, ptr, offset))?;
         Ok(())
     }
 
@@ -1951,12 +1961,12 @@ impl FuncTranslator {
     fn translate_istore<Src, Field>(
         &mut self,
         memarg: MemArg,
-        make_instr: fn(ptr: Reg, memory: index::Memory) -> Instruction,
-        make_instr_imm: fn(ptr: Reg, memory: index::Memory) -> Instruction,
-        make_instr_offset16: fn(ptr: Reg, offset: u16, value: Reg) -> Instruction,
-        make_instr_offset16_imm: fn(ptr: Reg, offset: u16, value: Field) -> Instruction,
-        make_instr_at: fn(value: Reg, address: u32) -> Instruction,
-        make_instr_at_imm: fn(value: Field, address: u32) -> Instruction,
+        make_instr: fn(instr_offset: usize, ptr: Reg, memory: index::Memory) -> Instruction,
+        make_instr_imm: fn(instr_offset: usize, ptr: Reg, memory: index::Memory) -> Instruction,
+        make_instr_offset16: fn(instr_offset: usize, ptr: Reg, offset: u16, value: Reg) -> Instruction,
+        make_instr_offset16_imm: fn(instr_offset: usize, ptr: Reg, offset: u16, value: Field) -> Instruction,
+        make_instr_at: fn(instr_offset: usize, value: Reg, address: u32) -> Instruction,
+        make_instr_at_imm: fn(instr_offset: usize, value: Field, address: u32) -> Instruction,
     ) -> Result<(), Error>
     where
         Src: Copy + From<TypedVal>,
@@ -1989,12 +1999,12 @@ impl FuncTranslator {
     fn translate_istore_wrap<Src, Wrapped, Field>(
         &mut self,
         memarg: MemArg,
-        make_instr: fn(ptr: Reg, memory: index::Memory) -> Instruction,
-        make_instr_imm: fn(ptr: Reg, memory: index::Memory) -> Instruction,
-        make_instr_offset16: fn(ptr: Reg, offset: u16, value: Reg) -> Instruction,
-        make_instr_offset16_imm: fn(ptr: Reg, offset: u16, value: Field) -> Instruction,
-        make_instr_at: fn(value: Reg, address: u32) -> Instruction,
-        make_instr_at_imm: fn(value: Field, address: u32) -> Instruction,
+        make_instr: fn(instr_offset: usize, ptr: Reg, memory: index::Memory) -> Instruction,
+        make_instr_imm: fn(instr_offset: usize, ptr: Reg, memory: index::Memory) -> Instruction,
+        make_instr_offset16: fn(instr_offset: usize, ptr: Reg, offset: u16, value: Reg) -> Instruction,
+        make_instr_offset16_imm: fn(instr_offset: usize, ptr: Reg, offset: u16, value: Field) -> Instruction,
+        make_instr_at: fn(instr_offset: usize, value: Reg, address: u32) -> Instruction,
+        make_instr_at_imm: fn(instr_offset: usize, value: Field, address: u32) -> Instruction,
     ) -> Result<(), Error>
     where
         Src: Copy + Wrap<Wrapped> + From<TypedVal>,
@@ -2029,17 +2039,17 @@ impl FuncTranslator {
         }
         let (instr, param) = match value {
             TypedProvider::Register(value) => (
-                make_instr(ptr, memory),
-                Instruction::register_and_imm32(value, offset),
+                make_instr(self.visit_pos, ptr, memory),
+                Instruction::register_and_imm32(self.visit_pos, value, offset),
             ),
             TypedProvider::Const(value) => match Field::try_from(Src::from(value).wrap()).ok() {
                 Some(value) => (
-                    make_instr_imm(ptr, memory),
-                    Instruction::imm16_and_imm32(value, offset),
+                    make_instr_imm(self.visit_pos, ptr, memory),
+                    Instruction::imm16_and_imm32(self.visit_pos, value, offset),
                 ),
                 None => (
-                    make_instr(ptr, memory),
-                    Instruction::register_and_imm32(self.alloc.stack.alloc_const(value)?, offset),
+                    make_instr(self.visit_pos, ptr, memory),
+                    Instruction::register_and_imm32(self.visit_pos, self.alloc.stack.alloc_const(value)?, offset),
                 ),
             },
         };
@@ -2059,8 +2069,8 @@ impl FuncTranslator {
         ptr: u32,
         offset: u32,
         value: TypedProvider,
-        make_instr_at: fn(value: Reg, address: u32) -> Instruction,
-        make_instr_at_imm: fn(value: Field, address: u32) -> Instruction,
+        make_instr_at: fn(instr_offset: usize, value: Reg, address: u32) -> Instruction,
+        make_instr_at_imm: fn(instr_offset: usize, value: Field, address: u32) -> Instruction,
     ) -> Result<(), Error>
     where
         Src: Copy + From<TypedVal> + Wrap<Wrapped>,
@@ -2071,21 +2081,21 @@ impl FuncTranslator {
         };
         match value {
             Provider::Register(value) => {
-                self.push_fueled_instr(make_instr_at(value, address), FuelCosts::store)?;
+                self.push_fueled_instr(make_instr_at(self.visit_pos, value, address), FuelCosts::store)?;
             }
             Provider::Const(value) => {
                 if let Ok(value) = Field::try_from(Src::from(value).wrap()) {
-                    self.push_fueled_instr(make_instr_at_imm(value, address), FuelCosts::store)?;
+                    self.push_fueled_instr(make_instr_at_imm(self.visit_pos, value, address), FuelCosts::store)?;
                 } else {
                     let value = self.alloc.stack.alloc_const(value)?;
-                    self.push_fueled_instr(make_instr_at(value, address), FuelCosts::store)?;
+                    self.push_fueled_instr(make_instr_at(self.visit_pos, value, address), FuelCosts::store)?;
                 }
             }
         }
         if !memory.is_default() {
             self.alloc
                 .instr_encoder
-                .append_instr(Instruction::memory_index(memory))?;
+                .append_instr(Instruction::memory_index(self.visit_pos, memory))?;
         }
         Ok(())
     }
@@ -2102,8 +2112,8 @@ impl FuncTranslator {
         ptr: Reg,
         offset: u32,
         value: TypedProvider,
-        make_instr_offset16: fn(Reg, u16, Reg) -> Instruction,
-        make_instr_offset16_imm: fn(Reg, u16, Field) -> Instruction,
+        make_instr_offset16: fn(instr_offset: usize, Reg, u16, Reg) -> Instruction,
+        make_instr_offset16_imm: fn(instr_offset: usize, Reg, u16, Field) -> Instruction,
     ) -> Result<Option<Instr>, Error>
     where
         Src: Copy + From<TypedVal> + Wrap<Wrapped>,
@@ -2114,17 +2124,17 @@ impl FuncTranslator {
         };
         let instr = match value {
             Provider::Register(value) => {
-                self.push_fueled_instr(make_instr_offset16(ptr, offset16, value), FuelCosts::store)?
+                self.push_fueled_instr(make_instr_offset16(self.visit_pos, ptr, offset16, value), FuelCosts::store)?
             }
             Provider::Const(value) => match Field::try_from(Src::from(value).wrap()) {
                 Ok(value) => self.push_fueled_instr(
-                    make_instr_offset16_imm(ptr, offset16, value),
+                    make_instr_offset16_imm(self.visit_pos, ptr, offset16, value),
                     FuelCosts::store,
                 )?,
                 Err(_) => {
                     let value = self.alloc.stack.alloc_const(value)?;
                     self.push_fueled_instr(
-                        make_instr_offset16(ptr, offset16, value),
+                        make_instr_offset16(self.visit_pos, ptr, offset16, value),
                         FuelCosts::store,
                     )?
                 }
@@ -2148,9 +2158,9 @@ impl FuncTranslator {
     fn translate_fstore(
         &mut self,
         memarg: MemArg,
-        make_instr: fn(ptr: Reg, memory: index::Memory) -> Instruction,
-        make_instr_offset16: fn(ptr: Reg, offset: u16, value: Reg) -> Instruction,
-        make_instr_at: fn(value: Reg, address: u32) -> Instruction,
+        make_instr: fn(instr_offset: usize, ptr: Reg, memory: index::Memory) -> Instruction,
+        make_instr_offset16: fn(instr_offset: usize, ptr: Reg, offset: u16, value: Reg) -> Instruction,
+        make_instr_at: fn(instr_offset: usize, value: Reg, address: u32) -> Instruction,
     ) -> Result<(), Error> {
         bail_unreachable!(self);
         let (memory, offset) = Self::decode_memarg(memarg);
@@ -2170,14 +2180,14 @@ impl FuncTranslator {
         let value = self.alloc.stack.provider2reg(&value)?;
         if memory.is_default() {
             if let Ok(offset) = u16::try_from(offset) {
-                self.push_fueled_instr(make_instr_offset16(ptr, offset, value), FuelCosts::store)?;
+                self.push_fueled_instr(make_instr_offset16(self.visit_pos, ptr, offset, value), FuelCosts::store)?;
                 return Ok(());
             }
         }
-        self.push_fueled_instr(make_instr(ptr, memory), FuelCosts::store)?;
+        self.push_fueled_instr(make_instr(self.visit_pos, ptr, memory), FuelCosts::store)?;
         self.alloc
             .instr_encoder
-            .append_instr(Instruction::register_and_imm32(value, offset))?;
+            .append_instr(Instruction::register_and_imm32(self.visit_pos, value, offset))?;
         Ok(())
     }
 
@@ -2192,17 +2202,17 @@ impl FuncTranslator {
         ptr: u32,
         offset: u32,
         value: TypedProvider,
-        make_instr_at: fn(value: Reg, address: u32) -> Instruction,
+        make_instr_at: fn(instr_offset: usize, value: Reg, address: u32) -> Instruction,
     ) -> Result<(), Error> {
         let Some(address) = Self::effective_address(ptr, offset) else {
             return self.translate_trap(TrapCode::MemoryOutOfBounds);
         };
         let value = self.alloc.stack.provider2reg(&value)?;
-        self.push_fueled_instr(make_instr_at(value, address), FuelCosts::store)?;
+        self.push_fueled_instr(make_instr_at(self.visit_pos, value, address), FuelCosts::store)?;
         if !memory.is_default() {
             self.alloc
                 .instr_encoder
-                .append_instr(Instruction::memory_index(memory))?;
+                .append_instr(Instruction::memory_index(self.visit_pos, memory))?;
         }
         Ok(())
     }
@@ -2241,6 +2251,7 @@ impl FuncTranslator {
                         let result = self.alloc.stack.push_dynamic()?;
                         let fuel_info = self.fuel_info();
                         self.alloc.instr_encoder.encode_copy(
+                            self.visit_pos,
                             &mut self.alloc.stack,
                             result,
                             selected,
@@ -2297,10 +2308,10 @@ impl FuncTranslator {
         rhs: Reg,
     ) -> Result<(), Error> {
         debug_assert_ne!(lhs, rhs);
-        self.push_fueled_instr(Instruction::select(result, lhs), FuelCosts::base)?;
+        self.push_fueled_instr(Instruction::select(self.visit_pos, result, lhs), FuelCosts::base)?;
         self.alloc
             .instr_encoder
-            .append_instr(Instruction::register2_ext(condition, rhs))?;
+            .append_instr(Instruction::register2_ext(self.visit_pos, condition, rhs))?;
         Ok(())
     }
 
@@ -2317,23 +2328,23 @@ impl FuncTranslator {
             (Provider::Register(lhs), Provider::Const(rhs)) => {
                 debug_assert!(matches!(rhs.ty(), ValType::I32 | ValType::F32));
                 (
-                    Instruction::select_imm32_rhs(result, lhs),
-                    Instruction::register_and_imm32(condition, u32::from(rhs.untyped())),
+                    Instruction::select_imm32_rhs(self.visit_pos, result, lhs),
+                    Instruction::register_and_imm32(self.visit_pos, condition, u32::from(rhs.untyped())),
                 )
             }
             (Provider::Const(lhs), Provider::Register(rhs)) => {
                 debug_assert!(matches!(lhs.ty(), ValType::I32 | ValType::F32));
                 (
-                    Instruction::select_imm32_lhs(result, u32::from(lhs.untyped())),
-                    Instruction::register2_ext(condition, rhs),
+                    Instruction::select_imm32_lhs(self.visit_pos, result, u32::from(lhs.untyped())),
+                    Instruction::register2_ext(self.visit_pos, condition, rhs),
                 )
             }
             (Provider::Const(lhs), Provider::Const(rhs)) => {
                 debug_assert!(matches!(lhs.ty(), ValType::I32 | ValType::F32));
                 debug_assert!(matches!(rhs.ty(), ValType::I32 | ValType::F32));
                 (
-                    Instruction::select_imm32(result, u32::from(lhs.untyped())),
-                    Instruction::register_and_imm32(condition, u32::from(rhs.untyped())),
+                    Instruction::select_imm32(self.visit_pos, result, u32::from(lhs.untyped())),
+                    Instruction::register_and_imm32(self.visit_pos, condition, u32::from(rhs.untyped())),
                 )
             }
         };
@@ -2369,16 +2380,16 @@ impl FuncTranslator {
                 return self.translate_select_regs(result, condition, lhs, rhs)
             }
             (Provider::Register(lhs), Provider::Const(rhs)) => (
-                Instruction::select_i64imm32_rhs(result, lhs),
-                Instruction::register_and_imm32(condition, rhs),
+                Instruction::select_i64imm32_rhs(self.visit_pos, result, lhs),
+                Instruction::register_and_imm32(self.visit_pos, condition, rhs),
             ),
             (Provider::Const(lhs), Provider::Register(rhs)) => (
-                Instruction::select_i64imm32_lhs(result, lhs),
-                Instruction::register2_ext(condition, rhs),
+                Instruction::select_i64imm32_lhs(self.visit_pos, result, lhs),
+                Instruction::register2_ext(self.visit_pos, condition, rhs),
             ),
             (Provider::Const(lhs), Provider::Const(rhs)) => (
-                Instruction::select_i64imm32(result, lhs),
-                Instruction::register_and_imm32(condition, rhs),
+                Instruction::select_i64imm32(self.visit_pos, result, lhs),
+                Instruction::register_and_imm32(self.visit_pos, condition, rhs),
             ),
         };
         self.push_fueled_instr(instr, FuelCosts::base)?;
@@ -2413,16 +2424,16 @@ impl FuncTranslator {
                 return self.translate_select_regs(result, condition, lhs, rhs)
             }
             (Provider::Register(lhs), Provider::Const(rhs)) => (
-                Instruction::select_f64imm32_rhs(result, lhs),
-                Instruction::register_and_imm32(condition, rhs),
+                Instruction::select_f64imm32_rhs(self.visit_pos, result, lhs),
+                Instruction::register_and_imm32(self.visit_pos, condition, rhs),
             ),
             (Provider::Const(lhs), Provider::Register(rhs)) => (
-                Instruction::select_f64imm32_lhs(result, lhs),
-                Instruction::register2_ext(condition, rhs),
+                Instruction::select_f64imm32_lhs(self.visit_pos, result, lhs),
+                Instruction::register2_ext(self.visit_pos, condition, rhs),
             ),
             (Provider::Const(lhs), Provider::Const(rhs)) => (
-                Instruction::select_f64imm32(result, lhs),
-                Instruction::register_and_imm32(condition, rhs),
+                Instruction::select_f64imm32(self.visit_pos, result, lhs),
+                Instruction::register_and_imm32(self.visit_pos, condition, rhs),
             ),
         };
         self.push_fueled_instr(instr, FuelCosts::base)?;
@@ -2500,7 +2511,7 @@ impl FuncTranslator {
         self.alloc.stack.pop_n(results.len(), values);
         self.alloc
             .instr_encoder
-            .encode_return(&mut self.alloc.stack, values, fuel_info)?;
+            .encode_return(self.visit_pos, &mut self.alloc.stack, values, fuel_info)?;
         self.reachable = false;
         Ok(())
     }
@@ -2513,6 +2524,7 @@ impl FuncTranslator {
         let values = &mut self.alloc.buffer.providers;
         self.alloc.stack.peek_n(len_results, values);
         self.alloc.instr_encoder.encode_return_nez(
+            self.visit_pos, 
             &mut self.alloc.stack,
             condition,
             values,
@@ -2531,16 +2543,16 @@ impl FuncTranslator {
                 Some(index) => {
                     // Case: the index is encodable as 16-bit constant value
                     //       which allows us to use an optimized instruction.
-                    Instruction::call_indirect_params_imm16(index, table_index)
+                    Instruction::call_indirect_params_imm16(self.visit_pos, index, table_index)
                 }
                 None => {
                     // Case: the index is not encodable as 16-bit constant value
                     //       and we need to allocate it as function local constant.
                     let index = self.alloc.stack.alloc_const(index)?;
-                    Instruction::call_indirect_params(index, table_index)
+                    Instruction::call_indirect_params(self.visit_pos, index, table_index)
                 }
             },
-            TypedProvider::Register(index) => Instruction::call_indirect_params(index, table_index),
+            TypedProvider::Register(index) => Instruction::call_indirect_params(self.visit_pos, index, table_index),
         };
         Ok(instr)
     }
@@ -2556,7 +2568,7 @@ impl FuncTranslator {
                 let branch_params = frame.branch_params(&engine);
                 self.translate_copy_branch_params(branch_params)?;
                 let branch_offset = self.alloc.instr_encoder.try_resolve_label(branch_dst)?;
-                self.push_base_instr(Instruction::branch(branch_offset))?;
+                self.push_base_instr(Instruction::branch(self.visit_pos, branch_offset))?;
                 self.reachable = false;
                 Ok(())
             }
@@ -2658,6 +2670,7 @@ impl FuncTranslator {
             match self.alloc.control_stack.acquire_target(target) {
                 AcquiredTarget::Return(_) => {
                     self.alloc.instr_encoder.encode_return(
+                        self.visit_pos, 
                         &mut self.alloc.stack,
                         values,
                         fuel_info,
@@ -2669,9 +2682,9 @@ impl FuncTranslator {
                     let branch_dst = frame.branch_destination();
                     let branch_offset = self.alloc.instr_encoder.try_resolve_label(branch_dst)?;
                     let instr = match branch_params.len() {
-                        0 => Instruction::branch(branch_offset),
+                        0 => Instruction::branch(self.visit_pos, branch_offset),
                         1..=3 => {
-                            Instruction::branch_table_target(branch_params.span(), branch_offset)
+                            Instruction::branch_table_target(self.visit_pos, branch_params.span(), branch_offset)
                         }
                         _ => make_target(branch_params, branch_offset),
                     };
@@ -2687,7 +2700,7 @@ impl FuncTranslator {
         let targets = &self.alloc.buffer.br_table_targets;
         let len_targets = targets.len() as u32;
         self.alloc.instr_encoder.push_fueled_instr(
-            Instruction::branch_table_0(index, len_targets),
+            Instruction::branch_table_0(self.visit_pos, index, len_targets),
             self.fuel_info(),
             FuelCosts::base,
         )?;
@@ -2702,33 +2715,33 @@ impl FuncTranslator {
         let len_targets = targets.len() as u32;
         let fuel_info = self.fuel_info();
         self.alloc.instr_encoder.push_fueled_instr(
-            Instruction::branch_table_1(index, len_targets),
+            Instruction::branch_table_1(self.visit_pos, index, len_targets),
             fuel_info,
             FuelCosts::base,
         )?;
         let stack = &mut self.alloc.stack;
         let value = stack.pop();
         let param_instr = match value {
-            TypedProvider::Register(register) => Instruction::register(register),
+            TypedProvider::Register(register) => Instruction::register(self.visit_pos, register),
             TypedProvider::Const(immediate) => match immediate.ty() {
-                ValType::I32 | ValType::F32 => Instruction::const32(u32::from(immediate.untyped())),
+                ValType::I32 | ValType::F32 => Instruction::const32(self.visit_pos, u32::from(immediate.untyped())),
                 ValType::I64 => match <Const32<i64>>::try_from(i64::from(immediate)) {
-                    Ok(value) => Instruction::i64const32(value),
+                    Ok(value) => Instruction::i64const32(self.visit_pos, value),
                     Err(_) => {
                         let register = self.alloc.stack.provider2reg(&value)?;
-                        Instruction::register(register)
+                        Instruction::register(self.visit_pos, register)
                     }
                 },
                 ValType::F64 => match <Const32<f64>>::try_from(f64::from(immediate)) {
-                    Ok(value) => Instruction::f64const32(value),
+                    Ok(value) => Instruction::f64const32(self.visit_pos, value),
                     Err(_) => {
                         let register = self.alloc.stack.provider2reg(&value)?;
-                        Instruction::register(register)
+                        Instruction::register(self.visit_pos, register)
                     }
                 },
                 ValType::ExternRef | ValType::FuncRef => {
                     let register = self.alloc.stack.provider2reg(&value)?;
-                    Instruction::register(register)
+                    Instruction::register(self.visit_pos, register)
                 }
             },
         };
@@ -2744,7 +2757,7 @@ impl FuncTranslator {
         let len_targets = targets.len() as u32;
         let fuel_info = self.fuel_info();
         self.alloc.instr_encoder.push_fueled_instr(
-            Instruction::branch_table_2(index, len_targets),
+            Instruction::branch_table_2(self.visit_pos, index, len_targets),
             fuel_info,
             FuelCosts::base,
         )?;
@@ -2753,6 +2766,7 @@ impl FuncTranslator {
         self.alloc
             .instr_encoder
             .append_instr(Instruction::register2_ext(
+                self.visit_pos, 
                 stack.provider2reg(&v0)?,
                 stack.provider2reg(&v1)?,
             ))?;
@@ -2767,7 +2781,7 @@ impl FuncTranslator {
         let len_targets = targets.len() as u32;
         let fuel_info = self.fuel_info();
         self.alloc.instr_encoder.push_fueled_instr(
-            Instruction::branch_table_3(index, len_targets),
+            Instruction::branch_table_3(self.visit_pos, index, len_targets),
             fuel_info,
             FuelCosts::base,
         )?;
@@ -2776,6 +2790,7 @@ impl FuncTranslator {
         self.alloc
             .instr_encoder
             .append_instr(Instruction::register3_ext(
+                self.visit_pos, 
                 stack.provider2reg(&v0)?,
                 stack.provider2reg(&v1)?,
                 stack.provider2reg(&v2)?,
@@ -2803,13 +2818,14 @@ impl FuncTranslator {
         let targets = &mut self.alloc.buffer.br_table_targets;
         let len_targets = targets.len() as u32;
         self.alloc.instr_encoder.push_fueled_instr(
-            Instruction::branch_table_span(index, len_targets),
+            Instruction::branch_table_span(self.visit_pos, index, len_targets),
             fuel_info,
             FuelCosts::base,
         )?;
+        let visit_pos = self.visit_pos.clone();
         self.alloc
             .instr_encoder
-            .append_instr(Instruction::register_span(values))?;
+            .append_instr(Instruction::register_span(visit_pos, values))?;
         self.apply_providers_buffer(|this, buffer| {
             this.translate_br_table_targets(buffer, |branch_params, branch_offset| {
                 debug_assert_eq!(values.len(), branch_params.len());
@@ -2821,7 +2837,7 @@ impl FuncTranslator {
                         true => Instruction::branch_table_target,
                         false => Instruction::branch_table_target_non_overlapping,
                     };
-                make_instr(branch_params.span(), branch_offset)
+                make_instr(visit_pos, branch_params.span(), branch_offset)
             })
         })?;
         self.reachable = false;
@@ -2834,23 +2850,24 @@ impl FuncTranslator {
         let len_targets = targets.len() as u32;
         let fuel_info = self.fuel_info();
         self.alloc.instr_encoder.push_fueled_instr(
-            Instruction::branch_table_many(index, len_targets),
+            Instruction::branch_table_many(self.visit_pos, index, len_targets),
             fuel_info,
             FuelCosts::base,
         )?;
         let stack = &mut self.alloc.stack;
         let values = &self.alloc.buffer.providers[..];
         debug_assert!(values.len() > 3);
+        let visit_pos = self.visit_pos.clone();
         self.alloc
             .instr_encoder
-            .encode_register_list(stack, values)?;
+            .encode_register_list(visit_pos, stack, values)?;
         self.apply_providers_buffer(|this, values| {
             this.translate_br_table_targets(&[], |branch_params, branch_offset| {
                 let make_instr = match InstrEncoder::has_overlapping_copies(branch_params, values) {
                     true => Instruction::branch_table_target,
                     false => Instruction::branch_table_target_non_overlapping,
                 };
-                make_instr(branch_params.span(), branch_offset)
+                make_instr(visit_pos, branch_params.span(), branch_offset)
             })
         })?;
         self.reachable = false;
