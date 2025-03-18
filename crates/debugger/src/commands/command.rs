@@ -3,12 +3,14 @@ use super::sourcemap::SourceMap;
 use super::subroutine::SubroutineMap;
 use anyhow::Result;
 // use wasminspect_vm::WasmValue;
-use wasmi::Val;
+use wasmi::{Store, Val};
+use wasmi_wasi::WasiCtx;
 
 pub struct CommandContext {
     pub sourcemap: Box<dyn SourceMap>,
     pub subroutine: Box<dyn SubroutineMap>,
     pub printer: Box<dyn OutputPrinter>,
+    pub store: Store<WasiCtx>,
 }
 
 #[derive(Debug)]

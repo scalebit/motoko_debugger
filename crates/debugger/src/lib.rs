@@ -16,6 +16,8 @@ pub use process::Process;
 use anyhow::Result;
 use commands::command;
 use log::warn;
+use wasmi::CompilationMode;
+use wasmi_wasi::WasiCtxBuilder;
 
 pub fn try_load_dwarf(
     buffer: &[u8],
@@ -57,10 +59,21 @@ pub fn start_debugger(
     command::CommandContext,
 )> {
     let mut debugger = debugger::MainDebugger::new(preopen_dirs, envs)?;
+
+    let mut wasi_ctx_builder = WasiCtxBuilder::new();
+    let wasi_ctx = wasi_ctx_builder.build();
+
+    let mut config = Config::default();
+    config.consume_fuel(false);
+    config.compilation_mode(CompilationMode::Eager);
+    let engine = wasmi::Engine::new(&config);
+    let store = wasmi::Store::new(&engine, wasi_ctx);
+
     let mut context = commands::command::CommandContext {
         sourcemap: Box::new(commands::sourcemap::EmptySourceMap::new()),
         subroutine: Box::new(commands::subroutine::EmptySubroutineMap::new()),
         printer: Box::new(ConsolePrinter {}),
+        store: store,
     };
 
     if let Some(ref module_input) = module_input {
