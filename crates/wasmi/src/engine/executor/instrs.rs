@@ -1432,25 +1432,11 @@ impl<'engine> Executor<'engine> {
         store: &mut Store<T>,
         interceptor: &I,
     ) -> Result<Signal, Error> {
-        let signal_inst = if let Some(frame) = self.stack.calls.frames.last_mut() {
-            frame.instr_count += 1;
-            
-            let func = frame.func.clone();
-            let compiled_func = self.code_map.get(None, EngineFunc::from_usize(func as usize))?;
-            let offsets = compiled_func.offsets();
-            if let Some(offset) = offsets.get(frame.instr_count as usize) {
-                interceptor.execute_inst(offset.clone() as u32)
-            } else {
-                Signal::Next
-            }
-        } else {
-            Signal::Next
-        };
-        
+        let signal_inst = interceptor.execute_inst(self.ip.get().get_offset() as u32);
+
         let mut call_idx = -1;
         let mut table_idx = None;
         let result = self.execute_instr(store, &mut call_idx, &mut table_idx)?;
-
         let signal_call = if call_idx != -1 {
             if let Some(table_idx) = table_idx {
                 let table = self.get_table(table_idx);
@@ -1473,7 +1459,6 @@ impl<'engine> Executor<'engine> {
     #[inline(always)]
     pub fn execute_instr<T>(&mut self, store: &mut Store<T>, call_idx: &mut i32, table_idx: &mut Option<index::Table>) -> Result<Signal, Error> {
         use Instruction as Instr;
-
         match *self.ip.get() {
             Instr::Trap { instr_offset: _, trap_code } => self.execute_trap(trap_code)?,
             Instr::ConsumeFuel { instr_offset: _, block_fuel } => {
@@ -2027,7 +2012,7 @@ impl<'engine> Executor<'engine> {
             Instr::I32StoreAt { instr_offset: _, address, value } => {
                 self.execute_i32_store_at(&mut store.inner, address, value)?
             }
-            Instr::I32StoreAtImm16 { instr_offset: _, address, value } => {
+            Instr::I32StoreAtImm16 { instr_offset, address, value } => {
                 self.execute_i32_store_at_imm16(&mut store.inner, address, value)?
             }
             Instr::I32Store8 { instr_offset: _, ptr, memory } => {
