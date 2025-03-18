@@ -17,7 +17,7 @@ pub trait ComparatorExt: Sized {
     fn negate(self) -> Option<Self>;
 
     /// Returns the [`Instruction`] constructor for `self` without immediate value.
-    fn branch_cmp_instr(self) -> fn(lhs: Reg, rhs: Reg, offset: BranchOffset16) -> ir::Instruction;
+    fn branch_cmp_instr(self) -> fn(instr_offset: usize, lhs: Reg, rhs: Reg, offset: BranchOffset16) -> ir::Instruction;
 }
 
 impl ComparatorExt for Comparator {
@@ -152,7 +152,7 @@ impl ComparatorExt for Comparator {
         Some(negated)
     }
 
-    fn branch_cmp_instr(self) -> fn(lhs: Reg, rhs: Reg, offset: BranchOffset16) -> ir::Instruction {
+    fn branch_cmp_instr(self) -> fn(instr_offset: usize, lhs: Reg, rhs: Reg, offset: BranchOffset16) -> ir::Instruction {
         match self {
             Self::I32And => Instruction::branch_i32_and,
             Self::I32Or => Instruction::branch_i32_or,
@@ -204,7 +204,7 @@ pub trait ComparatorExtImm<T> {
 
 /// Constructor for branch+cmp [`Instruction`] with an immediate value of type `T`.
 type MakeBranchCmpInstrImm<T> =
-    fn(lhs: Reg, rhs: Const16<T>, offset: BranchOffset16) -> ir::Instruction;
+    fn(instr_offset: usize, lhs: Reg, rhs: Const16<T>, offset: BranchOffset16) -> ir::Instruction;
 
 impl ComparatorExtImm<i32> for Comparator {
     fn branch_cmp_instr_imm(self) -> Option<MakeBranchCmpInstrImm<i32>> {

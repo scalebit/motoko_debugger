@@ -63,13 +63,14 @@ macro_rules! define_enum {
             $(
                 #[doc = concat!("Creates a new [`Instruction::", stringify!($name), "`].")]
                 pub fn $snake_name(
+                    instr_offset: usize,
                     $(
                         $( $result_name: impl Into<$result_ty>, )?
                         $( $field_name: impl Into<$field_ty> ),*
                     )?
                 ) -> Self {
                     Self::$name {
-                        instr_offset: 0,
+                        instr_offset,
                         $(
                             $( $result_name: $result_name.into(), )?
                             $( $field_name: $field_name.into() ),*
@@ -134,99 +135,113 @@ impl WasmInstPayloadFrom<BrTable<'_>> for BrTableData {
 
 for_each_operator!(define_instr_kind);
 
-pub fn transform_inst(
-    reader: &mut OperatorsReader,
-    base_offset: usize,
-) -> anyhow::Result<ZaxInstruction> {
-    let (op, offset) = reader.read_with_offset()?;
-    let kind = TryFrom::try_from(op)?;
-    Ok(ZaxInstruction {
-        kind,
-        offset: offset - base_offset,
-    })
-}
 
 impl Instruction {
     /// Creates a new [`Instruction::ReturnReg2`] for the given [`Reg`] indices.
-    pub fn return_reg2_ext(reg0: impl Into<Reg>, reg1: impl Into<Reg>) -> Self {
-        Self::return_reg2([reg0.into(), reg1.into()])
+    pub fn return_reg2_ext(instr_offset: usize, reg0: impl Into<Reg>, reg1: impl Into<Reg>) -> Self {
+        Self::return_reg2(instr_offset, [reg0.into(), reg1.into()])
     }
 
     /// Creates a new [`Instruction::ReturnReg3`] for the given [`Reg`] indices.
     pub fn return_reg3_ext(
+        instr_offset: usize,
         reg0: impl Into<Reg>,
         reg1: impl Into<Reg>,
         reg2: impl Into<Reg>,
     ) -> Self {
-        Self::return_reg3([reg0.into(), reg1.into(), reg2.into()])
+        Self::return_reg3(instr_offset, [reg0.into(), reg1.into(), reg2.into()])
     }
 
     /// Creates a new [`Instruction::ReturnMany`] for the given [`Reg`] indices.
     pub fn return_many_ext(
+        instr_offset: usize,
         reg0: impl Into<Reg>,
         reg1: impl Into<Reg>,
         reg2: impl Into<Reg>,
     ) -> Self {
-        Self::return_many([reg0.into(), reg1.into(), reg2.into()])
+        Self::return_many(instr_offset, [reg0.into(), reg1.into(), reg2.into()])
     }
 
     /// Creates a new [`Instruction::ReturnNezReg2`] for the given `condition` and `value`.
     pub fn return_nez_reg2_ext(
+        instr_offset: usize,
         condition: impl Into<Reg>,
         value0: impl Into<Reg>,
         value1: impl Into<Reg>,
     ) -> Self {
-        Self::return_nez_reg2(condition, [value0.into(), value1.into()])
+        Self::return_nez_reg2(instr_offset, condition, [value0.into(), value1.into()])
     }
 
     /// Creates a new [`Instruction::ReturnNezMany`] for the given `condition` and `value`.
     pub fn return_nez_many_ext(
+        instr_offset: usize,
         condition: impl Into<Reg>,
         head0: impl Into<Reg>,
         head1: impl Into<Reg>,
     ) -> Self {
-        Self::return_nez_many(condition, [head0.into(), head1.into()])
+        Self::return_nez_many(instr_offset, condition, [head0.into(), head1.into()])
     }
 
     /// Creates a new [`Instruction::Copy2`].
-    pub fn copy2_ext( results: RegSpan, value0: impl Into<Reg>, value1: impl Into<Reg>) -> Self {
+    pub fn copy2_ext(
+        instr_offset: usize,
+        results: RegSpan,
+        value0: impl Into<Reg>,
+        value1: impl Into<Reg>,
+    ) -> Self {
         let span = FixedRegSpan::new(results).unwrap_or_else(|_| {
             panic!("encountered invalid `results` `RegSpan` for `Copy2`: {results:?}")
         });
-        Self::copy2(span, [value0.into(), value1.into()])
+        Self::copy2(instr_offset, span, [value0.into(), value1.into()])
     }
 
     /// Creates a new [`Instruction::CopyMany`].
-    pub fn copy_many_ext(results: RegSpan, head0: impl Into<Reg>, head1: impl Into<Reg>) -> Self {
-        Self::copy_many(results, [head0.into(), head1.into()])
-    }
-
-    /// Creates a new [`Instruction::CopyManyNonOverlapping`].
-    pub fn copy_many_non_overlapping_ext(
+    pub fn copy_many_ext(
+        instr_offset: usize,
         results: RegSpan,
         head0: impl Into<Reg>,
         head1: impl Into<Reg>,
     ) -> Self {
-        Self::copy_many_non_overlapping(results, [head0.into(), head1.into()])
+        Self::copy_many(instr_offset, results, [head0.into(), head1.into()])
+    }
+
+    /// Creates a new [`Instruction::CopyManyNonOverlapping`].
+    pub fn copy_many_non_overlapping_ext(
+        instr_offset: usize,
+        results: RegSpan,
+        head0: impl Into<Reg>,
+        head1: impl Into<Reg>,
+    ) -> Self {
+        Self::copy_many_non_overlapping(instr_offset, results, [head0.into(), head1.into()])
     }
 
     /// Creates a new [`Instruction::Register2`] instruction parameter.
-    pub fn register2_ext(reg0: impl Into<Reg>, reg1: impl Into<Reg>) -> Self {
-        Self::register2([reg0.into(), reg1.into()])
+    pub fn register2_ext(
+        instr_offset: usize,
+        reg0: impl Into<Reg>,
+        reg1: impl Into<Reg>,
+    ) -> Self {
+        Self::register2(instr_offset, [reg0.into(), reg1.into()])
     }
 
     /// Creates a new [`Instruction::Register3`] instruction parameter.
-    pub fn register3_ext(reg0: impl Into<Reg>, reg1: impl Into<Reg>, reg2: impl Into<Reg>) -> Self {
-        Self::register3([reg0.into(), reg1.into(), reg2.into()])
-    }
-
-    /// Creates a new [`Instruction::RegisterList`] instruction parameter.
-    pub fn register_list_ext(
+    pub fn register3_ext(
+        instr_offset: usize,
         reg0: impl Into<Reg>,
         reg1: impl Into<Reg>,
         reg2: impl Into<Reg>,
     ) -> Self {
-        Self::register_list([reg0.into(), reg1.into(), reg2.into()])
+        Self::register3(instr_offset, [reg0.into(), reg1.into(), reg2.into()])
+    }
+
+    /// Creates a new [`Instruction::RegisterList`] instruction parameter.
+    pub fn register_list_ext(
+        instr_offset: usize,
+        reg0: impl Into<Reg>,
+        reg1: impl Into<Reg>,
+        reg2: impl Into<Reg>,
+    ) -> Self {
+        Self::register_list(instr_offset, [reg0.into(), reg1.into(), reg2.into()])
     }
 }
 
