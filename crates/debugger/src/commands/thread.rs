@@ -4,6 +4,7 @@ use super::command::{Command, CommandContext, CommandResult};
 use super::debugger::{Debugger, StepStyle};
 // use super::list::{display_source, next_line_info};
 use super::list::{display_source, next_line_info};
+use super::sourcemap::{ColumnType, LineInfo};
 
 pub struct ThreadCommand {}
 
@@ -89,7 +90,15 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                     Opts::StepOver => StepStyle::InstOver,
                     _ => panic!(),
                 };
-                let initial_line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
+                let initial_line_info = if let Some(info) = next_line_info(debugger, context.sourcemap.as_ref())? {
+                    info
+                } else {
+                    LineInfo {
+                        filepath: "".to_string(),
+                        line: None,
+                        column: ColumnType::LeftEdge,
+                    }
+                };
                 while {
                     ret = Some(debugger.step(style)?);
                     ret = if let Some(ret) = ret {
@@ -104,12 +113,15 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                     } else {
                         None
                     };
-                    let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
-                    initial_line_info.filepath == line_info.filepath
-                        && initial_line_info.line == line_info.line
+                    if let Some(line_info) = next_line_info(debugger, context.sourcemap.as_ref())? {
+                        initial_line_info.filepath == line_info.filepath && initial_line_info.line == line_info.line
+                    } else {
+                        true
+                    }
                 } {}
-                let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
-                display_source(line_info, context.printer.as_ref())?;
+                if let Some(line_info) = next_line_info(debugger, context.sourcemap.as_ref())? {
+                    display_source(line_info, context.printer.as_ref())?;
+                }
             }
             Opts::StepOut => {
                 ret = Some(debugger.step(StepStyle::Out)?);
@@ -125,8 +137,9 @@ impl<D: Debugger> Command<D> for ThreadCommand {
                 } else {
                     None
                 };
-                let line_info = next_line_info(debugger, context.sourcemap.as_ref())?;
-                display_source(line_info, context.printer.as_ref())?;
+                if let Some(line_info) = next_line_info(debugger, context.sourcemap.as_ref())? {
+                    display_source(line_info, context.printer.as_ref())?;
+                }
             }
             Opts::StepInstIn | Opts::StepInstOver => {
                 let style = match opts {

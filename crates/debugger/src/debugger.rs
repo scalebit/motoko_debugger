@@ -264,9 +264,6 @@ impl<'engine> MainDebugger<'engine> {
             )
             .map_err(|e| anyhow::anyhow!(e))?;
 
-        // let store = get_store();
-        // let stack = get_stack();
-        // let code_map = get_engine().code_map();
 
         let instance = stack.calls.instance_expect();
         let cache = CachedInstance::new(&mut store.inner, &instance);
@@ -334,21 +331,9 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     fn selected_instr_offset(&self) -> Result<Option<usize>> {
         let executor = self.executor()?;
         let executor = executor.borrow();
-        let frame = executor.stack.calls.frames.last();
-        if frame.is_none() {
-            return Ok(None);
-        }
-
-        let frame = frame.unwrap();
-        let func = frame.func.clone();
-        let code_map = get_engine().code_map();
-        let compiled_func = code_map.get(None, EngineFunc::from_usize(func as usize))?;
-        let offsets = compiled_func.offsets();
-        if let Some(offset) = offsets.get(frame.instr_count as usize) {
-            Ok(Some(offset.clone()))
-        } else {
-            Ok(None)
-        }
+        let ip = executor.ip.get().clone();
+        let offset = ip.get_offset();
+        Ok(Some(offset))
     }
 
     fn set_breakpoint(&mut self, breakpoint: debugger::Breakpoint) {
@@ -582,10 +567,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             anyhow!("failed to add motoko syscall to the linker: {error}")
         })?;
 
-        let instance = linker.instantiate(&mut store, &module).map(|pre| {
-            self.start_fn_idx = pre.start_fn();
-            pre.initialize_instance(&mut store)
-        })?;
+        let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
 
         self.breakpoints.inst_in_file_0 = inst_in_file_0;
         self.instance = Some(InstanceWithName {
@@ -630,15 +612,14 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
     }
 
     fn execute_inst(&self, instr_offset: u32) -> Signal {
-        // if self.is_interrupted.load(Ordering::SeqCst) && self.breakpoints.inst_in_file_0.contains(&(instr_offset as u64)) {
-        //     self.is_interrupted.store(false, Ordering::SeqCst);
-        //     Signal::Breakpoint
-        // } else if self.breakpoints.should_break_inst(instr_offset) {
-        //     Signal::Breakpoint
-        // } else {
-        //     Signal::Next
-        // }
-        Signal::Next
+        if self.is_interrupted.load(Ordering::SeqCst) && self.breakpoints.inst_in_file_0.contains(&(instr_offset as u64)) {
+            self.is_interrupted.store(false, Ordering::SeqCst);
+            Signal::Breakpoint
+        } else if self.breakpoints.should_break_inst(instr_offset) {
+            Signal::Breakpoint
+        } else {
+            Signal::Next
+        }
     }
 }
 
