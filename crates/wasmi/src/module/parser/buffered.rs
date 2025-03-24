@@ -146,7 +146,7 @@ impl ModuleParser {
                     break;
                 }
                 Payload::CustomSection(reader) => {
-                    self.process_custom_section(custom_sections, reader)
+                    self.process_custom_section(custom_sections, None, reader)
                 }
                 _ => {
                     Ok(())
@@ -219,7 +219,7 @@ impl ModuleParser {
                     break;
                 }
                 Payload::CustomSection(reader) => {
-                    self.process_custom_section(&mut builder.custom_sections, reader)?;
+                    self.process_custom_section(&mut builder.custom_sections, Some(&builder.header), reader)?;
                 }
                 invalid => self.process_invalid_payload(invalid)?,
             }

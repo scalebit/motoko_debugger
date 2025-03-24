@@ -59,14 +59,14 @@ pub trait Debugger {
     fn is_running(&self) -> bool;
     fn frame(&self) -> Vec<String>;
     // fn current_frame(&self) -> Option<FunctionFrame>;
-    // fn locals(&self) -> Vec<Val>;
+    fn locals(&self) -> Result<(u32, String ,Vec<(u32, String, i32)>)>;
     // fn memory(&self) -> Result<Vec<u8>>;
     // fn store(&self) -> Result<&Store>;
     fn global(&self, name: &str) -> Option<Val>;
     fn set_breakpoint(&mut self, breakpoint: Breakpoint);
     fn stack_values(&self) -> Vec<UntypedVal>;
     fn selected_instr_offset(&self) -> Result<Option<usize>>;
-    fn step(&self, style: StepStyle) -> Result<RunResult>;
-    fn process(&self) -> Result<RunResult>;
+    fn step(&mut self, style: StepStyle) -> Result<RunResult>;
+    fn process(&mut self) -> Result<RunResult>;
     fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()>;
 }

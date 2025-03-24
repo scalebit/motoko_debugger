@@ -16,6 +16,5 @@ impl AliasCommand for RunCommand {
 
     fn run(&self, args: Vec<&str>) -> Result<String> {
         Ok(format!("{} {}", "process launch", args[1..].join(" ")))
-        // Ok("process launch".to_string())
     }
 }

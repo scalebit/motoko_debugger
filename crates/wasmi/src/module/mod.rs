@@ -125,7 +125,7 @@ impl ModuleHeader {
         let len_imports = self.inner.imports.len_funcs as u32;
         Some(FuncIdx::from(position + len_imports))
     }
-
+    
     /// Returns the global variable type and optional initial value.
     pub fn get_global(&self, global_idx: GlobalIdx) -> (&GlobalType, Option<&ConstExpr>) {
         let index = global_idx.into_u32() as usize;
@@ -373,6 +373,10 @@ impl Module {
             memories: header.memories.iter(),
             globals: header.globals[..len_imported_globals].iter(),
         }
+    }
+
+    pub fn import_func_len(&self) -> usize {
+        self.module_header().imports.len_funcs
     }
 
     /// Returns an iterator over the internally defined [`Func`].

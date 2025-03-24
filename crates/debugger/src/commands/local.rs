@@ -16,8 +16,8 @@ impl LocalCommand {
 enum Opts {
     #[structopt(name = "read")]
     Read {
-        #[structopt(name = "INDEX")]
-        index: Option<usize>,
+        #[structopt(name = "NAME")]
+        local_name: Option<String>,
     },
 }
 
@@ -37,22 +37,38 @@ impl<D: Debugger> Command<D> for LocalCommand {
         args: Vec<&str>,
     ) -> Result<Option<CommandResult>> {
         let opts = Opts::from_iter_safe(args)?;
-        // match opts {
-        //     Opts::Read { index: None } => {
-        //         for (index, value) in debugger.locals().iter().enumerate() {
-        //             let output = format!("{: <3}: {:?}", index, value);
-        //             context.printer.println(&output);
-        //         }
-        //     }
-        //     Opts::Read { index: Some(index) } => {
-        //         let locals = debugger.locals();
-        //         if index >= locals.len() {
-        //             return Err(anyhow::anyhow!("{:?} is out of range, locals length is {:?}", index, locals.len()));
-        //         }
-        //         let output = format!("{:?}", locals[index]);
-        //         context.printer.println(&output);
-        //     }
-        // }
+        let (func_idx, func_name, locals) = match debugger.locals() {
+            Ok((func_idx, func_name, locals)) => (func_idx, func_name, locals),
+            Err(e) => {
+                context.printer.println(&format!("Error getting locals: {:?}", e));
+                return Ok(None);
+            }
+        };
+
+        match opts {
+            Opts::Read { local_name: None } => {
+                
+                let output = format!("{}. function name: {}", func_idx, func_name);
+                context.printer.println(&output);
+                for (index, name, value) in locals.iter() {
+                    let output = format!("  {: <3}. {: <10}: {:?}", index, name, value);
+                    context.printer.println(&output);
+                }
+            }
+            Opts::Read { local_name: Some(local_name) } => {
+                let mut output = String::new();
+                for (index, name, value) in locals.iter() {
+                    if name.eq(&local_name) {
+                        output = format!("{: <3}. {: <10}: {:?}", index, name, value);
+                    }
+                }
+                if output.is_empty() {
+                    context.printer.println(&format!("No local variable with name {:?} in function {:?}", local_name, func_name));
+                } else {
+                    context.printer.println(&output);
+                }
+            }
+        }
         Ok(None)
     }
 }

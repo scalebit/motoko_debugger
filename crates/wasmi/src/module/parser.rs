@@ -488,6 +488,7 @@ impl ModuleParser {
     fn process_custom_section(
         &mut self,
         custom_sections: &mut CustomSectionsBuilder,
+        header: Option<&ModuleHeader>,
         reader: CustomSectionReader,
     ) -> Result<(), Error> {
         if self.engine.config().get_ignore_custom_sections() {
@@ -507,13 +508,15 @@ impl ModuleParser {
                     std::result::Result::Ok(name) => {
                         match name {
                             wasmparser::Name::Function(naming) => {
+                                println!("\n\nfunction name: ");
                                 collect_nameing(naming, &mut func_names);
                             },
                             wasmparser::Name::Global(naming) => {
+                                println!("\n\nglobal name: ");
                                 collect_nameing(naming, &mut global_names);
                             },
                             wasmparser::Name::Local(indrect_nameing) => {
-                                collect_indrect_nameing(indrect_nameing, &mut local_names);
+                                collect_indrect_nameing(indrect_nameing, &mut local_names, header);
                             }
                             _ => {}
                         }
@@ -547,7 +550,6 @@ fn collect_nameing<'a>(
     for item in naming.into_iter() {
         match item {
             std::result::Result::Ok(nameing) => {
-                // println!("nameing: {:?}, index: {:?}", nameing.name, nameing.index);
                 results.insert(nameing.index, nameing.name.to_string());
             }
             _ => {}
@@ -557,18 +559,23 @@ fn collect_nameing<'a>(
 
 fn collect_indrect_nameing<'a>(
     indrect_nameing: wasmparser::SectionLimited<'a, wasmparser::IndirectNaming<'a>>,  
-    results: &mut HashMap<u32, String>,
+    results: &mut HashMap<u32, Vec<(u32, String)>>,
+    header: Option<&ModuleHeader>,
 ) {
-    let mut count = 0;
+    let func_imports = if let Some(header) = header {
+        header.inner.imports.len_funcs()
+    } else {
+        0
+    };
+    
     for (func_index,item1) in indrect_nameing.into_iter().enumerate() {
-        count += 1;
+        let mut vec = Vec::new();
         match item1 {
             std::result::Result::Ok(func_naming) => {
                 for item2 in func_naming.names.into_iter() {
                     match item2 {
                         std::result::Result::Ok(nameing) => {
-                            // println!("count: {}, func_idx: {} nameing: {:?}, index: {:?}", count, func_index, nameing.name, nameing.index); 
-                            results.insert( nameing.index, nameing.name.to_string());
+                            vec.push((nameing.index, nameing.name.to_string()));
                         }
                         _ => {}
                     }
@@ -576,5 +583,6 @@ fn collect_indrect_nameing<'a>(
             }
             _ => {}
         };
+        results.insert((func_index + func_imports) as u32, vec);
     }
 }

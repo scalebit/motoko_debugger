@@ -55,6 +55,7 @@ macro_rules! forward_return {
 
 macro_rules! forward_return_dbg {
     ($self:expr, $expr:expr) => {{
+        println!("forward_return_dbg: {:?}", $self.stack.calls.frames.len());
         if $self.stack.calls.is_empty() {
             return Ok(Signal::End); // 如果为空，返回 Signal::End
         }
@@ -1430,13 +1431,13 @@ impl<'engine> Executor<'engine> {
     pub fn execute_step<T, I: Interceptor>(
         &mut self,
         store: &mut Store<T>,
-        interceptor: &I,
+        interceptor: &mut I,
     ) -> Result<Signal, Error> {
         let signal_inst = interceptor.execute_inst(self.ip.get().get_offset() as u32);
 
         let mut call_idx = -1;
         let mut table_idx = None;
-        let result = self.execute_instr(store, &mut call_idx, &mut table_idx)?;
+        let result = self.execute_instr(store, &mut call_idx, &mut table_idx, interceptor.get_import_func_len())?;
         let signal_call = if call_idx != -1 {
             if let Some(table_idx) = table_idx {
                 let table = self.get_table(table_idx);
@@ -1457,7 +1458,13 @@ impl<'engine> Executor<'engine> {
     }
 
     #[inline(always)]
-    pub fn execute_instr<T>(&mut self, store: &mut Store<T>, call_idx: &mut i32, table_idx: &mut Option<index::Table>) -> Result<Signal, Error> {
+    pub fn execute_instr<T>(
+        &mut self, 
+        store: &mut Store<T>, 
+        call_idx: &mut i32, 
+        table_idx: &mut Option<index::Table>, 
+        import_func_len: u32
+    ) -> Result<Signal, Error> {
         use Instruction as Instr;
         match *self.ip.get() {
             Instr::Trap { instr_offset: _, trap_code } => self.execute_trap(trap_code)?,
@@ -1763,11 +1770,12 @@ impl<'engine> Executor<'engine> {
             }
             Instr::CallInternal0 { instr_offset: _,results, func } => {
                 *call_idx = u32::from(func).try_into().unwrap_or_default();
+                *call_idx += import_func_len as i32;
                 self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
-                // return Ok(Signal::Breakpoint);
             }
             Instr::CallInternal { instr_offset: _,results, func } => {
                 *call_idx = u32::from(func).try_into().unwrap_or_default();;
+                *call_idx += import_func_len as i32;
                 self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
             }
             Instr::CallImported0 { instr_offset: _,results, func } => {
@@ -2669,8 +2677,9 @@ impl<'engine> Executor<'engine> {
 }
 
 pub trait Interceptor {
-    fn invoke_func(&self, func_idx: i32, table: Option<Table>) -> Signal;
+    fn invoke_func(&mut self, func_idx: i32, table: Option<Table>) -> Signal;
     fn execute_inst(&self, instr_offset: u32) -> Signal;
+    fn get_import_func_len(&self) -> u32;
 }
 
 macro_rules! get_entity {
@@ -2720,7 +2729,7 @@ impl Executor<'_> {
     }
 
     /// Returns the [`Reg`] value.
-    fn get_register(&self, register: Reg) -> UntypedVal {
+    pub fn get_register(&self, register: Reg) -> UntypedVal {
         // Safety: - It is the responsibility of the `Executor`
         //           implementation to keep the `sp` pointer valid
         //           whenever this method is accessed.

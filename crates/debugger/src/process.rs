@@ -73,7 +73,6 @@ impl<D: Debugger> Process<D> {
 
 pub struct Interactive {
     pub interface: Interface<DefaultTerminal>,
-
     history_file: String,
 }
 
@@ -101,6 +100,7 @@ impl Interactive {
                 eprintln!("Could not load history file {}: {}", history_file, e);
             }
         }
+        
         Ok(Self {
             interface,
             history_file: history_file.to_string(),
@@ -113,9 +113,12 @@ impl Interactive {
         last_line: &mut Option<String>,
         timeout: Option<Duration>,
     ) -> Result<Option<CommandResult>> {
-        let line = match self.interface.read_line_step(timeout)? {
+        let r = self.interface.read_line_step(timeout)?;
+        let line = match r {
             Some(ReadResult::Input(line)) => line,
-            Some(_) => return Ok(Some(CommandResult::Exit)),
+            Some(_) => {
+                return Ok(Some(CommandResult::Exit))
+            },
             None => return Ok(None),
         };
         let result = if !line.trim().is_empty() {

@@ -14,8 +14,6 @@ impl CustomSections {
     pub fn iter(&self) -> CustomSectionsIter {
         self.inner.iter()
     }
-
-
 }
 
 /// A builder for [`CustomSections`].
@@ -35,7 +33,7 @@ impl CustomSectionsBuilder {
     pub fn set_name_section(
         &mut self, 
         functions:HashMap<u32, String>, 
-        locals:HashMap<u32, String>, 
+        locals:HashMap<u32, Vec<(u32, String)>>, 
         globals:HashMap<u32, String>
     ) {
         // std::println!("locals length: {:?}", locals.len());
@@ -58,7 +56,7 @@ impl CustomSectionsBuilder {
 #[derive(Debug, Default)]
 pub struct NameSectionInner {
     pub functions: HashMap<u32, String>,
-    pub locals: HashMap<u32, String>,
+    pub locals: HashMap<u32, Vec<(u32, String)>>,
     pub globals: HashMap<u32, String>,
 }
 
