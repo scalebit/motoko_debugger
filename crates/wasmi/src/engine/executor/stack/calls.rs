@@ -191,8 +191,8 @@ impl StackOffsets {
 /// A single frame of a called [`EngineFunc`].
 #[derive(Debug, Copy, Clone)]
 pub struct CallFrame {
-    pub func: u32,
-    pub instr_count: u32,
+    /// The [`EngineFunc`] that is being called.
+    pub func: EngineFunc,
     /// The pointer to the [`Instruction`] that is executed next.
     instr_ptr: InstructionPtr,
     /// Offsets of the [`CallFrame`] into the [`ValueStack`].
@@ -218,8 +218,7 @@ impl CallFrame {
         results: RegSpan,
     ) -> Self {
         Self {
-            func: func.into_usize() as u32,
-            instr_count: 0,
+            func,
             instr_ptr,
             offsets,
             results,

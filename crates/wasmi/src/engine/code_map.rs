@@ -722,10 +722,10 @@ impl<'a> From<&'a [u8]> for SmallByteSlice {
 pub struct CompiledFuncEntity {
     /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
     instrs: Pin<Box<[Instruction]>>,
-    /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
-    offsets: Pin<Box<[usize]>>,
     /// The constant values local to the [`EngineFunc`].
     consts: Pin<Box<[UntypedVal]>>,
+    /// The value types of the local variables.
+    value_types: Pin<Box<[wasmparser::ValType]>>,
     /// The number of registers used by the [`EngineFunc`] in total.
     ///
     /// # Note
@@ -742,15 +742,15 @@ impl CompiledFuncEntity {
     ///
     /// - If `instrs` is empty.
     /// - If `instrs` contains more than `i32::MAX` instructions.
-    pub fn new<I, O, C>(len_registers: u16, instrs: I, offsets: O, consts: C) -> Self
+    pub fn new<I, C, V>(len_registers: u16, instrs: I, consts: C, value_types: V) -> Self
     where
         I: IntoIterator<Item = Instruction>,
-        O: IntoIterator<Item = usize>,
         C: IntoIterator<Item = UntypedVal>,
+        V: IntoIterator<Item = wasmparser::ValType>,
     {
         let instrs: Pin<Box<[Instruction]>> = Pin::new(instrs.into_iter().collect());
-        let offsets: Pin<Box<[usize]>> = Pin::new(offsets.into_iter().collect());
         let consts: Pin<Box<[UntypedVal]>> = Pin::new(consts.into_iter().collect());
+        let value_types: Pin<Box<[wasmparser::ValType]>> = Pin::new(value_types.into_iter().collect());
         assert!(
             !instrs.is_empty(),
             "compiled functions must have at least one instruction"
@@ -766,9 +766,9 @@ impl CompiledFuncEntity {
         );
         Self {
             instrs,
-            offsets,
             consts,
             len_registers,
+            value_types,
         }
     }
 }
@@ -778,10 +778,10 @@ impl CompiledFuncEntity {
 pub struct CompiledFuncRef<'a> {
     /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
     instrs: Pin<&'a [Instruction]>,
-    /// The sequence of [`Instruction`] of the [`CompiledFuncEntity`].
-    offsets: Pin<&'a [usize]>,
     /// The constant values local to the [`EngineFunc`].
     consts: Pin<&'a [UntypedVal]>,
+    /// The value types of the local variables.
+    value_types: Pin<&'a [wasmparser::ValType]>,
     /// The number of registers used by the [`EngineFunc`] in total.
     len_registers: u16,
 }
@@ -791,8 +791,8 @@ impl<'a> From<&'a CompiledFuncEntity> for CompiledFuncRef<'a> {
     fn from(func: &'a CompiledFuncEntity) -> Self {
         Self {
             instrs: func.instrs.as_ref(),
-            offsets: func.offsets.as_ref(),
             consts: func.consts.as_ref(),
+            value_types: func.value_types.as_ref(),
             len_registers: func.len_registers,
         }
     }
@@ -805,10 +805,10 @@ impl<'a> CompiledFuncRef<'a> {
         self.instrs.get_ref()
     }
 
-    /// Returns the sequence of [`offsets`] of the [`Instruction`].
+    /// Returns the value types of the local variables.
     #[inline]
-    pub fn offsets(&self) -> &'a [usize] {
-        self.offsets.get_ref()
+    pub fn value_types(&self) -> &'a [wasmparser::ValType] {
+        self.value_types.get_ref()
     }
 
     /// Returns the number of registers used by the [`EngineFunc`].

@@ -4,6 +4,7 @@ use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
 use anyhow::{anyhow, Error, Ok, Result};
 use log::{trace, warn};
 use wasmi::store::StoreIdx;
+use wasmparser::ValType;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
@@ -24,7 +25,7 @@ use wasmi::{
     Val,
 };
 use wasmi_collections::arena::{ArenaIndex, GuardedEntity};
-use wasmi_core::UntypedVal;
+use wasmi_core::{UntypedVal, F32, F64};
 use wasmi_ir::{Instruction, Reg, RegSpan};
 use wasmi_wasi::{WasiCtx, WasiCtxBuilder};
 
@@ -49,8 +50,7 @@ pub struct MainDebugger<'engine> {
     pub instance: Option<InstanceWithName>,
     start_fn_idx: Option<u32>,
     run_func: Option<Func>,
-    invoked_func_index: Option<u32>,
-    invoked_func_name: Option<String>,
+    invoked_func_index: Vec<u32>,
     executor: Option<Rc<RefCell<Executor<'engine>>>>,
 
     main_module: Option<(RawModule, String)>,
@@ -60,7 +60,6 @@ pub struct MainDebugger<'engine> {
 
     breakpoints: Breakpoints,
     is_interrupted: Arc<AtomicBool>,
-    selected_frame: Option<usize>,
 }
 
 #[derive(Default)]
@@ -112,8 +111,7 @@ impl<'engine> MainDebugger<'engine> {
             instance: None,
             start_fn_idx: None,
             run_func: None,
-            invoked_func_index: None,
-            invoked_func_name: None,
+            invoked_func_index: Vec::new(),
             executor: None,
             main_module: None,
             opts: DebuggerOpts::default(),
@@ -121,7 +119,6 @@ impl<'engine> MainDebugger<'engine> {
             is_interrupted,
             preopen_dirs,
             envs,
-            selected_frame: None,
         })
     }
 
@@ -147,18 +144,6 @@ impl<'engine> MainDebugger<'engine> {
         } else {
             Err(anyhow::anyhow!("No execution context"))
         }
-    }
-
-    pub fn get_instr_offset(&self) -> Result<()> {
-        let executor = self.executor()?;
-        let executor = executor.borrow();
-        let frame = executor.stack.calls.frames.last().unwrap();
-        let func = frame.func.clone();
-
-        let code_map = get_engine().code_map();
-        let compiled_func = code_map.get(None, EngineFunc::from_usize(func as usize))?;
-        let offsets = compiled_func.offsets();
-        Ok(())
     }
 
     fn running_func(&self) -> Result<Func> {
@@ -329,7 +314,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     }
 
     fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()> {
-        self.selected_frame = frame_index;
+        // self.selected_frame = frame_index;
         Ok(())
     }
 
@@ -365,37 +350,64 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //     Ok(&instance.store)
     // }
 
-    fn locals(&self) -> Result<(u32, String ,Vec<(u32, String, i32)>)>{
+    fn locals(&self) -> Result<(u32, String, Vec<(u32, String, Val)>)> {
         let executor = self.executor()?;
         let executor = executor.borrow();
+
+        let func_idx = self.invoked_func_index
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("No invoked func index found"))?;
         
-        if let Some(func_idx) = self.invoked_func_index {
-            let func_name = if let Some(name) = self.invoked_func_name.as_ref() {
-                name.clone()
-            } else {
-                "".to_string()
-            };
-            let invoked_func = self.instance.as_ref().unwrap().local_names.get(&func_idx);
-            if let Some(invoked_func) = invoked_func {
-                let mut ret = Vec::new();
-                for (index, name) in invoked_func.iter() {
-                    let reg = i16::try_from(*index)
-                        .ok()
-                        .map(Reg::from)
-                        .unwrap_or_else(|| {
-                            panic!("Index {} is out of bounds", index);
-                        });
-                    let val = executor.get_register(reg);
-                    let val = i32::from(val);
-                    ret.push((*index, name.clone(), val));
-                }
-                Ok((func_idx, func_name, ret))
-            } else {
-                Err(anyhow::anyhow!("No local names found in func {:?} or index {:?}", func_name, func_idx))
-            }
+        let func_name = self.get_func_name_by_idx(*func_idx)
+            .unwrap_or_default();
+        
+        let local_names = self.instance
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No instance found"))?
+            .local_names
+            .get(func_idx)
+            .ok_or_else(|| anyhow::anyhow!("No local names found in func {:?} or index {:?}", func_name, func_idx))?;
+        
+        let func = executor.stack.calls.frames.last().unwrap().func.into_usize() + self.get_import_func_len() as usize;
+        println!("func: {:?}", func);
+        let types = executor.code_map.get(None, EngineFunc::from_usize(func))?.value_types();
+
+        let mut locals = Vec::new();
+        if types.len() == local_names.len() {
+            println!("types.len({}) == local_names.len({})", types.len(), local_names.len());
+            locals = local_names
+            .iter().zip(types.iter())
+            .map(|((index, name), ty)| {
+                let reg = i16::try_from(*index)
+                    .map(Reg::from)?;
+                    
+                let val = executor.get_register(reg);
+                let typed_val =match ty {
+                    ValType::I32 => Val::I32(i32::from(val)),
+                    ValType::I64 => Val::I64(i64::from(val)),
+                    ValType::F32 => Val::F32(F32::from(val)),
+                    ValType::F64 => Val::F64(F64::from(val)),
+                    _ => return Err(anyhow::anyhow!("Unsupported type {:?}", ty))
+                };
+                Ok((*index, name.clone(), typed_val))
+            })
+            .collect::<Result<Vec<_>>>()?;
         } else {
-            Err(anyhow::anyhow!("No invoked func index found {:?}", self.invoked_func_index))
+            println!("types.len({}) != local_names.len({})", types.len(), local_names.len());
+            locals = local_names
+            .iter()
+            .map(|(index, name)| {
+                let reg = i16::try_from(*index)
+                    .map(Reg::from)?;
+                    
+                let val = executor.get_register(reg);
+                Ok((*index, name.clone(), Val::I32(i32::from(val))))
+            })
+            .collect::<Result<Vec<_>>>()?;
         }
+        
+        
+        Ok((*func_idx, func_name, locals))
     }
 
     fn global(&self, name: &str) -> Option<Val> {
@@ -422,29 +434,29 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     // }
 
     fn frame(&self) -> Vec<String> {
-        let executor = if let Some(executor) = self.executor.clone() {
-            executor
-        } else {
-            return vec![];
-        };
+        // let executor = if let Some(executor) = self.executor.clone() {
+        //     executor
+        // } else {
+        //     return vec![];
+        // };
 
-        let frames = &executor.borrow().stack.calls.frames;
-        let instances = &executor.borrow().stack.calls.instances;
+        // let frames = &executor.borrow().stack.calls.frames;
+        // let instances = &executor.borrow().stack.calls.instances;
 
-        if instances.last().is_none() {
-            return vec![];
-        }
-        let mut frames_string = vec![];
-        let mut all_instances = instances.rest().iter().collect::<Vec<_>>();
-        all_instances.push(instances.last().unwrap());
-        for f in frames.iter() {
-            frames_string.push(format!(
-                "{:?} - func {}",
-                all_instances.last().unwrap(),
-                f.func
-            ));
-        }
-        return frames_string;
+        // if instances.last().is_none() {
+        //     return vec![];
+        // }
+        // let mut frames_string = vec![];
+        // let mut all_instances = instances.rest().iter().collect::<Vec<_>>();
+        // all_instances.push(instances.last().unwrap());
+        // for f in frames.iter() {
+        //     frames_string.push(format!(
+        //         "{:?} - func {}",
+        //         all_instances.last().unwrap(),
+        //         f.func
+        //     ));
+        // }
+        return vec![];
     }
 
     // fn memory(&self) -> Result<Vec<u8>> {
@@ -516,7 +528,6 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     fn process(&mut self) -> Result<RunResult> {
         let store = get_store();
         let executor = self.executor()?;
-        self.get_instr_offset()?;
         loop {
             match executor.borrow_mut().execute_step(store, self)? {
                 Signal::Next => continue,
@@ -594,7 +605,6 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         })?;
 
         let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
-        println!("import_func_len: {:?}", module.import_func_len());
         self.breakpoints.inst_in_file_0 = inst_in_file_0;
         self.instance = Some(InstanceWithName {
             inner: instance,
@@ -626,12 +636,15 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
             let func = funcref.func().unwrap();
             func_idx = func.as_inner().entity_idx.into_usize() as u32;
         } 
-        self.invoked_func_index = Some(func_idx);
-        self.invoked_func_name = None;
+
+        println!("\n\n--------------");
+        self.invoked_func_index.push(func_idx);
+        
+        println!("invoked_func_index: {:?}", self.invoked_func_index.last());
+        
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
             println!("invoke func_name: {:?}", name);
-            self.invoked_func_name = Some(name);
-            if self.breakpoints.should_break_func(&self.invoked_func_name.as_ref().unwrap()) {
+            if self.breakpoints.should_break_func(&name) {
                 Signal::Breakpoint
             } else {
                 Signal::Next
@@ -639,6 +652,10 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         } else {
             Signal::Next
         }
+    }
+
+    fn pop_frame(&mut self) {
+        self.invoked_func_index.pop();
     }
 
     fn get_import_func_len(&self) -> u32 {

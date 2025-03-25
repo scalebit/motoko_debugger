@@ -102,7 +102,6 @@ pub struct InstrEncoder {
 pub struct InstrSequence {
     /// Already encoded [`Instruction`] words.
     pub instrs: Vec<Instruction>,
-    pub offsets: Vec<usize>,
 }
 
 impl InstrSequence {
@@ -175,10 +174,9 @@ impl InstrSequence {
     /// # Note
     ///
     /// The [`InstrSequence`] will be in an empty state after this operation.
-    pub fn drain_instrs(&mut self) -> (Drain<Instruction>, Drain<usize>) {
+    pub fn drain_instrs(&mut self) -> Drain<Instruction> {
         let instrs = self.instrs.drain(..);
-        let offsets = self.offsets.drain(..);
-        (instrs, offsets)
+        instrs
     }
 
     /// Returns a slice to the sequence of [`Instruction`] starting at `start`.
@@ -229,7 +227,7 @@ impl InstrEncoder {
     /// # Note
     ///
     /// The [`InstrEncoder`] will be in an empty state after this operation.
-    pub fn drain_instrs(&mut self) -> (Drain<Instruction>, Drain<usize>) {
+    pub fn drain_instrs(&mut self) -> Drain<Instruction> {
         self.instrs.drain_instrs()
     }
 

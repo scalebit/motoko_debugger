@@ -54,8 +54,8 @@ macro_rules! forward_return {
 }
 
 macro_rules! forward_return_dbg {
-    ($self:expr, $expr:expr) => {{
-        println!("forward_return_dbg: {:?}", $self.stack.calls.frames.len());
+    ($self:expr, $is_pop_frame:expr, $expr:expr) => {{
+        *$is_pop_frame = true;
         if $self.stack.calls.is_empty() {
             return Ok(Signal::End); // 如果为空，返回 Signal::End
         }
@@ -1437,17 +1437,29 @@ impl<'engine> Executor<'engine> {
 
         let mut call_idx = -1;
         let mut table_idx = None;
-        let result = self.execute_instr(store, &mut call_idx, &mut table_idx, interceptor.get_import_func_len())?;
+        let mut is_pop_frame = false;
+        let result = self.execute_instr(
+            store, 
+            &mut is_pop_frame, 
+            &mut call_idx, 
+            &mut table_idx, 
+            interceptor.get_import_func_len()
+        )?;
         let signal_call = if call_idx != -1 {
             if let Some(table_idx) = table_idx {
                 let table = self.get_table(table_idx);
                 interceptor.invoke_func(call_idx, Some(table))
             } else {
                 interceptor.invoke_func(call_idx, None)
+                
             }
         } else {
             Signal::Next
         };
+
+        if is_pop_frame {
+            interceptor.pop_frame();
+        }
 
         Ok(match (signal_inst, signal_call, result) {
             (_, _, Signal::End) => Signal::End,
@@ -1461,6 +1473,7 @@ impl<'engine> Executor<'engine> {
     pub fn execute_instr<T>(
         &mut self, 
         store: &mut Store<T>, 
+        is_pop_frame: &mut bool, 
         call_idx: &mut i32, 
         table_idx: &mut Option<index::Table>, 
         import_func_len: u32
@@ -1472,74 +1485,81 @@ impl<'engine> Executor<'engine> {
                 self.execute_consume_fuel(&mut store.inner, block_fuel)?
             }
             Instr::Return { instr_offset: _ } => {
-                forward_return_dbg!(self, self.execute_return(&mut store.inner))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return(&mut store.inner))
             }
             Instr::ReturnReg { instr_offset: _, value } => {
-                forward_return_dbg!(self, self.execute_return_reg(&mut store.inner, value))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_reg(&mut store.inner, value))
             }
             Instr::ReturnReg2 { instr_offset: _, values } => {
-                forward_return_dbg!(self, self.execute_return_reg2(&mut store.inner, values))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_reg2(&mut store.inner, values))
             }
             Instr::ReturnReg3 { instr_offset: _, values } => {
-                forward_return_dbg!(self, self.execute_return_reg3(&mut store.inner, values))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_reg3(&mut store.inner, values))
             }
             Instr::ReturnImm32 { instr_offset: _, value } => {
-                forward_return_dbg!(self, self.execute_return_imm32(&mut store.inner, value))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_imm32(&mut store.inner, value))
             }
             Instr::ReturnI64Imm32 { instr_offset: _, value } => {
-                forward_return_dbg!(self, self.execute_return_i64imm32(&mut store.inner, value))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_i64imm32(&mut store.inner, value))
             }
             Instr::ReturnF64Imm32 { instr_offset: _, value } => {
-                forward_return_dbg!(self, self.execute_return_f64imm32(&mut store.inner, value))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_f64imm32(&mut store.inner, value))
             }
             Instr::ReturnSpan { instr_offset: _, values } => {
-                forward_return_dbg!(self, self.execute_return_span(&mut store.inner, values))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_span(&mut store.inner, values))
             }
             Instr::ReturnMany { instr_offset: _, values } => {
-                forward_return_dbg!(self, self.execute_return_many(&mut store.inner, values))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_many(&mut store.inner, values))
             }
             Instr::ReturnNez { instr_offset: _, condition } => {
-                forward_return_dbg!(self, self.execute_return_nez(&mut store.inner, condition))
+                forward_return_dbg!(self, is_pop_frame, self.execute_return_nez(&mut store.inner, condition))
             }
             Instr::ReturnNezReg { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_reg(&mut store.inner, condition, value)
                 )
             }
             Instr::ReturnNezReg2 { instr_offset: _, condition, values } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_reg2(&mut store.inner, condition, values)
                 )
             }
             Instr::ReturnNezImm32 { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_imm32(&mut store.inner, condition, value)
                 )
             }
             Instr::ReturnNezI64Imm32 { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_i64imm32(&mut store.inner, condition, value)
                 )
             }
             Instr::ReturnNezF64Imm32 { instr_offset: _, condition, value } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_f64imm32(&mut store.inner, condition, value)
                 )
             }
             Instr::ReturnNezSpan { instr_offset: _, condition, values } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_span(&mut store.inner, condition, values)
                 )
             }
             Instr::ReturnNezMany { instr_offset: _, condition, values } => {
                 forward_return_dbg!(
                     self,
+                    is_pop_frame,
                     self.execute_return_nez_many(&mut store.inner, condition, values)
                 )
             }
@@ -1780,11 +1800,9 @@ impl<'engine> Executor<'engine> {
             }
             Instr::CallImported0 { instr_offset: _,results, func } => {
                 self.execute_call_imported_0::<T>(store, results, func)?;
-                *call_idx = u32::from(func).try_into().unwrap_or_default();;
             }
             Instr::CallImported { instr_offset: _,results, func } => {
                 self.execute_call_imported::<T>(store, results, func)?;
-                *call_idx = u32::from(func).try_into().unwrap_or_default();;
             }
             Instr::CallIndirect0 { instr_offset: _,results, func_type } => {
                 let (c_idx, tab) = self.execute_call_indirect_0::<T>(store, results, func_type)?;
@@ -2678,6 +2696,7 @@ impl<'engine> Executor<'engine> {
 
 pub trait Interceptor {
     fn invoke_func(&mut self, func_idx: i32, table: Option<Table>) -> Signal;
+    fn pop_frame(&mut self);
     fn execute_inst(&self, instr_offset: u32) -> Signal;
     fn get_import_func_len(&self) -> u32;
 }

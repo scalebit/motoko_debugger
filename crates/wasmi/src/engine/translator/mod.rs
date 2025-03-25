@@ -226,7 +226,7 @@ pub trait WasmTranslator<'parser>: VisitOperator<'parser, Output = Result<(), Er
     /// This information is mainly used in visit operator to record map<instr_offset, instr> for debugger
     fn update_visit_pos(&mut self, pos: usize);
 
-    fn push_instr_offset(&mut self, offset: usize);
+    fn set_value_types(&mut self, value_types: Vec<wasmparser::ValType>);
 
     /// Finishes constructing the Wasm function translation.
     ///
@@ -309,8 +309,8 @@ where
         self.translator.update_visit_pos(pos);
     }
 
-    fn push_instr_offset(&mut self, offset: usize) {
-        self.translator.push_instr_offset(offset);
+    fn set_value_types(&mut self, value_types: Vec<wasmparser::ValType>) {
+        self.translator.set_value_types(value_types);
     }
 
     fn finish(
@@ -479,7 +479,7 @@ impl WasmTranslator<'_> for LazyFuncTranslator {
     fn update_visit_pos(&mut self, _pos: usize) {}
 
     #[inline]
-    fn push_instr_offset(&mut self, _offset: usize) {}
+    fn set_value_types(&mut self, _value_types: Vec<wasmparser::ValType>) {}
 
     #[inline]
     fn finish(
@@ -571,8 +571,8 @@ impl WasmTranslator<'_> for FuncTranslator {
         self.visit_pos = _pos;
     }
 
-    fn push_instr_offset(&mut self, offset: usize) {
-        self.alloc.instr_encoder.instrs.offsets.push(offset);
+    fn set_value_types(&mut self, value_types: Vec<wasmparser::ValType>) {
+        self.alloc.stack.set_local_value_types(value_types);
     }
 
     fn finish(
@@ -602,12 +602,13 @@ impl WasmTranslator<'_> for FuncTranslator {
                 })?;
         }
         let func_consts = self.alloc.stack.func_local_consts();
-        let (instrs, offsets) = self.alloc.instr_encoder.drain_instrs();
+        let value_types = self.alloc.stack.local_value_types();
+        let instrs = self.alloc.instr_encoder.drain_instrs();
         finalize(CompiledFuncEntity::new(
             len_registers,
             instrs,
-            offsets,
             func_consts,
+            value_types,
         ));
         Ok(self.into_allocations())
     }

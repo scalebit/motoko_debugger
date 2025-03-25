@@ -76,14 +76,17 @@ where
     fn translate_locals(&mut self) -> Result<(), Error> {
         let mut reader = self.func_body.get_locals_reader()?;
         let len_locals = reader.get_count();
+        let mut value_types = std::vec::Vec::new();
         for _ in 0..len_locals {
             let offset = reader.original_position();
             let (amount, value_type) = reader.read()?;
             self.translator.update_pos(offset);
             self.translator.translate_locals(amount, value_type)?;
+            value_types.push(value_type);
         }
+        self.translator.set_value_types(value_types);
         self.translator.finish_translate_locals()?;
-        Ok(())
+        Ok(())  
     }
 
     /// Translates the Wasm operators of the Wasm function.
@@ -91,19 +94,11 @@ where
     /// Returns the offset of the `End` Wasm operator.
     fn translate_operators(&mut self) -> Result<usize, Error> {
         let mut reader = self.func_body.get_operators_reader()?;
-        let mut before_len = self.translator.get_instr_encoder_len();
         while !reader.eof() {
             let pos = reader.original_position();
             self.translator.update_pos(pos);
             self.translator.update_visit_pos(pos - self.base_offset);
             reader.visit_operator(&mut self.translator)??;
-            let after_len = self.translator.get_instr_encoder_len();
-            if before_len != after_len {
-                for _ in 0..after_len - before_len {
-                    self.translator.push_instr_offset(pos - self.base_offset);
-                }
-                before_len = after_len;
-            }
         }
         reader.ensure_end()?;
         Ok(reader.original_position())

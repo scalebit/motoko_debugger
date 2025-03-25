@@ -50,12 +50,13 @@ impl<D: Debugger> Command<D> for FrameCommand {
                 //     let output = format!("{}: {}", variable.name, variable.type_name);
                 //     context.printer.println(&output);
                 // }
-                Ok(None)
+                // Ok(None)
             }
             Opts::Select { frame_index } => {
-                debugger.select_frame(Some(frame_index))?;
-                Ok(None)
+                // debugger.select_frame(Some(frame_index))?;
+                // Ok(None)
             }
         }
+        Ok(None)
     }
 }

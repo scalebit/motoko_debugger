@@ -64,6 +64,7 @@ pub struct ValueStack {
     pub providers: ProviderStack,
     reg_alloc: RegisterAlloc,
     consts: FuncLocalConsts,
+    local_value_types: Vec<wasmparser::ValType>,
 }
 
 impl ValueStack {
@@ -80,6 +81,10 @@ impl ValueStack {
         while self.height() != height {
             self.drop();
         }
+    }
+
+    pub fn set_local_value_types(&mut self, value_types: Vec<wasmparser::ValType>) {
+        self.local_value_types = value_types;
     }
 
     /// Preserves `local.get` on the [`ProviderStack`] by shifting to the preservation space.
@@ -184,6 +189,10 @@ impl ValueStack {
     pub fn func_local_consts(&self) -> FuncLocalConstsIter {
         self.consts.iter()
     }
+
+    pub fn local_value_types(&self) -> Vec<wasmparser::ValType> {
+        self.local_value_types.clone()
+    }   
 
     /// Pushes the given [`TypedProvider`] to the [`ValueStack`].
     ///
