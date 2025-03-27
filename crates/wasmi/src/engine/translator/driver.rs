@@ -82,7 +82,7 @@ where
             let (amount, value_type) = reader.read()?;
             self.translator.update_pos(offset);
             self.translator.translate_locals(amount, value_type)?;
-            value_types.push(value_type);
+            value_types.extend(std::iter::repeat(value_type).take(amount as usize));
         }
         self.translator.set_value_types(value_types);
         self.translator.finish_translate_locals()?;

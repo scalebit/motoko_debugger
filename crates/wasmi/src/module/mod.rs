@@ -9,7 +9,7 @@ mod init_expr;
 mod instantiate;
 mod parser;
 mod read;
-pub(crate) mod utils;
+pub mod utils;
 
 use self::{
     builder::ModuleBuilder,

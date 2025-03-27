@@ -3,6 +3,7 @@
 use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
 use anyhow::{anyhow, Error, Ok, Result};
 use log::{trace, warn};
+use wasmi::module::utils::WasmiValueType;
 use wasmi::store::StoreIdx;
 use wasmparser::ValType;
 use std::cell::RefCell;
@@ -285,6 +286,35 @@ impl<'engine> MainDebugger<'engine> {
         Ok(())
     }
 
+    pub fn get_params_locals_types(&self, func_idx: u32) -> Result<Vec<wasmi_core::ValType>> {
+        let mut types = Vec::new();
+        let store = get_store();
+        let func = self.instance()
+            .ok_or_else(|| anyhow::anyhow!("No instance found"))?
+            .get_func_by_index(&store, func_idx)
+            .ok_or_else(|| anyhow::anyhow!("No func found in index {:?}", func_idx))?;
+
+        let wasm_func = match store.inner.resolve_func(&func) {
+            FuncEntity::Wasm(x) => x,
+            _ => return Err(anyhow!("not support host")),
+        };
+        let engine_func = wasm_func.func_body();
+        self.executor()?
+            .borrow()
+            .code_map.get(None, engine_func)?
+            .value_types()
+            .iter()
+            .for_each(|ty| {
+                types.push(WasmiValueType::from(ty.clone()).into_inner());
+            });
+
+        let func_type = func.ty(&store);
+        func_type.params().iter().for_each(|ty| {
+            types.push(ty.clone());
+        });
+        Ok(types)
+    }
+
     // fn selected_frame(&self) -> Result<CallFrame> {
     //     // let executor = self.executor()?;
     //     // let executor = executor.borrow();
@@ -353,6 +383,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     fn locals(&self) -> Result<(u32, String, Vec<(u32, String, Val)>)> {
         let executor = self.executor()?;
         let executor = executor.borrow();
+        dump_func_types(&executor)?;
 
         let func_idx = self.invoked_func_index
             .last()
@@ -368,45 +399,26 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             .get(func_idx)
             .ok_or_else(|| anyhow::anyhow!("No local names found in func {:?} or index {:?}", func_name, func_idx))?;
         
-        let func = executor.stack.calls.frames.last().unwrap().func.into_usize() + self.get_import_func_len() as usize;
-        println!("func: {:?}", func);
-        let types = executor.code_map.get(None, EngineFunc::from_usize(func))?.value_types();
-
-        let mut locals = Vec::new();
-        if types.len() == local_names.len() {
-            println!("types.len({}) == local_names.len({})", types.len(), local_names.len());
-            locals = local_names
-            .iter().zip(types.iter())
-            .map(|((index, name), ty)| {
-                let reg = i16::try_from(*index)
-                    .map(Reg::from)?;
-                    
-                let val = executor.get_register(reg);
-                let typed_val =match ty {
-                    ValType::I32 => Val::I32(i32::from(val)),
-                    ValType::I64 => Val::I64(i64::from(val)),
-                    ValType::F32 => Val::F32(F32::from(val)),
-                    ValType::F64 => Val::F64(F64::from(val)),
-                    _ => return Err(anyhow::anyhow!("Unsupported type {:?}", ty))
-                };
-                Ok((*index, name.clone(), typed_val))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        } else {
-            println!("types.len({}) != local_names.len({})", types.len(), local_names.len());
-            locals = local_names
-            .iter()
-            .map(|(index, name)| {
-                let reg = i16::try_from(*index)
-                    .map(Reg::from)?;
-                    
-                let val = executor.get_register(reg);
-                Ok((*index, name.clone(), Val::I32(i32::from(val))))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        }
+        let types = self.get_params_locals_types(*func_idx)?;
         
-        
+         let locals = local_names
+        .iter().zip(types.iter())
+        .map(|((index, name), ty)| {
+            let reg = i16::try_from(*index)
+                .map(Reg::from)?;
+                
+            let val = executor.get_register(reg);
+            let typed_val =match ty {
+                wasmi_core::ValType::I32 => Val::I32(i32::from(val)),
+                wasmi_core::ValType::I64 => Val::I64(i64::from(val)),
+                wasmi_core::ValType::F32 => Val::F32(F32::from(val)),
+                wasmi_core::ValType::F64 => Val::F64(F64::from(val)),
+                _ => return Err(anyhow::anyhow!("Unsupported type {:?}", ty))
+            };
+            Ok((*index, name.clone(), typed_val))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    
         Ok((*func_idx, func_name, locals))
     }
 
@@ -696,4 +708,22 @@ pub fn get_stack() -> &'static mut Stack {
     //         Wasm validation and Wasmi codegen to never run out
     //         of valid bounds using this method.
     unsafe { WASM_STACK.as_mut().unwrap() }
+}
+
+use std::fs::File;
+use std::io::Write;
+
+pub fn dump_func_types(executor: &Executor) -> Result<()> {
+    let mut file = File::create("tmp")?;
+    for i in 0..100 {
+        if let std::result::Result::Ok(types) = executor.code_map
+            .get(None, EngineFunc::from_usize(i))
+            .map(|f| f.value_types()) 
+        {
+            writeln!(file, "\n\n-------------")?;
+            writeln!(file, "len = {}", types.len())?;
+            writeln!(file, "func {}: {:?}", i, types)?;
+        }
+    }
+    Ok(())
 }
