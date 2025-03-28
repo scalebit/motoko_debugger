@@ -329,48 +329,48 @@ impl<'engine> MainDebugger<'engine> {
             // If LSBit is 1, then it is a pointer into the heap (bignum)
             let mut ret_val = Vec::<Val>::new();
             ret_val.push(Val::default(ty));
-            // match ty {
-            //     wasmi_core::ValType::F64 => {
-            //         if let Some(func) = self.lookup_func_by_name("bigint_to_float64") {
-            //             func.call(&mut get_store(), &[Val::F64(F64::from(value))], &mut ret_val)?;
-            //         } else {
-            //             return Ok(format!("bigint_to_float64 function not found"))
-            //         }
-            //     },
-            //     wasmi_core::ValType::I32 => {
-            //         if let Some(func) = self.lookup_func_by_name("bigint_to_word32_wrap") {
-            //             let raw_value = value.to_bits();
-            //             println!(
-            //                 "bigint_to_word32_trap, raw value: 0x{:x}, value: {}", 
-            //                 raw_value, 
-            //                 raw_value as i32,
-            //                 // i32::from(raw_value)
-            //             );
-            //             func.call(
-            //                 &mut get_store(), 
-            //                 &[Val::I32(raw_value as i32)], 
-            //                 &mut ret_val
-            //             )?;
-            //         } else {
-            //             return Ok(format!("bigint_to_word32_trap function not found"))
-            //         }
-            //     },
-            //     wasmi_core::ValType::I64 => {
-            //         if let Some(func) = self.lookup_func_by_name("bigint_to_word64_trap") {
-            //             func.call(&mut get_store(), &[Val::I64(i64::from(value))], &mut ret_val)?;
-            //         } else {
-            //             return Ok(format!("bigint_to_word64_trap function not found"))
-            //         }
-            //     },
-            //     wasmi_core::ValType::F32 => {
-            //         if let Some(func) = self.lookup_func_by_name("bigint_to_float32_trap") {
-            //             func.call(&mut get_store(), &[Val::F32(F32::from(value))], &mut ret_val)?;
-            //         } else {
-            //             return Ok(format!("bigint_to_float32_trap function not found"))
-            //         }
-            //     },
-            //     _ => return Ok(format!("Unsupported type {:?}", ty))
-            // }
+            match ty {
+                wasmi_core::ValType::F64 => {
+                    if let Some(func) = self.lookup_func_by_name("bigint_to_float64") {
+                        func.call(&mut get_store(), &[Val::F64(F64::from(value))], &mut ret_val)?;
+                    } else {
+                        return Ok(format!("bigint_to_float64 function not found"))
+                    }
+                },
+                wasmi_core::ValType::I32 => {
+                    if let Some(func) = self.lookup_func_by_name("bigint_to_word32_wrap") {
+                        let raw_value = value.to_bits();
+                        println!(
+                            "bigint_to_word32_trap, raw value: 0x{:x}, value: {}", 
+                            raw_value, 
+                            raw_value as i32,
+                            // i32::from(raw_value)
+                        );
+                        func.call(
+                            &mut get_store(), 
+                            &[Val::I32(raw_value as i32)], 
+                            &mut ret_val
+                        )?;
+                    } else {
+                        return Ok(format!("bigint_to_word32_trap function not found"))
+                    }
+                },
+                wasmi_core::ValType::I64 => {
+                    if let Some(func) = self.lookup_func_by_name("bigint_to_word64_trap") {
+                        func.call(&mut get_store(), &[Val::I64(i64::from(value))], &mut ret_val)?;
+                    } else {
+                        return Ok(format!("bigint_to_word64_trap function not found"))
+                    }
+                },
+                wasmi_core::ValType::F32 => {
+                    if let Some(func) = self.lookup_func_by_name("bigint_to_float32_trap") {
+                        func.call(&mut get_store(), &[Val::F32(F32::from(value))], &mut ret_val)?;
+                    } else {
+                        return Ok(format!("bigint_to_float32_trap function not found"))
+                    }
+                },
+                _ => return Ok(format!("Unsupported type {:?}", ty))
+            }
             ret_val[0].clone()
         };
         println!("typed_val: {:?}", typed_val);
