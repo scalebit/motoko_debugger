@@ -315,6 +315,68 @@ impl<'engine> MainDebugger<'engine> {
         Ok(types)
     }
 
+    fn display_valtype_with_value(&self, ty: wasmi_core::ValType, value: UntypedVal) -> Result<String> {
+        let typed_val = if value.to_bits() & 1 == 0 {
+            let divided_value = UntypedVal::from(value.to_bits() >> 1);
+            match ty {
+                wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
+                wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
+                wasmi_core::ValType::F32 => Val::F32(F32::from(divided_value)),
+                wasmi_core::ValType::F64 => Val::F64(F64::from(divided_value)),
+                _ => return Ok(format!("Unsupported type {:?}", ty))
+            }
+        } else {
+            // If LSBit is 1, then it is a pointer into the heap (bignum)
+            let mut ret_val = Vec::<Val>::new();
+            ret_val.push(Val::default(ty));
+            // match ty {
+            //     wasmi_core::ValType::F64 => {
+            //         if let Some(func) = self.lookup_func_by_name("bigint_to_float64") {
+            //             func.call(&mut get_store(), &[Val::F64(F64::from(value))], &mut ret_val)?;
+            //         } else {
+            //             return Ok(format!("bigint_to_float64 function not found"))
+            //         }
+            //     },
+            //     wasmi_core::ValType::I32 => {
+            //         if let Some(func) = self.lookup_func_by_name("bigint_to_word32_wrap") {
+            //             let raw_value = value.to_bits();
+            //             println!(
+            //                 "bigint_to_word32_trap, raw value: 0x{:x}, value: {}", 
+            //                 raw_value, 
+            //                 raw_value as i32,
+            //                 // i32::from(raw_value)
+            //             );
+            //             func.call(
+            //                 &mut get_store(), 
+            //                 &[Val::I32(raw_value as i32)], 
+            //                 &mut ret_val
+            //             )?;
+            //         } else {
+            //             return Ok(format!("bigint_to_word32_trap function not found"))
+            //         }
+            //     },
+            //     wasmi_core::ValType::I64 => {
+            //         if let Some(func) = self.lookup_func_by_name("bigint_to_word64_trap") {
+            //             func.call(&mut get_store(), &[Val::I64(i64::from(value))], &mut ret_val)?;
+            //         } else {
+            //             return Ok(format!("bigint_to_word64_trap function not found"))
+            //         }
+            //     },
+            //     wasmi_core::ValType::F32 => {
+            //         if let Some(func) = self.lookup_func_by_name("bigint_to_float32_trap") {
+            //             func.call(&mut get_store(), &[Val::F32(F32::from(value))], &mut ret_val)?;
+            //         } else {
+            //             return Ok(format!("bigint_to_float32_trap function not found"))
+            //         }
+            //     },
+            //     _ => return Ok(format!("Unsupported type {:?}", ty))
+            // }
+            ret_val[0].clone()
+        };
+        println!("typed_val: {:?}", typed_val);
+        Ok(format!("{:?}", typed_val))
+    }
+
     // fn selected_frame(&self) -> Result<CallFrame> {
     //     // let executor = self.executor()?;
     //     // let executor = executor.borrow();
@@ -380,7 +442,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     //     Ok(&instance.store)
     // }
 
-    fn locals(&self) -> Result<(u32, String, Vec<(u32, String, Val)>)> {
+    fn locals(&self) -> Result<(u32, String, Vec<(u32, String, String)>)> {
         let executor = self.executor()?;
         let executor = executor.borrow();
         dump_func_types(&executor)?;
@@ -401,23 +463,17 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         
         let types = self.get_params_locals_types(*func_idx)?;
         
-         let locals = local_names
-        .iter().zip(types.iter())
-        .map(|((index, name), ty)| {
-            let reg = i16::try_from(*index)
-                .map(Reg::from)?;
-                
-            let val = executor.get_register(reg);
-            let typed_val =match ty {
-                wasmi_core::ValType::I32 => Val::I32(i32::from(val)),
-                wasmi_core::ValType::I64 => Val::I64(i64::from(val)),
-                wasmi_core::ValType::F32 => Val::F32(F32::from(val)),
-                wasmi_core::ValType::F64 => Val::F64(F64::from(val)),
-                _ => return Err(anyhow::anyhow!("Unsupported type {:?}", ty))
-            };
-            Ok((*index, name.clone(), typed_val))
-        })
-        .collect::<Result<Vec<_>>>()?;
+        let locals = local_names
+            .iter().zip(types.iter())
+            .map(
+                |((index, name), ty)| {
+                    let reg = i16::try_from(*index).map(Reg::from)?;
+                    let val = executor.get_register(reg);
+                    let typed_val_display = self.display_valtype_with_value(*ty, val)?;
+                    Ok((*index, name.clone(), typed_val_display))
+                }
+            )
+            .collect::<Result<Vec<_>>>()?;
     
         Ok((*func_idx, func_name, locals))
     }
@@ -648,12 +704,9 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
             let func = funcref.func().unwrap();
             func_idx = func.as_inner().entity_idx.into_usize() as u32;
         } 
-
-        println!("\n\n--------------");
         self.invoked_func_index.push(func_idx);
         
-        println!("invoked_func_index: {:?}", self.invoked_func_index.last());
-        
+        println!("\n\n--------------func index: {:?}", func_idx);
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
             println!("invoke func_name: {:?}", name);
             if self.breakpoints.should_break_func(&name) {

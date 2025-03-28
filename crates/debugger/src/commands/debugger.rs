@@ -59,7 +59,7 @@ pub trait Debugger {
     fn is_running(&self) -> bool;
     fn frame(&self) -> Vec<String>;
     // fn current_frame(&self) -> Option<FunctionFrame>;
-    fn locals(&self) -> Result<(u32, String ,Vec<(u32, String, Val)>)>;
+    fn locals(&self) -> Result<(u32, String ,Vec<(u32, String, String)>)>;
     // fn memory(&self) -> Result<Vec<u8>>;
     // fn store(&self) -> Result<&Store>;
     fn global(&self, name: &str) -> Option<Val>;
