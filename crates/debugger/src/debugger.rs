@@ -13,8 +13,8 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{usize, vec};
-
-
+use crate::heap::display_local_in_heap;
+use crate::breakpoint::Breakpoints;
 use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
@@ -45,6 +45,7 @@ pub struct InstanceWithName {
     pub func_names: HashMap<u32, String>,
     pub global_names: HashMap<u32, String>,
     pub local_names: HashMap<u32, Vec<(u32, String)>>,
+    pub local_dep_names: HashMap<u32, Vec<(u32, String)>>,
 }
 
 pub struct MainDebugger<'engine> {
@@ -61,38 +62,6 @@ pub struct MainDebugger<'engine> {
 
     breakpoints: Breakpoints,
     is_interrupted: Arc<AtomicBool>,
-}
-
-#[derive(Default)]
-struct Breakpoints {
-    function_map: HashMap<String, debugger::Breakpoint>,
-    inst_map: HashMap<usize, debugger::Breakpoint>,
-    inst_in_file_0: Vec<u64>, // instr in file 0 for interrupt in first instr of file 0
-}
-
-impl Breakpoints {
-    fn should_break_func(&self, name: &str) -> bool {
-        // FIXME
-        self.function_map
-            .keys()
-            .any(|k| name.contains(Clone::clone(&k)))
-    }
-
-    fn should_break_inst(&self, inst: u32) -> bool {
-        // self.inst_map.contains_key(&inst.offset)
-        false
-    }
-
-    fn insert(&mut self, breakpoint: debugger::Breakpoint) {
-        match &breakpoint {
-            debugger::Breakpoint::Function { name } => {
-                self.function_map.insert(name.clone(), breakpoint);
-            }
-            debugger::Breakpoint::Instruction { inst_offset } => {
-                self.inst_map.insert(*inst_offset, breakpoint);
-            }
-        }
-    }
 }
 
 impl<'engine> MainDebugger<'engine> {
@@ -286,8 +255,7 @@ impl<'engine> MainDebugger<'engine> {
         Ok(())
     }
 
-    pub fn get_params_locals_types(&self, func_idx: u32) -> Result<Vec<wasmi_core::ValType>> {
-        let mut types = Vec::new();
+    pub fn get_params_locals_types(&self, func_idx: u32, types: &mut Vec<wasmi_core::ValType>) -> Result<u32> {
         let store = get_store();
         let func = self.instance()
             .ok_or_else(|| anyhow::anyhow!("No instance found"))?
@@ -299,6 +267,12 @@ impl<'engine> MainDebugger<'engine> {
             _ => return Err(anyhow!("not support host")),
         };
         let engine_func = wasm_func.func_body();
+        
+        let func_type = func.ty(&store);
+        func_type.params().iter().for_each(|ty| {
+            types.push(ty.clone());
+        });
+        
         self.executor()?
             .borrow()
             .code_map.get(None, engine_func)?
@@ -307,74 +281,66 @@ impl<'engine> MainDebugger<'engine> {
             .for_each(|ty| {
                 types.push(WasmiValueType::from(ty.clone()).into_inner());
             });
+        Ok(func_type.len_params() as u32)
+    }
 
-        let func_type = func.ty(&store);
-        func_type.params().iter().for_each(|ty| {
-            types.push(ty.clone());
-        });
-        Ok(types)
+    pub fn get_display_locals(
+        &self, 
+        local_names: &Vec<(u32, String)>, 
+        types: &Vec<wasmi_core::ValType>, 
+        len_params: u32,
+        local_dep_names: &Vec<(u32, String)>
+    ) -> Result<Vec<(u32, String, wasmi_core::ValType)>> {
+        let mut pushed_locals = Vec::new();
+        let mut ret = Vec::new();
+        for i in 0..len_params {
+            let paras = local_names.get(i as usize).expect("locals may not have params");
+            ret.push((paras.0, paras.1.clone(), types[i as usize].clone()));
+            pushed_locals.push(paras.0);
+        }
+
+        for (idx, name) in local_dep_names.iter() {
+            if !pushed_locals.contains(idx) {
+                ret.push((*idx, name.clone(), types[*idx as usize].clone()));
+            }
+        }
+
+        Ok(ret)
     }
 
     fn display_valtype_with_value(&self, ty: wasmi_core::ValType, value: UntypedVal) -> Result<String> {
-        let typed_val = if value.to_bits() & 1 == 0 {
+        let typed_val_str = if value.to_bits() & 1 == 0 {
             let divided_value = UntypedVal::from(value.to_bits() >> 1);
-            match ty {
+            let typed_val = match ty {
                 wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
                 wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
                 wasmi_core::ValType::F32 => Val::F32(F32::from(divided_value)),
                 wasmi_core::ValType::F64 => Val::F64(F64::from(divided_value)),
                 _ => return Ok(format!("Unsupported type {:?}", ty))
-            }
+            };
+            format!("{:?}", typed_val)
         } else {
             // If LSBit is 1, then it is a pointer into the heap (bignum)
-            let mut ret_val = Vec::<Val>::new();
-            ret_val.push(Val::default(ty));
             match ty {
-                wasmi_core::ValType::F64 => {
-                    if let Some(func) = self.lookup_func_by_name("bigint_to_float64") {
-                        func.call(&mut get_store(), &[Val::F64(F64::from(value))], &mut ret_val)?;
-                    } else {
-                        return Ok(format!("bigint_to_float64 function not found"))
-                    }
-                },
-                wasmi_core::ValType::I32 => {
-                    if let Some(func) = self.lookup_func_by_name("bigint_to_word32_wrap") {
-                        let raw_value = value.to_bits();
-                        println!(
-                            "bigint_to_word32_trap, raw value: 0x{:x}, value: {}", 
-                            raw_value, 
-                            raw_value as i32,
-                            // i32::from(raw_value)
-                        );
-                        func.call(
-                            &mut get_store(), 
-                            &[Val::I32(raw_value as i32)], 
-                            &mut ret_val
-                        )?;
-                    } else {
-                        return Ok(format!("bigint_to_word32_trap function not found"))
-                    }
-                },
-                wasmi_core::ValType::I64 => {
-                    if let Some(func) = self.lookup_func_by_name("bigint_to_word64_trap") {
-                        func.call(&mut get_store(), &[Val::I64(i64::from(value))], &mut ret_val)?;
-                    } else {
-                        return Ok(format!("bigint_to_word64_trap function not found"))
-                    }
-                },
-                wasmi_core::ValType::F32 => {
-                    if let Some(func) = self.lookup_func_by_name("bigint_to_float32_trap") {
-                        func.call(&mut get_store(), &[Val::F32(F32::from(value))], &mut ret_val)?;
-                    } else {
-                        return Ok(format!("bigint_to_float32_trap function not found"))
-                    }
-                },
+                wasmi_core::ValType::F64 
+                | wasmi_core::ValType::I32 
+                | wasmi_core::ValType::I64 
+                | wasmi_core::ValType::F32 
+                => {
+                    display_local_in_heap(
+                        self.executor()?.borrow(), 
+                        &mut get_store(), 
+                        value.to_bits(),
+                       ty,
+                       self.lookup_func_by_name("bigint_to_float64"),
+                       self.lookup_func_by_name("bigint_to_word64_wrap"),
+                       self.lookup_func_by_name("bigint_to_word32_wrap"),
+                    )?
+                }
                 _ => return Ok(format!("Unsupported type {:?}", ty))
             }
-            ret_val[0].clone()
         };
-        println!("typed_val: {:?}", typed_val);
-        Ok(format!("{:?}", typed_val))
+        Ok(typed_val_str)
     }
 
     // fn selected_frame(&self) -> Result<CallFrame> {
@@ -422,6 +388,14 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         self.breakpoints.insert(breakpoint)
     }
 
+    fn list_breakpoints(&self) -> Vec<&debugger::Breakpoint> {
+        self.breakpoints.function_map().values().collect::<Vec<_>>()
+    }
+
+    fn delete_breakpoint(&mut self, id: usize) -> Result<(), anyhow::Error> {
+        self.breakpoints.delete(id)
+    }
+
     fn stack_values(&self) -> Vec<UntypedVal> {
         if self.executor.is_none() {
             return vec![];
@@ -460,13 +434,22 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             .local_names
             .get(func_idx)
             .ok_or_else(|| anyhow::anyhow!("No local names found in func {:?} or index {:?}", func_name, func_idx))?;
+
+        let local_dep_names = self.instance
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No instance found"))?
+            .local_dep_names
+            .get(func_idx)
+            .ok_or_else(|| anyhow::anyhow!("No local dep names found in func {:?} or index {:?}", func_name, func_idx))?;
         
-        let types = self.get_params_locals_types(*func_idx)?;
+        let mut types = Vec::new();
+        let len_params = self.get_params_locals_types(*func_idx, &mut types)?;
+        let locals = self.get_display_locals(local_names, &types, len_params, local_dep_names)?;
         
-        let locals = local_names
-            .iter().zip(types.iter())
+        let ret_locals = locals
+            .iter()
             .map(
-                |((index, name), ty)| {
+                |(index, name, ty)| {
                     let reg = i16::try_from(*index).map(Reg::from)?;
                     let val = executor.get_register(reg);
                     let typed_val_display = self.display_valtype_with_value(*ty, val)?;
@@ -475,7 +458,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             )
             .collect::<Result<Vec<_>>>()?;
     
-        Ok((*func_idx, func_name, locals))
+        Ok((*func_idx, func_name, ret_locals))
     }
 
     fn global(&self, name: &str) -> Option<Val> {
@@ -680,6 +663,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             func_names: module.name_custom_sections().functions.clone(),
             global_names: module.name_custom_sections().globals.clone(),
             local_names: module.name_custom_sections().locals.clone(),
+            local_dep_names: module.name_custom_sections().locals_dep.clone(),
         });
 
         unsafe {
@@ -706,9 +690,9 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         } 
         self.invoked_func_index.push(func_idx);
         
-        println!("\n\n--------------func index: {:?}", func_idx);
+        // println!("\n\n--------------func index: {:?}", func_idx);
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
-            println!("invoke func_name: {:?}", name);
+            // println!("invoke func_name: {:?}", name);
             if self.breakpoints.should_break_func(&name) {
                 Signal::Breakpoint
             } else {

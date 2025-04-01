@@ -2,6 +2,8 @@ pub mod commands;
 mod debugger;
 mod dwarf;
 mod process;
+mod heap;
+mod breakpoint;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -102,6 +104,7 @@ pub fn start_debugger(
         vec![
             Box::new(commands::run::RunCommand::new()),
             Box::new(commands::backtrace::BacktraceCommand::new()),
+            Box::new(commands::breakpoint::AliasBpCommand::new()),
         ],
     )?;
     Ok((process, context))

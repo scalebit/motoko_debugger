@@ -94,12 +94,12 @@ impl ProcessCommand {
 
         match debugger.run(start.as_deref(), args) {
             Ok(RunResult::Finish(values)) => {
-                let output = format!("{:?}", values);
+                let output = format!("finish: {:?}", values);
                 context.printer.println(&output);
                 return Ok(Some(CommandResult::ProcessFinish(values)));
             }
             Ok(RunResult::Breakpoint) => {
-                context.printer.println("Hit breakpoint");
+                context.printer.println("\nHit breakpoint");
             }
             Ok(RunResult::Next) => {}
             Err(msg) => {

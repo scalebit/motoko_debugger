@@ -34,12 +34,14 @@ impl CustomSectionsBuilder {
         &mut self, 
         functions:HashMap<u32, String>, 
         locals:HashMap<u32, Vec<(u32, String)>>, 
-        globals:HashMap<u32, String>
+        globals:HashMap<u32, String>,
+        locals_dep:HashMap<u32, Vec<(u32, String)>>
     ) {
         // std::println!("locals length: {:?}", locals.len());
         self.name_inner.functions = functions;
         self.name_inner.locals = locals;
         self.name_inner.globals = globals;
+        self.name_inner.locals_dep = locals_dep;
     }
 
     /// Finalize construction of the [`CustomSections`].
@@ -58,6 +60,8 @@ pub struct NameSectionInner {
     pub functions: HashMap<u32, String>,
     pub locals: HashMap<u32, Vec<(u32, String)>>,
     pub globals: HashMap<u32, String>,
+    // Remove duplicates and locally introduced variables at compile time.
+    pub locals_dep: HashMap<u32, Vec<(u32, String)>>, // (index, name)
 }
 
 /// Internal representation of [`CustomSections`].

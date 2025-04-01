@@ -498,6 +498,7 @@ impl ModuleParser {
         if reader.name() == "name" {
             let mut func_names = HashMap::new();
             let mut local_names = HashMap::new();
+            let mut local_dep_names = HashMap::new();
             let mut global_names = HashMap::new();
 
             let section =
@@ -508,15 +509,18 @@ impl ModuleParser {
                     std::result::Result::Ok(name) => {
                         match name {
                             wasmparser::Name::Function(naming) => {
-                                println!("\n\nfunction name: ");
                                 collect_nameing(naming, &mut func_names);
                             },
                             wasmparser::Name::Global(naming) => {
-                                println!("\n\nglobal name: ");
                                 collect_nameing(naming, &mut global_names);
                             },
                             wasmparser::Name::Local(indrect_nameing) => {
-                                collect_indrect_nameing(indrect_nameing, &mut local_names, header);
+                                collect_indrect_nameing(
+                                    indrect_nameing, 
+                                    &mut local_names, 
+                                    &mut local_dep_names, 
+                                    header
+                                );
                             }
                             _ => {}
                         }
@@ -524,7 +528,7 @@ impl ModuleParser {
                     Err(_) => {}
                 }
             } 
-            custom_sections.set_name_section(func_names, local_names, global_names);
+            custom_sections.set_name_section(func_names, local_names, global_names, local_dep_names);
         } else {
             custom_sections.push(reader.name(), reader.data());
         }
@@ -560,6 +564,7 @@ fn collect_nameing<'a>(
 fn collect_indrect_nameing<'a>(
     indrect_nameing: wasmparser::SectionLimited<'a, wasmparser::IndirectNaming<'a>>,  
     results: &mut HashMap<u32, Vec<(u32, String)>>,
+    dep_results: &mut HashMap<u32, Vec<(u32, String)>>,
     header: Option<&ModuleHeader>,
 ) {
     let func_imports = if let Some(header) = header {
@@ -569,13 +574,17 @@ fn collect_indrect_nameing<'a>(
     };
     
     for (func_index,item1) in indrect_nameing.into_iter().enumerate() {
-        let mut vec = Vec::new();
+        let mut name_index = std::collections::HashMap::new();
+        let mut name_count = std::collections::HashMap::new();
+        let mut all_vec = Vec::new();
         match item1 {
             std::result::Result::Ok(func_naming) => {
                 for item2 in func_naming.names.into_iter() {
                     match item2 {
                         std::result::Result::Ok(nameing) => {
-                            vec.push((nameing.index, nameing.name.to_string()));
+                            name_index.insert(nameing.name.to_string(), nameing.index);
+                            *name_count.entry(nameing.name.to_string()).or_insert(0) += 1;
+                            all_vec.push((nameing.index, nameing.name.to_string()));
                         }
                         _ => {}
                     }
@@ -583,6 +592,14 @@ fn collect_indrect_nameing<'a>(
             }
             _ => {}
         };
-        results.insert((func_index + func_imports) as u32, vec);
+        results.insert((func_index + func_imports) as u32, all_vec);
+
+        let mut vec = Vec::new();
+        for (name, count) in &name_count {
+            if count == &1 && !name.starts_with("$") {
+                vec.push((name_index[name], name.to_string()));
+            }
+        }
+        dep_results.insert((func_index + func_imports) as u32, vec);
     }
 }

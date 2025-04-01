@@ -37,7 +37,7 @@ impl Executor<'_> {
     }
 
     /// Fetches the bytes of the given `memory`.
-    fn fetch_memory_bytes<'exec, 'store, 'bytes>(
+    pub fn fetch_memory_bytes<'exec, 'store, 'bytes>(
         &'exec self,
         memory: Memory,
         store: &'store StoreInner,

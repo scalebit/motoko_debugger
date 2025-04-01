@@ -991,7 +991,7 @@
     (local.set $idx.6
       (local.get $i))
     (local.tee $array.6)
-    (local.get $idx.6)
+    (local.get $idx.6) 
     (local.set $err_msg.3
       (i32.const 2097311))
     (local.set $idx.7

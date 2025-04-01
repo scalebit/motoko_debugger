@@ -51,7 +51,7 @@ impl<D: Debugger> Command<D> for LocalCommand {
                 let output = format!("{}. function name: {}", func_idx, func_name);
                 context.printer.println(&output);
                 for (index, name, value) in locals.iter() {
-                    let output = format!("  {: <3}. {: <10}: {:?}", index, name, value);
+                    let output = format!("{: <3}. {: <10}: {:?}", index, name, value);
                     context.printer.println(&output);
                 }
             }

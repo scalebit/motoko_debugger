@@ -445,7 +445,7 @@ pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
     for file_entry in header.file_names() {
         let dir = dirs[file_entry.directory_index() as usize].clone();
         let dir_path = Path::new(&dir);
-        let mut path = dir_path.join(clone_string_attribute_with_out_unit(dwarf,  file_entry.path_name())?);
+        let path = dir_path.join(clone_string_attribute_with_out_unit(dwarf,  file_entry.path_name())?);
         files.push(path);
     }
 
@@ -453,9 +453,6 @@ pub fn transform_debug_line_without_debug_info<R: gimli::Reader>(
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
         if let Some(_line) = row.line() {
-            // if row.file_index() == 0 {
-                println!(" file: {:?}, line: {:?}, column: {:?}",  files[0], row.line(), row.column());
-            // }
             sorted_rows.insert(row.address(), *row);
         }
     }
