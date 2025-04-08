@@ -1,3 +1,5 @@
+use std::{print, println};
+
 use super::{Executor, InstructionPtr};
 use crate::{
     core::{TrapCode, UntypedVal},
@@ -113,6 +115,7 @@ impl Executor<'_> {
         value: UntypedVal,
         store_wrap: WasmStoreOp,
     ) -> Result<(), Error> {
+        println!("val: {:?}", value);
         let memory = self.fetch_memory_bytes_mut(memory, store);
         store_wrap(memory, address, offset, value)?;
         Ok(())
@@ -246,6 +249,7 @@ impl Executor<'_> {
         T: From<V> + Into<UntypedVal>,
     {
         let memory = self.fetch_optional_memory();
+        std::println!("store mem: {:?}, {}", memory, address);
         self.execute_store_wrap(
             store,
             memory,

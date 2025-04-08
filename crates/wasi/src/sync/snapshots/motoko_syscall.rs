@@ -117,8 +117,8 @@ macro_rules! add_funcs_to_linker {
                                 };
                                 let(memory, ctx) = memory.data_and_store_mut(&mut caller);
                                 let ctx = wasi_ctx(ctx);
-                                let mut memory = WasmiGuestMemory::Unshared(memory);
-                                match MotokoSyscall::$fname(ctx,  $($arg,)*) {
+                                // let mut memory = WasmiGuestMemory::Unshared(memory);
+                                match MotokoSyscall::$fname(ctx, memory,  $($arg,)*) {
                                     std::result::Result::Ok(r) => Ok(<$ret>::from(r)),
                                     _ => Err(wasmi::Error::new(String::from("error")))
                                 }
@@ -160,6 +160,7 @@ macro_rules! apply_wasi_definitions {
             fn call_simple(a: u32, b: u32, c: u32, d: u32, e: u32, f: u32, g: u32, h: u32, i: u32, j: u32) -> i32; 
             fn call_new(a: u32, b: u32, c: u32, d: u32, e: u32, f: u32, g: u32, h: u32) -> (); 
             fn call_data_append(a: u32, b: u32) -> (); 
+            fn call_with_best_effort_response(timeout_seconds: u32) -> ();
             fn call_on_cleanup(a: u32, b: u32) -> (); 
             fn call_cycles_add(cycles: u64) -> (); 
             fn call_perform() -> i32; 
@@ -185,17 +186,29 @@ macro_rules! apply_wasi_definitions {
             fn data_certificate_copy(a: u32, b: u32, c: u32) -> (); 
             fn canister_status() -> u32; 
             fn mint_cycles(cycles: u64) -> u64;
+            fn mint_cycles128(amount_high: u64, amount_low: u64, dst: u32) -> ();
 
             fn call_cycles_add128(amount_high: u64, amount_low: u64) ->();
             fn canister_cycle_balance128(dst: u32) -> ();
             fn canister_version() -> u64;
             fn is_controller(a: u32, b: u32) -> u32; 
+            fn in_replicated_execution() -> u32;
             fn msg_cycles_accept128(max_amount_high: u64, max_amount_low: u64, dst: u32) -> ();
             fn cycles_burn128(amount_high: u64, amount_low: u64, dst: u32) -> ();
             fn msg_deadline() -> u64;
             fn performance_counter(counter_type: u32) -> u64;
             fn time() -> u64;
             fn global_timer_set(timestamp: u64) -> u64;
+
+            fn cost_call(method_name_size: u64, payload_size: u64, dst: u32) -> ();
+            fn cost_create_canister(dst: u32) -> ();
+            fn cost_http_request(request_size: u64, max_res_bytes: u64, dst: u32) -> ();
+            fn cost_sign_with_ecdsa(src: u32, size: u32, ecdsa_curve: u32, dst: u32) -> u32;
+            fn cost_sign_with_schnorr(src: u32, size: u32, algorithm: u32, dst: u32) -> u32;
+            fn cost_vetkd_derive_key(src: u32, size: u32, vetkd_curve: u32, dst: u32) -> u32;
+
+            fn subnet_self_copy(dst: u32, offset: u32, size: u32) -> ();
+            fn subnet_self_size() -> u32;
         }
     };
 }
@@ -205,297 +218,386 @@ apply_wasi_definitions!(add_funcs_to_linker, LinkerBuilder<Constructing, T>);
 
 
 pub trait MotokoSyscall {
-    fn msg_caller_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn msg_caller_size(&self) -> HypervisorResult<u32>; 
-    fn msg_arg_data_size(&self) -> HypervisorResult<u32>; 
-    fn msg_arg_data_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn msg_method_name_size(&self) -> HypervisorResult<u32>; 
-    fn msg_method_name_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn accept_message(&mut self) -> HypervisorResult<()>; 
-    fn msg_reply_data_append(&mut self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn msg_reply(&mut self) -> HypervisorResult<()>; 
-    fn msg_reject_code(&self) -> HypervisorResult<i32>; 
-    fn msg_reject(&mut self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn msg_reject_msg_size(&self) -> HypervisorResult<u32>; 
-    fn msg_reject_msg_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn canister_self_size(&self) -> HypervisorResult<i32>; 
-    fn canister_self_copy(&mut self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn controller_size(&self) -> HypervisorResult<i32>; 
-    fn controller_copy(&mut self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn debug_print(&self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn trap(&self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn call_simple(&mut self, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<i32>; 
-    fn call_new(&mut self, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn call_data_append(&mut self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn call_on_cleanup(&mut self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn call_cycles_add(&mut self, _: u64) -> HypervisorResult<()>; 
-    fn call_perform(&mut self) -> HypervisorResult<i32>; 
-    fn stable_size(&self) -> HypervisorResult<u32>; 
-    fn stable_grow(&mut self, _: u32) -> HypervisorResult<i32>; 
-    fn stable_read(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn stable_write(&mut self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn stable64_size(&self) -> HypervisorResult<u64>; 
-    fn stable64_grow(&mut self, _: u64) -> HypervisorResult<i64>; 
-    fn stable64_read(&self, _: u64, _: u64, _: u64) -> HypervisorResult<()>; 
-    fn stable64_write(&mut self, _: u64, _: u64, _: u64) -> HypervisorResult<()>; 
-    fn update_available_memory(&mut self, _: i32, _: u32) -> HypervisorResult<i32>; 
-    fn canister_cycle_balance(&self) -> HypervisorResult<u64>; 
-    fn canister_cycles_balance128(&self, _: u32) -> HypervisorResult<()>; 
-    fn msg_cycles_available(&self) -> HypervisorResult<u64>; 
-    fn msg_cycles_available128(&self, _: u32) -> HypervisorResult<()>; 
-    fn msg_cycles_refunded(&self) -> HypervisorResult<u64>; 
-    fn msg_cycles_refunded128(&self, _: u32) -> HypervisorResult<()>; 
-    fn msg_cycles_accept(&mut self, _: u64) -> HypervisorResult<u64>; 
-    fn certified_data_set(&mut self, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn data_certificate_present(&self) -> HypervisorResult<i32>; 
-    fn data_certificate_size(&self) -> HypervisorResult<i32>; 
-    fn data_certificate_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
-    fn canister_status(&self) -> HypervisorResult<u32>; 
-    fn mint_cycles(&self, cycles: u64) -> HypervisorResult<u64>;
+    fn msg_caller_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn msg_caller_size(&self, memory: &mut [u8]) -> HypervisorResult<u32>; 
+    fn msg_arg_data_size(&self, memory: &mut [u8]) -> HypervisorResult<u32>; 
+    fn msg_arg_data_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn msg_method_name_size(&self, memory: &mut [u8]) -> HypervisorResult<u32>; 
+    fn msg_method_name_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn accept_message(&mut self, memory: &mut [u8]) -> HypervisorResult<()>; 
+    fn msg_reply_data_append(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn msg_reply(&mut self, memory: &mut [u8]) -> HypervisorResult<()>; 
+    fn msg_reject_code(&self, memory: &mut [u8]) -> HypervisorResult<i32>; 
+    fn msg_reject(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn msg_reject_msg_size(&self, memory: &mut [u8]) -> HypervisorResult<u32>; 
+    fn msg_reject_msg_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn canister_self_size(&self, memory: &mut [u8]) -> HypervisorResult<i32>; 
+    fn canister_self_copy(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn controller_size(&self, memory: &mut [u8]) -> HypervisorResult<i32>; 
+    fn controller_copy(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn debug_print(&self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn trap(&self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn call_simple(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<i32>; 
+    fn call_new(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn call_data_append(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn call_with_best_effort_response(&mut self, memory: &mut [u8], _: u32) -> HypervisorResult<()>;
+    fn call_on_cleanup(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn call_cycles_add(&mut self, memory: &mut [u8], _: u64) -> HypervisorResult<()>; 
+    fn call_perform(&mut self, memory: &mut [u8]) -> HypervisorResult<i32>; 
+    fn stable_size(&self, memory: &mut [u8]) -> HypervisorResult<u32>; 
+    fn stable_grow(&mut self, memory: &mut [u8], _: u32) -> HypervisorResult<i32>; 
+    fn stable_read(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn stable_write(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn stable64_size(&self, memory: &mut [u8]) -> HypervisorResult<u64>; 
+    fn stable64_grow(&mut self, memory: &mut [u8], _: u64) -> HypervisorResult<i64>; 
+    fn stable64_read(&self, memory: &mut [u8], _: u64, _: u64, _: u64) -> HypervisorResult<()>; 
+    fn stable64_write(&mut self, memory: &mut [u8], _: u64, _: u64, _: u64) -> HypervisorResult<()>; 
+    fn update_available_memory(&mut self, memory: &mut [u8], _: i32, _: u32) -> HypervisorResult<i32>; 
+    fn canister_cycle_balance(&self, memory: &mut [u8]) -> HypervisorResult<u64>; 
+    fn canister_cycles_balance128(&self, memory: &mut [u8], _: u32) -> HypervisorResult<()>; 
+    fn msg_cycles_available(&self, memory: &mut [u8]) -> HypervisorResult<u64>; 
+    fn msg_cycles_available128(&self, memory: &mut [u8], _: u32) -> HypervisorResult<()>; 
+    fn msg_cycles_refunded(&self, memory: &mut [u8]) -> HypervisorResult<u64>; 
+    fn msg_cycles_refunded128(&self, memory: &mut [u8], _: u32) -> HypervisorResult<()>; 
+    fn msg_cycles_accept(&mut self, memory: &mut [u8], _: u64) -> HypervisorResult<u64>; 
+    fn certified_data_set(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()>; 
+    fn data_certificate_present(&self, memory: &mut [u8]) -> HypervisorResult<i32>; 
+    fn data_certificate_size(&self, memory: &mut [u8]) -> HypervisorResult<i32>; 
+    fn data_certificate_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()>; 
+    fn canister_status(&self, memory: &mut [u8]) -> HypervisorResult<u32>; 
+    fn mint_cycles(&self, memory: &mut [u8], cycles: u64) -> HypervisorResult<u64>;
+    fn mint_cycles128(&self, memory: &mut [u8], amount_high: u64, amount_low: u64, dst: u32) -> HypervisorResult<()>;
 
-    fn call_cycles_add128(&mut self, amount_high: u64, amount_low: u64) -> HypervisorResult<()>;
-    fn canister_cycle_balance128(&mut self, dst: u32) -> HypervisorResult<()>;
-    fn canister_version(&self) -> HypervisorResult<u64>;
-    fn is_controller(&self, a: u32, b: u32) -> HypervisorResult<u32>;
-    fn msg_cycles_accept128(&mut self, max_amount_high: u64, max_amount_low: u64, dst: u32) -> HypervisorResult<()>;
-    fn cycles_burn128(&mut self, amount_high: u64, amount_low: u64, dst: u32) -> HypervisorResult<()>;
-    fn msg_deadline(&self) -> HypervisorResult<u64>;
-    fn performance_counter(&self, counter_type: u32) -> HypervisorResult<u64>;
-    fn time(&self) -> HypervisorResult<u64>;
-    fn global_timer_set(&mut self, timestamp: u64) -> HypervisorResult<u64>;
-    // fn call_cycles_add128(&mut self, _: Cycles) -> HypervisorResult<()>;
-    // fn msg_cycles_accept128(&mut self, _: Cycles, _: u32, _: &mut [u8]) -> HypervisorResult<()>;
-    // fn time(&self) -> HypervisorResult<Time>;
-    // fn out_of_instructions(&self, _num_instruction_left: NumInstructions) -> Result<NumInstructions, HypervisorError>;
+    fn call_cycles_add128(&mut self, memory: &mut [u8], amount_high: u64, amount_low: u64) -> HypervisorResult<()>;
+    fn canister_cycle_balance128(&mut self, memory: &mut [u8], dst: u32) -> HypervisorResult<()>;
+    fn canister_version(&self, memory: &mut [u8]) -> HypervisorResult<u64>;
+    fn is_controller(&self, memory: &mut [u8], a: u32, b: u32) -> HypervisorResult<u32>;
+    fn in_replicated_execution(&self, memory: &mut [u8]) -> HypervisorResult<u32>;
+    fn msg_cycles_accept128(&mut self, memory: &mut [u8], max_amount_high: u64, max_amount_low: u64, dst: u32) -> HypervisorResult<()>;
+    fn cycles_burn128(&mut self, memory: &mut [u8], amount_high: u64, amount_low: u64, dst: u32) -> HypervisorResult<()>;
+    fn msg_deadline(&self, memory: &mut [u8]) -> HypervisorResult<u64>;
+    fn performance_counter(&self, memory: &mut [u8], counter_type: u32) -> HypervisorResult<u64>;
+    fn time(&self, memory: &mut [u8]) -> HypervisorResult<u64>;
+    fn global_timer_set(&mut self, memory: &mut [u8], timestamp: u64) -> HypervisorResult<u64>;
+
+    fn cost_call(&mut self, memory: &mut [u8], method_name_size: u64, payload_size: u64, dst: u32) -> HypervisorResult<()>;
+    fn cost_create_canister(&mut self, memory: &mut [u8], dst: u32) -> HypervisorResult<()>;
+    fn cost_http_request(&mut self, memory: &mut [u8], request_size: u64, max_res_bytes: u64, dst: u32) -> HypervisorResult<()>;
+    fn cost_sign_with_ecdsa(&mut self, memory: &mut [u8], src: u32, size: u32, ecdsa_curve: u32, dst: u32) -> HypervisorResult<u32>;
+    fn cost_sign_with_schnorr(&mut self, memory: &mut [u8], src: u32, size: u32, algorithm: u32, dst: u32) -> HypervisorResult<u32>;
+    fn cost_vetkd_derive_key(&mut self, memory: &mut [u8], src: u32, size: u32, vetkd_curve: u32, dst: u32) -> HypervisorResult<u32>;
     
+    fn subnet_self_copy(&self, memory: &mut [u8], dst: u32, offset: u32, size: u32) -> HypervisorResult<()>;
+    fn subnet_self_size(&self, memory: &mut [u8]) -> HypervisorResult<u32>;
+
 }
+
 
 impl MotokoSyscall for WasiCtx {
-    fn msg_caller_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn msg_caller_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_caller_size(&self) -> HypervisorResult<u32> {
+    fn msg_caller_size(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
         Ok(0)
     }
     
-    fn msg_arg_data_size(&self) -> HypervisorResult<u32> {
+    fn msg_arg_data_size(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
         Ok(0)
     }
     
-    fn msg_arg_data_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn msg_arg_data_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_method_name_size(&self) -> HypervisorResult<u32> {
+    fn msg_method_name_size(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
         Ok(0)
     }
     
-    fn msg_method_name_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn msg_method_name_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn accept_message(&mut self) -> HypervisorResult<()> {
+    fn accept_message(&mut self, memory: &mut [u8]) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_reply_data_append(&mut self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn msg_reply_data_append(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_reply(&mut self) -> HypervisorResult<()> {
+    fn msg_reply(&mut self, memory: &mut [u8]) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_reject_code(&self) -> HypervisorResult<i32> {
+    fn msg_reject_code(&self, memory: &mut [u8]) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn msg_reject(&mut self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn msg_reject(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_reject_msg_size(&self) -> HypervisorResult<u32> {
+    fn msg_reject_msg_size(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
         Ok(0)
     }
     
-    fn msg_reject_msg_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn msg_reject_msg_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn canister_self_size(&self) -> HypervisorResult<i32> {
+    fn canister_self_size(&self, memory: &mut [u8]) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn canister_self_copy(&mut self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn canister_self_copy(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn controller_size(&self) -> HypervisorResult<i32> {
+    fn controller_size(&self, memory: &mut [u8]) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn controller_copy(&mut self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn controller_copy(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn debug_print(&self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn debug_print(&self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn trap(&self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn trap(&self, memory: &mut [u8], str: u32, len: u32) -> HypervisorResult<()> {
+        const MAX_ERROR_MESSAGE_SIZE: usize = 16 * 1024;
+        let size = len  as usize;
+        let src = str as usize;
+        let size = size.min(MAX_ERROR_MESSAGE_SIZE);
+        let result = std::str::from_utf8(&memory[src..src + size]);
+        println!("result: {:?}", result);
+        // Err(result)
         Ok(())
     }
     
-    fn call_simple(&mut self, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<i32> {
+    fn call_simple(&mut self, memory: &mut [u8], _: u32,_: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn call_new(&mut self, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn call_new(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn call_data_append(&mut self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn call_with_best_effort_response(&mut self, memory: &mut [u8], _: u32) -> HypervisorResult<()> {
+        Ok(())
+    }
+
+    fn call_data_append(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn call_on_cleanup(&mut self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn call_on_cleanup(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn call_cycles_add(&mut self, _: u64) -> HypervisorResult<()> {
+    fn call_cycles_add(&mut self, memory: &mut [u8], _: u64) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn call_perform(&mut self) -> HypervisorResult<i32> {
+    fn call_perform(&mut self, memory: &mut [u8]) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn stable_size(&self) -> HypervisorResult<u32> {
+    fn stable_size(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
         Ok(0)
     }
     
-    fn stable_grow(&mut self, _: u32) -> HypervisorResult<i32> {
+    fn stable_grow(&mut self, memory: &mut [u8], _: u32) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn stable_read(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn stable_read(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn stable_write(&mut self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn stable_write(&mut self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn stable64_size(&self) -> HypervisorResult<u64> {
+    fn stable64_size(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
     
-    fn stable64_grow(&mut self, _: u64) -> HypervisorResult<i64> {
+    fn stable64_grow(&mut self, memory: &mut [u8], _: u64) -> HypervisorResult<i64> {
         Ok(0)
     }
     
-    fn stable64_read(&self, _: u64, _: u64, _: u64) -> HypervisorResult<()> {
+    fn stable64_read(&self, memory: &mut [u8], _: u64, _: u64, _: u64) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn stable64_write(&mut self, _: u64, _: u64, _: u64) -> HypervisorResult<()> {
+    fn stable64_write(&mut self, memory: &mut [u8], _: u64, _: u64, _: u64) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn update_available_memory(&mut self, _: i32, _: u32) -> HypervisorResult<i32> {
+    fn update_available_memory(&mut self, memory: &mut [u8], _: i32, _: u32) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn canister_cycle_balance(&self) -> HypervisorResult<u64> {
+    fn canister_cycle_balance(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
     
-    fn canister_cycles_balance128(&self, _: u32) -> HypervisorResult<()> {
+    fn canister_cycles_balance128(&self, memory: &mut [u8], _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_cycles_available(&self) -> HypervisorResult<u64> {
+    fn msg_cycles_available(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
     
-    fn msg_cycles_available128(&self, _: u32) -> HypervisorResult<()> {
+    fn msg_cycles_available128(&self, memory: &mut [u8], _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_cycles_refunded(&self) -> HypervisorResult<u64> {
+    fn msg_cycles_refunded(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
     
-    fn msg_cycles_refunded128(&self, _: u32) -> HypervisorResult<()> {
+    fn msg_cycles_refunded128(&self, memory: &mut [u8], _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn msg_cycles_accept(&mut self, _: u64) -> HypervisorResult<u64> {
+    fn msg_cycles_accept(&mut self, memory: &mut [u8], _: u64) -> HypervisorResult<u64> {
         Ok(0)
     }
     
-    fn certified_data_set(&mut self, _: u32, _: u32) -> HypervisorResult<()> {
+    fn certified_data_set(&mut self, memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn data_certificate_present(&self) -> HypervisorResult<i32> {
+    fn data_certificate_present(&self, memory: &mut [u8]) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn data_certificate_size(&self) -> HypervisorResult<i32> {
+    fn data_certificate_size(&self, memory: &mut [u8]) -> HypervisorResult<i32> {
         Ok(0)
     }
     
-    fn data_certificate_copy(&self, _: u32, _: u32, _: u32) -> HypervisorResult<()> {
+    fn data_certificate_copy(&self, memory: &mut [u8], _: u32, _: u32, _: u32) -> HypervisorResult<()> {
         Ok(())
     }
     
-    fn canister_status(&self) -> HypervisorResult<u32> {
+    fn canister_status(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
         Ok(0)
     }
     
-    fn mint_cycles(&self, cycles: u64) -> HypervisorResult<u64> {
+    fn mint_cycles(&self, memory: &mut [u8], cycles: u64) -> HypervisorResult<u64> {
         Ok(cycles) // Returning the input value as a placeholder
     }
+
+    fn mint_cycles128(&self, memory: &mut [u8], amount_high: u64, amount_low: u64, dst: u32) -> HypervisorResult<()> {
+        Ok(())
+    }
     
-    fn call_cycles_add128(&mut self, amount_high: u64, amount_low: u64) -> HypervisorResult<()> {
+    fn call_cycles_add128(&mut self, memory: &mut [u8], amount_high: u64, amount_low: u64) -> HypervisorResult<()> {
         Ok(())
     }
 
-    fn canister_cycle_balance128(&mut self, dst: u32) -> HypervisorResult<()> {
+    fn canister_cycle_balance128(&mut self, memory: &mut [u8], dst: u32) -> HypervisorResult<()> {
         Ok(())
     }
 
-    fn canister_version(&self) -> HypervisorResult<u64> {
+    fn canister_version(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
 
-    fn is_controller(&self, a: u32, b: u32) -> HypervisorResult<u32> {
+    fn is_controller(&self, memory: &mut [u8], a: u32, b: u32) -> HypervisorResult<u32> {
         Ok(0)
     }
 
-    fn msg_cycles_accept128(&mut self, max_amount_high: u64, max_amount_low: u64, dst: u32) -> HypervisorResult<()> {
+    fn in_replicated_execution(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
+        Ok(0)
+    }
+
+    fn msg_cycles_accept128(&mut self, memory: &mut [u8], max_amount_high: u64, max_amount_low: u64, dst: u32) -> HypervisorResult<()> {
         Ok(())
     }
 
-    fn cycles_burn128(&mut self, amount_high: u64, amount_low: u64, dst: u32) -> HypervisorResult<()> {
+    fn cycles_burn128(&mut self, memory: &mut [u8], amount_high: u64, amount_low: u64, dst: u32) -> HypervisorResult<()> {
         Ok(())
     }
 
-    fn msg_deadline(&self) -> HypervisorResult<u64> {
+    fn msg_deadline(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
 
-    fn performance_counter(&self, counter_type: u32) -> HypervisorResult<u64> {
+    fn performance_counter(&self, memory: &mut [u8], counter_type: u32) -> HypervisorResult<u64> {
         Ok(0)
     }
 
-    fn time(&self) -> HypervisorResult<u64> {
+    fn time(&self, memory: &mut [u8]) -> HypervisorResult<u64> {
         Ok(0)
     }
 
-    fn global_timer_set(&mut self, timestamp: u64) -> HypervisorResult<u64> {
+    fn global_timer_set(&mut self, memory: &mut [u8], timestamp: u64) -> HypervisorResult<u64> {
         Ok(timestamp)
     }
+
+    fn cost_call(&mut self, memory: &mut [u8], method_name_size: u64, payload_size: u64, dst: u32) -> HypervisorResult<()> {
+        Ok(())
+    }
+
+    fn cost_create_canister(&mut self, memory: &mut [u8], dst: u32) -> HypervisorResult<()> {
+        Ok(())
+    }
+
+    fn cost_http_request(&mut self, memory: &mut [u8], request_size: u64, max_res_bytes: u64, dst: u32) -> HypervisorResult<()> {
+        Ok(())
+    }
+
+    fn cost_sign_with_ecdsa(&mut self, memory: &mut [u8], src: u32, size: u32, ecdsa_curve: u32, dst: u32) -> HypervisorResult<u32> {
+        Ok(0)
+    }   
+
+    fn cost_sign_with_schnorr(&mut self, memory: &mut [u8], src: u32, size: u32, algorithm: u32, dst: u32) -> HypervisorResult<u32> {
+        Ok(0)
+    }
+
+    fn cost_vetkd_derive_key(&mut self, memory: &mut [u8], src: u32, size: u32, vetkd_curve: u32, dst: u32) -> HypervisorResult<u32> {
+        Ok(0)
+    }
+
+    fn subnet_self_copy(&self, memory: &mut [u8], dst: u32, offset: u32, size: u32) -> HypervisorResult<()> {
+        Ok(())
+    }
+
+    fn subnet_self_size(&self, memory: &mut [u8]) -> HypervisorResult<u32> {
+        Ok(0)
+    }
+
 }
+
+
+
+#[derive(Copy, Clone)]
+pub struct InternalAddress(usize);
+
+impl InternalAddress {
+    pub fn new(value: usize) -> Self {
+        Self(value)
+    }
+    pub fn get(&self) -> usize {
+        self.0
+    }
+    pub fn checked_add(self, rhs: Self) -> Result<InternalAddress, String> {
+        self.get()
+            .checked_add(rhs.get())
+            .map(InternalAddress::new)
+            .ok_or_else(|| "Invalid InternalAddress.".to_string())
+    }
+    pub fn checked_sub(self, rhs: Self) -> Result<InternalAddress, String> {
+        self.get()
+            .checked_sub(rhs.get())
+            .map(InternalAddress::new)
+            .ok_or_else(|| "Invalid InternalAddress.".to_string())
+    }
+}
+

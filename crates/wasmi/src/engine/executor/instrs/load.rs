@@ -1,3 +1,5 @@
+use std::println;
+
 use super::Executor;
 use crate::{
     core::{TrapCode, UntypedVal},
@@ -144,6 +146,7 @@ impl Executor<'_> {
         load_extend: WasmLoadOp,
     ) -> Result<(), Error> {
         let memory = self.fetch_optional_memory();
+        println!("mem: {:?}", memory);
         let offset = address;
         self.execute_load_extend(
             store,

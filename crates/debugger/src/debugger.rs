@@ -690,9 +690,9 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         } 
         self.invoked_func_index.push(func_idx);
         
-        // println!("\n\n--------------func index: {:?}", func_idx);
+        println!("\n\n--------------func index: {:?}", func_idx);
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
-            // println!("invoke func_name: {:?}", name);
+            println!("invoke func_name: {:?}", name);
             if self.breakpoints.should_break_func(&name) {
                 Signal::Breakpoint
             } else {
@@ -715,9 +715,11 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         // if self.is_interrupted.load(Ordering::SeqCst) && self.breakpoints.inst_in_file_0.contains(&(instr_offset as u64)) {
         //     self.is_interrupted.store(false, Ordering::SeqCst);
         //     Signal::Breakpoint
-        // } else if self.breakpoints.should_break_inst(instr_offset) {
-        //     Signal::Breakpoint
-        // } else {
+        // } 
+        // // else if self.breakpoints.should_break_inst(instr_offset) {
+        // //     Signal::Breakpoint
+        // // } 
+        // else {
         //     Signal::Next
         // }
         Signal::Next
