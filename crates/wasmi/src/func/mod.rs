@@ -20,7 +20,7 @@ use super::{
 };
 use crate::{
     collections::arena::ArenaIndex,
-    engine::{executor::instrs::Signal, ResumableCall},
+    engine::ResumableCall,
     Engine, Error, Val,
 };
 use core::{fmt, fmt::Debug, num::NonZeroU32};

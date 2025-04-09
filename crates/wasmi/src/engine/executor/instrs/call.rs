@@ -1,5 +1,3 @@
-use wasmi_collections::arena::ArenaIndex;
-
 use super::{Executor, InstructionPtr};
 use crate::{
     core::TrapCode,
@@ -15,7 +13,7 @@ use crate::{
     CallHook, Error, Func, FuncRef, Instance, Store,
 };
 use core::array;
-use std::{fmt, println};
+use std::fmt;
 
 /// Dispatches and executes the host function.
 ///

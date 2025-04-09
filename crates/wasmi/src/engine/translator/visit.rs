@@ -1097,7 +1097,7 @@ impl<'a> VisitOperator<'a> for FuncTranslator {
             Instruction::i32_eq,
             Instruction::i32_eq_imm16,
             TypedVal::i32_eq,
-            |this, instr_offset: usize, lhs: Reg, rhs: Reg| {
+            |this, _instr_offset: usize, lhs: Reg, rhs: Reg| {
                 if lhs == rhs {
                     // Optimization: `x == x` is always `true`
                     this.alloc.stack.push_const(true);

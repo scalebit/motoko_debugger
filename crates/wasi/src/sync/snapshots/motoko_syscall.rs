@@ -1,9 +1,9 @@
-use crate::WasmiGuestMemory;
+
 use std::{
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
 };
-use wasi_common::{snapshots::preview_0::wasi_unstable::WasiUnstable, Error, WasiCtx};
+use wasi_common::{Error, WasiCtx};
 use wasmi::{state::Constructing, Caller, Extern, Linker, LinkerBuilder};
 // use wiggle::{anyhow::Ok, GuestMemory};
 type HypervisorResult<T> = Result<T, wasmi::Error>;

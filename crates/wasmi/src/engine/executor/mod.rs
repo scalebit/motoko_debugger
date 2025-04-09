@@ -1,5 +1,3 @@
-use instrs::Signal;
-
 pub use self::instrs::ResumableHostError;
 pub use self::stack::Stack;
 use self::{

@@ -1,4 +1,4 @@
-use std::{print, println};
+use std::println;
 
 use super::{Executor, InstructionPtr};
 use crate::{

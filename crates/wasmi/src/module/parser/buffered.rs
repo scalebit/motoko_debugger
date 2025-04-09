@@ -1,10 +1,9 @@
-use std::{eprintln, println};
 
 use super::{
     CustomSectionsBuilder, ModuleBuilder, ModuleHeader, ModuleHeaderBuilder, ModuleParser,
 };
 use crate::{Error, Module};
-use wasmparser::{Chunk, NameSectionReader, Payload, Validator};
+use wasmparser::{Chunk, Payload, Validator};
 
 impl ModuleParser {
     /// Starts parsing and validating the Wasm bytecode stream.
@@ -147,9 +146,6 @@ impl ModuleParser {
                 }
                 Payload::CustomSection(reader) => {
                     self.process_custom_section(custom_sections, None, reader)
-                }
-                _ => {
-                    Ok(())
                 }
                 unexpected => self.process_invalid_payload(unexpected),
             }?;

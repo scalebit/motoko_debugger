@@ -43,13 +43,11 @@ pub use self::{
 use crate::{
     collections::arena::{ArenaIndex, GuardedEntity},
     module::{FuncIdx, ModuleHeader},
-    AsContextMut, Error, Func, FuncType, StoreContextMut,
+    Error, Func, FuncType, StoreContextMut,
 };
 use core::sync::atomic::{AtomicU32, Ordering};
-use executor::instrs::Signal;
 use spin::{Mutex, RwLock};
 use std::{
-    eprintln,
     sync::{Arc, Weak},
     vec::Vec,
 };

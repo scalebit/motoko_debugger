@@ -727,15 +727,16 @@ pub fn get_store() -> &'static mut Store<WasiCtx> {
     // SAFETY: Within Wasm bytecode execution we are guaranteed by
     //         Wasm validation and Wasmi codegen to never run out
     //         of valid bounds using this method.
-    #[allow(unsafe_code)]
+    #[allow(static_mut_refs)]
     unsafe { WASM_STORE.as_mut().unwrap() }
 }
+
 
 pub fn get_engine() -> &'static mut Engine {
     // SAFETY: Within Wasm bytecode execution we are guaranteed by
     //         Wasm validation and Wasmi codegen to never run out
     //         of valid bounds using this method.
-    #[allow(unsafe_code)]
+    #[allow(static_mut_refs)]
     unsafe { WASM_ENGINE.as_mut().unwrap() }
 }
 
@@ -743,6 +744,7 @@ pub fn get_stack() -> &'static mut Stack {
     // SAFETY: Within Wasm bytecode execution we are guaranteed by
     //         Wasm validation and Wasmi codegen to never run out
     //         of valid bounds using this method.
+    #[allow(static_mut_refs)]
     unsafe { WASM_STACK.as_mut().unwrap() }
 }
 

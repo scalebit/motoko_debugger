@@ -103,7 +103,7 @@ macro_rules! define_enum {
 for_each_op::for_each_op!(define_enum);
 
 use wasmi_inst_macro::*;
-use wasmparser::{for_each_operator, BrTable, OperatorsReader};
+use wasmparser::{for_each_operator, BrTable};
 
 #[derive(Debug, Clone)]
 pub struct BrTableData {

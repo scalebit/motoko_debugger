@@ -1,4 +1,4 @@
-use wasmi_collections::arena::ArenaIndex;
+
 
 use super::{err_stack_overflow, BaseValueStackOffset, FrameValueStackOffset};
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     ir::RegSpan,
     Instance,
 };
-use std::{boxed::Box, vec::Vec};
+use std::vec::Vec;
 
 #[cfg(doc)]
 use crate::{

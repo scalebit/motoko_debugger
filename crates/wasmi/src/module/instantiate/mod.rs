@@ -4,8 +4,6 @@ mod pre;
 #[cfg(test)]
 mod tests;
 
-use std::println;
-
 pub use self::{error::InstantiationError, pre::InstancePre};
 use super::{element::ElementSegmentKind, export, ConstExpr, InitDataSegment, Module};
 use crate::{

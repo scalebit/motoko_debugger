@@ -1,7 +1,5 @@
 use std::println;
 
-use wasmi_collections::arena::ArenaIndex;
-
 pub use self::call::{dispatch_host_func, ResumableHostError};
 use super::{cache::CachedInstance, InstructionPtr, Stack};
 use crate::{
@@ -1794,7 +1792,7 @@ impl<'engine> Executor<'engine> {
                 self.execute_call_internal_0(&mut store.inner, results, EngineFunc::from(func))?
             }
             Instr::CallInternal { instr_offset: _,results, func } => {
-                *call_idx = u32::from(func).try_into().unwrap_or_default();;
+                *call_idx = u32::from(func).try_into().unwrap_or_default();
                 *call_idx += import_func_len as i32;
                 self.execute_call_internal(&mut store.inner, results, EngineFunc::from(func))?
             }
@@ -2044,7 +2042,7 @@ impl<'engine> Executor<'engine> {
                 self.execute_i32_store_at(&mut store.inner, address, value)?;
                 println!("i32 store at {}: {:?}", address, self.get_register(value));
             }
-            Instr::I32StoreAtImm16 { instr_offset, address, value } => {
+            Instr::I32StoreAtImm16 { instr_offset: _, address, value } => {
                 self.execute_i32_store_at_imm16(&mut store.inner, address, value)?;
                 println!("i32 store at imm16 {}: {:?}", address, value);
             }

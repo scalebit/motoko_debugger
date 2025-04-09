@@ -1,5 +1,3 @@
-use std::{eprintln, println};
-
 use crate::{
     engine::{code_map::CompiledFuncEntity, WasmTranslator},
     Error,

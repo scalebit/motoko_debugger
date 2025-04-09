@@ -144,7 +144,7 @@ macro_rules! impl_host_visitor {
             fn host_visitor<V: VisitRegs>(self, visitor: &mut V) {
                 match self {
                     $(
-                        Instruction::$name { instr_offset, $( $( $result_name, )? $( $field_name, )* )? } => {
+                        Instruction::$name { instr_offset: _, $( $( $result_name, )? $( $field_name, )* )? } => {
                             $(
                                 $( Res($result_name).host_visitor(visitor); )?
                                 $( $field_name.host_visitor(visitor); )*

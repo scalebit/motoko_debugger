@@ -10,7 +10,7 @@ use crate::{
     Engine, Error, FuncType, MemoryType, TableType,
 };
 use core::ops::Range;
-use std::{boxed::Box, collections::HashMap, println, string::{String, ToString}, vec::{self, Vec}};
+use std::{boxed::Box, collections::HashMap, string::{String, ToString}, vec::Vec};
 use wasmparser::{
     CustomSectionReader, DataSectionReader, ElementSectionReader, Encoding, ExportSectionReader,
     FunctionBody, FunctionSectionReader, GlobalSectionReader, ImportSectionReader,
