@@ -32,6 +32,7 @@ impl<D: Debugger> Command<D> for FrameCommand {
         "Commands for selecting current stack frame."
     }
 
+    #[allow(unused)]
     fn run(
         &self,
         debugger: &mut D,

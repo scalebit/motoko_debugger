@@ -23,7 +23,6 @@
 
 use std::cell::Ref;
 use anyhow::Error;
-use linefeed::memory;
 use wasmi::{engine::executor::instrs::Executor, Func, Store, Val};
 use wasmi_core::{UntypedVal, F64};
 use wasmi_wasi::WasiCtx;

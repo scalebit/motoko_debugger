@@ -1,13 +1,11 @@
 use anyhow::Error;
 use anyhow::Result;
 
-// use wasminspect_vm::{HostValue, Instruction, ModuleIndex, Signal, Store, WasmValue};
 use wasmi::{
-    engine::executor::instrs::{ModuleIndex, Signal},
+    engine::executor::instrs::ModuleIndex,
     Val,
 };
 use wasmi_core::UntypedVal;
-// use wasmi::{Val, engine::executor::instrs::{Signal, ExecResult, ModuleIndex, Executor, Interceptor}};
 
 #[derive(Default, Clone)]
 pub struct DebuggerOpts {

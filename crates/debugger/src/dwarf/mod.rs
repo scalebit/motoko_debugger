@@ -26,7 +26,7 @@ pub fn parse_dwarf(module: &[u8]) -> Result<Dwarf> {
             _ => continue,
         }
     }
-    let try_get = |key: &str| sections.get(key).with_context(|| format!("no {}", key));
+    let _try_get = |key: &str| sections.get(key).with_context(|| format!("no {}", key));
     let endian = LittleEndian;
     let debug_str = match sections.get(".debug_str") {
         Some(section) => DebugStr::from(EndianSlice::new(section, endian)),
@@ -140,7 +140,7 @@ enum VariableContent<R: gimli::Reader> {
 
 #[derive(Debug)]
 pub struct Subroutine<Offset> {
-    pub name: Option<String>,
+    // pub name: Option<String>,
     pub pc: std::ops::Range<u64>,
     pub entry_offset: UnitOffset<Offset>,
     pub unit_offset: DebugInfoOffset<Offset>,
@@ -208,7 +208,7 @@ fn read_subprogram_header<R: gimli::Reader>(
         _ => return Ok(None),
     };
 
-    let name = match node.entry().attr_value(gimli::DW_AT_name)? {
+    let _ = match node.entry().attr_value(gimli::DW_AT_name)? {
         Some(attr) => Some(clone_string_attribute(dwarf, unit, attr)?),
         None => None,
     };
@@ -233,7 +233,7 @@ fn read_subprogram_header<R: gimli::Reader>(
         };
         Subroutine {
             pc: low_pc..high_pc,
-            name,
+            // name,
             encoding: unit.encoding(),
             entry_offset: node.entry().offset(),
             unit_offset,
@@ -400,11 +400,10 @@ pub fn transform_debug_line<R: gimli::Reader>(
         files.push(path);
     }
 
-    let mut count = 0;
     let mut rows = program.rows();
     let mut sorted_rows = BTreeMap::new();
     while let Some((_, row)) = rows.next_row()? {
-        println!("address {} row: {:?}", row.address(), row);
+        // println!("address {} row: {:?}", row.address(), row);
         sorted_rows.insert(row.address(), *row);
     }
 

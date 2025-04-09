@@ -110,6 +110,7 @@ pub fn start_debugger(
     Ok((process, context))
 }
 
+#[allow(unused)]
 pub fn run_loop(
     module_input: Option<ModuleInput>,
     init_source: Option<String>,
@@ -127,6 +128,7 @@ use std::fs::File;
 use std::io::Read;
 use wasmi::{Config, StackLimits};
 
+#[allow(unused)]
 fn load_file(filename: &str) -> anyhow::Result<Vec<u8>> {
     let mut f = ::std::fs::File::open(filename)?;
     let mut buffer = Vec::new();

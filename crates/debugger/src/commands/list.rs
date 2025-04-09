@@ -1,8 +1,7 @@
 use super::command::{Command, CommandContext, CommandResult};
 use super::debugger::{Debugger, OutputPrinter};
 use super::sourcemap::{ColumnType, LineInfo, SourceMap};
-use anyhow::{anyhow, Result};
-use gimli::FileEntry;
+use anyhow::Result;
 
 pub struct ListCommand {}
 

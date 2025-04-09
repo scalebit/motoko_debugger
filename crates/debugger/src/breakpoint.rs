@@ -14,9 +14,9 @@ impl Breakpoints {
         &self.function_map
     }
 
-    pub fn inst_map(&self) -> &HashMap<usize, Breakpoint> {
-        &self.inst_map
-    }
+    // pub fn inst_map(&self) -> &HashMap<usize, Breakpoint> {
+    //     &self.inst_map
+    // }
 
     pub fn should_break_func(&self, name: &str) -> bool {
         // FIXME
@@ -25,10 +25,10 @@ impl Breakpoints {
             .any(|k| name.contains(Clone::clone(&k)))
     }
 
-    pub fn should_break_inst(&self, inst: u32) -> bool {
-        // self.inst_map.contains_key(&inst.offset)
-        false
-    }
+    // pub fn should_break_inst(&self, inst: u32) -> bool {
+    //     // self.inst_map.contains_key(&inst.offset)
+    //     false
+    // }
 
     pub fn insert(&mut self, breakpoint: Breakpoint) {
         match &breakpoint {

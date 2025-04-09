@@ -1,39 +1,35 @@
 // use crate::commands::{backtrace, breakpoint};
 // use crate::commands::debugger::{self, Debugger, DebuggerOpts, RawHostModule, RunResult};
-use crate::commands::debugger::{self, Debugger, DebuggerOpts, RunResult};
+use crate::commands::debugger::{self, DebuggerOpts, RunResult};
 use anyhow::{anyhow, Error, Ok, Result};
-use log::{trace, warn};
+use log::warn;
 use wasmi::module::utils::WasmiValueType;
-use wasmi::store::StoreIdx;
-use wasmparser::ValType;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::Path;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{usize, vec};
 use crate::heap::display_local_in_heap;
 use crate::breakpoint::Breakpoints;
-use wasmi::engine::code_map::CodeMap;
 use wasmi::engine::executor::cache::CachedInstance;
 use wasmi::engine::executor::instr_ptr::InstructionPtr;
-use wasmi::engine::{self, executor, CallResults, EngineFunc};
+use wasmi::engine::{CallResults, EngineFunc};
 use wasmi::engine::{CallParams, Stack};
 use wasmi::{
-    engine::executor::instrs::{ExecResult, Executor, Interceptor, Signal},
+    engine::executor::instrs::{ Executor, Interceptor, Signal},
     func::FuncEntity,
     Val,
 };
-use wasmi_collections::arena::{ArenaIndex, GuardedEntity};
+use wasmi_collections::arena::ArenaIndex;
 use wasmi_core::{UntypedVal, F32, F64};
-use wasmi_ir::{Instruction, Reg, RegSpan};
+use wasmi_ir::{Reg, RegSpan};
 use wasmi_wasi::{WasiCtx, WasiCtxBuilder};
 
 type RawModule = Vec<u8>;
 
 use wasmi::engine::executor::stack::CallFrame;
-use wasmi::{instance, CompilationMode, Config, Engine, Func, Instance, Store};
+use wasmi::{CompilationMode, Config, Engine, Func, Instance, Store};
 
 static mut WASM_STORE: Option<Store<WasiCtx>> = None;
 static mut WASM_ENGINE: Option<Engine> = None;
@@ -48,6 +44,7 @@ pub struct InstanceWithName {
     pub local_dep_names: HashMap<u32, Vec<(u32, String)>>,
 }
 
+#[allow(unused)]
 pub struct MainDebugger<'engine> {
     pub instance: Option<InstanceWithName>,
     start_fn_idx: Option<u32>,
@@ -371,7 +368,7 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         self.opts = opts
     }
 
-    fn select_frame(&mut self, frame_index: Option<usize>) -> Result<()> {
+    fn select_frame(&mut self, _frame_index: Option<usize>) -> Result<()> {
         // self.selected_frame = frame_index;
         Ok(())
     }
@@ -561,9 +558,9 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             }
             Out => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
-                let mut last_signal = executor.borrow_mut().execute_step(store, self)?;
+                let _instr_offset = executor.borrow_mut().execute_step(store, self)?;
                 while initial_frame_depth <= frame_depth(&executor.borrow()) {
-                    last_signal = executor.borrow_mut().execute_step(store, self)?;
+                    let last_signal = executor.borrow_mut().execute_step(store, self)?;
                     if let Signal::Breakpoint = last_signal {
                         return Ok(RunResult::Breakpoint);
                     } else if let Signal::End = last_signal {
@@ -711,7 +708,7 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         self.instance.as_ref().unwrap().import_func_len
     }
 
-    fn execute_inst(&self, instr_offset: u32) -> Signal {
+    fn execute_inst(&self, _instr_offset: u32) -> Signal {
         // if self.is_interrupted.load(Ordering::SeqCst) && self.breakpoints.inst_in_file_0.contains(&(instr_offset as u64)) {
         //     self.is_interrupted.store(false, Ordering::SeqCst);
         //     Signal::Breakpoint
