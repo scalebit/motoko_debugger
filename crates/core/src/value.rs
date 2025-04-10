@@ -40,6 +40,10 @@ impl ValType {
     pub fn is_ref(&self) -> bool {
         matches!(self, Self::ExternRef | Self::FuncRef)
     }
+
+    pub fn is_float(&self) -> bool {
+        matches!(self, Self::F32 | Self::F64)
+    }
 }
 
 /// Convert one type to another by wrapping.

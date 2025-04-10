@@ -2024,35 +2024,27 @@ impl<'engine> Executor<'engine> {
             } => self.execute_i64_load32_u_offset16(result, ptr, offset)?,
             Instr::I32Store { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store(&mut store.inner, ptr, memory)?;
-                println!("i32 store {:?}: {:?}", memory, self.get_register(ptr));
             }
             Instr::I32StoreImm16 { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store_imm16(&mut store.inner, ptr, memory)?;
-                println!("i32 storeImm16 {:?}: {:?}", memory, self.get_register(ptr));
             }
             Instr::I32StoreOffset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store_offset16(ptr, offset, value)?;
-                println!("i32 StoreOffset16 {:?}: {:?}, {:?}", self.get_register(ptr), offset, self.get_register(ptr));
             }
             Instr::I32StoreOffset16Imm16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store_offset16_imm16(ptr, offset, value)?;
-                println!("i32 StoreOffset16Imm16 {:?}: {:?}, {:?}", self.get_register(ptr), offset, self.get_register(ptr));
             }
             Instr::I32StoreAt { instr_offset: _, address, value } => {
                 self.execute_i32_store_at(&mut store.inner, address, value)?;
-                println!("i32 store at {}: {:?}", address, self.get_register(value));
             }
             Instr::I32StoreAtImm16 { instr_offset: _, address, value } => {
                 self.execute_i32_store_at_imm16(&mut store.inner, address, value)?;
-                println!("i32 store at imm16 {}: {:?}", address, value);
             }
             Instr::I32Store8 { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store8(&mut store.inner, ptr, memory)?;
-                println!("I32Store8  {:?}: {:?}", memory, self.get_register(ptr));
             }
             Instr::I32Store8Imm { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store8_imm(&mut store.inner, ptr, memory)?;
-                println!("I32Store8  {:?}: {:?}", memory, self.get_register(ptr));
             }
             Instr::I32Store8Offset16 { instr_offset: _, ptr, offset, value } => {
                 self.execute_i32_store8_offset16(ptr, offset, value)?
@@ -2062,11 +2054,9 @@ impl<'engine> Executor<'engine> {
             }
             Instr::I32Store8At { instr_offset: _, address, value } => {
                 self.execute_i32_store8_at(&mut store.inner, address, value)?;
-                println!("I32Store8 at  {:?}: {:?}", address, self.get_register(value));
             }
             Instr::I32Store8AtImm { instr_offset: _, address, value } => {
                 self.execute_i32_store8_at_imm(&mut store.inner, address, value)?;
-                println!("I32Store8AtImm  {:?}: {:?}", address, value);
             }
             Instr::I32Store16 { instr_offset: _, ptr, memory } => {
                 self.execute_i32_store16(&mut store.inner, ptr, memory)?

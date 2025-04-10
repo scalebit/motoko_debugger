@@ -72,7 +72,7 @@ impl<'engine> MainDebugger<'engine> {
     }
 
     pub fn new(preopen_dirs: Vec<(String, String)>, envs: Vec<(String, String)>) -> Result<Self> {
-        let is_interrupted = Arc::new(AtomicBool::new(false));
+        let is_interrupted = Arc::new(AtomicBool::new(true));
         signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_interrupted))?;
         Ok(Self {
             instance: None,
@@ -227,7 +227,8 @@ impl<'engine> MainDebugger<'engine> {
         self.executor = Some(Rc::new(RefCell::new(Executor::new(
             stack, &code_map, cache,
         ))));
-
+        // println!("init func: {}", engine_func.into_usize() as u32);
+        self.invoked_func_index.push(engine_func.into_usize() as u32 + self.get_import_func_len());
         Ok(())
     }
 
@@ -311,13 +312,13 @@ impl<'engine> MainDebugger<'engine> {
             let typed_val = match ty {
                 wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
                 wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
-                wasmi_core::ValType::F32 => Val::F32(F32::from(divided_value)),
-                wasmi_core::ValType::F64 => Val::F64(F64::from(divided_value)),
+                wasmi_core::ValType::F32 => Val::F32(F32::from(value)),
+                wasmi_core::ValType::F64 => Val::F64(F64::from(value)),
                 _ => return Ok(format!("Unsupported type {:?}", ty))
             };
             format!("{:?}", typed_val)
         } else {
-            // If LSBit is 1, then it is a pointer into the heap (bignum)
+            // If LSBit is 1, then it is a pointer into the heap
             match ty {
                 wasmi_core::ValType::F64 
                 | wasmi_core::ValType::I32 
@@ -687,9 +688,9 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
         } 
         self.invoked_func_index.push(func_idx);
         
-        println!("\n\n--------------func index: {:?}", func_idx);
+        // println!("\n--------------func index: {:?}", func_idx);
         if let Some(name) = self.get_func_name_by_idx(func_idx) {
-            println!("invoke func_name: {:?}", name);
+            // println!("invoke func_name: {:?}", name);
             if self.breakpoints.should_break_func(&name) {
                 Signal::Breakpoint
             } else {
@@ -709,17 +710,18 @@ impl<'engine> Interceptor for MainDebugger<'engine> {
     }
 
     fn execute_inst(&self, _instr_offset: u32) -> Signal {
-        // if self.is_interrupted.load(Ordering::SeqCst) && self.breakpoints.inst_in_file_0.contains(&(instr_offset as u64)) {
-        //     self.is_interrupted.store(false, Ordering::SeqCst);
-        //     Signal::Breakpoint
-        // } 
+        if self.is_interrupted.load(Ordering::SeqCst) 
+        && self.breakpoints.inst_in_file_0.contains(&(_instr_offset as u64)) {
+            self.is_interrupted.store(false, Ordering::SeqCst);
+            Signal::Breakpoint
+        } 
         // // else if self.breakpoints.should_break_inst(instr_offset) {
         // //     Signal::Breakpoint
         // // } 
-        // else {
-        //     Signal::Next
-        // }
-        Signal::Next
+        else {
+            Signal::Next
+        }
+        // Signal::Next
     }
 }
 

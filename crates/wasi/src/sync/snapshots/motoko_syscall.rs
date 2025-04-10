@@ -362,7 +362,16 @@ impl MotokoSyscall for WasiCtx {
         Ok(())
     }
     
-    fn debug_print(&self, _memory: &mut [u8], _: u32, _: u32) -> HypervisorResult<()> {
+    fn debug_print(&self, _memory: &mut [u8], src: u32, size: u32) -> HypervisorResult<()> {
+        const MAX_DEBUG_MESSAGE_SIZE: usize = 32 * 1024;
+        let src = src as usize;
+        let size = size as usize;
+        let size = size.min(MAX_DEBUG_MESSAGE_SIZE);
+        let result = std::str::from_utf8(&_memory[src..src + size])
+            .map_err(|e| 
+                wasmi::Error::new(e.to_string())
+            )?;
+        println!("debug_print: {:?}", result);
         Ok(())
     }
     
@@ -372,8 +381,7 @@ impl MotokoSyscall for WasiCtx {
         let src = str as usize;
         let size = size.min(MAX_ERROR_MESSAGE_SIZE);
         let result = std::str::from_utf8(&memory[src..src + size]);
-        println!("result: {:?}", result);
-        // Err(result)
+        println!("Trap! msg: {:?}", result);
         Ok(())
     }
     

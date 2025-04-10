@@ -22,13 +22,14 @@
 
 
 use std::cell::Ref;
-use anyhow::Error;
+use anyhow::{Error, Ok};
 use wasmi::{engine::executor::instrs::Executor, Func, Store, Val};
 use wasmi_core::{UntypedVal, F64};
 use wasmi_wasi::WasiCtx;
 
 const TAG_OFFSET: u32 = 1;
-const DATA_OFFSET: u32 = 8;
+const DATA_OFFSET: u32 = 4;
+const ARRAY_VAR_T_DATA_OFFSET: u32 = 8;
 
 #[derive(Debug)]
 enum Tagged {
@@ -63,39 +64,39 @@ enum Tagged {
     StableSeen = 0xffff_ffff,
 }
 
-impl From<u64> for Tagged {
-    fn from(value: u64) -> Self {
+impl Tagged {
+    fn from_u64(value: u64) -> Result<Self, Error> {
         match value {
-            1 => Tagged::Object,
-            3 => Tagged::ArrayT,
-            5 => Tagged::ArrayVarT,
-            7 => Tagged::ArrayTuple,
-            9 => Tagged::ArrayShared,
-            11 => Tagged::Bits64Signed,
-            13 => Tagged::Bits64Unsigned,
-            15 => Tagged::Bits64Float,
-            17 => Tagged::MutBox,
-            19 => Tagged::Closure,
-            21 => Tagged::Some,
-            23 => Tagged::Variant,
-            25 => Tagged::BlobBlob,
-            27 => Tagged::BlobText,
-            29 => Tagged::BlobPrincipal,
-            31 => Tagged::BlobActor,
-            33 => Tagged::Indirection,
-            35 => Tagged::BigInt,
-            37 => Tagged::Concat,
-            39 => Tagged::Region,
-            41 => Tagged::Bits32Signed,
-            43 => Tagged::Bits32Unsigned,
-            45 => Tagged::Bits32Float,
-            47 => Tagged::Null,
-            49 => Tagged::OneWordFiller,
-            51 => Tagged::FreeSpace,
-            52 => Tagged::ArraySliceMinimum,
-            0xffff_fffe => Tagged::CoercionFailure,
-            0xffff_ffff => Tagged::StableSeen,
-            _ => panic!("Unknown tag value: {}", value),
+            1 => Ok(Tagged::Object),
+            3 => Ok(Tagged::ArrayT),
+            5 => Ok(Tagged::ArrayVarT),
+            7 => Ok(Tagged::ArrayTuple),
+            9 => Ok(Tagged::ArrayShared),
+            11 => Ok(Tagged::Bits64Signed),
+            13 => Ok(Tagged::Bits64Unsigned),
+            15 => Ok(Tagged::Bits64Float),
+            17 => Ok(Tagged::MutBox),
+            19 => Ok(Tagged::Closure),
+            21 => Ok(Tagged::Some),
+            23 => Ok(Tagged::Variant),
+            25 => Ok(Tagged::BlobBlob),
+            27 => Ok(Tagged::BlobText),
+            29 => Ok(Tagged::BlobPrincipal),
+            31 => Ok(Tagged::BlobActor),
+            33 => Ok(Tagged::Indirection),
+            35 => Ok(Tagged::BigInt),
+            37 => Ok(Tagged::Concat),
+            39 => Ok(Tagged::Region),
+            41 => Ok(Tagged::Bits32Signed),
+            43 => Ok(Tagged::Bits32Unsigned),
+            45 => Ok(Tagged::Bits32Float),
+            47 => Ok(Tagged::Null),
+            49 => Ok(Tagged::OneWordFiller),
+            51 => Ok(Tagged::FreeSpace),
+            52 => Ok(Tagged::ArraySliceMinimum),
+            0xffff_fffe => Ok(Tagged::CoercionFailure),
+            0xffff_ffff => Ok(Tagged::StableSeen),
+            _ => Err(Error::msg(format!("Unknown tag value: {}", value))),
         }
     }
 }
@@ -103,32 +104,45 @@ impl From<u64> for Tagged {
 pub fn display_local_in_heap(
     executor: Ref<'_, Executor>, 
     store: &mut Store<WasiCtx>, 
-    address : u64, 
+    address: u64, 
     val_type: wasmi_core::ValType,
 
     bigint_to_float64: Option<Func>,
     bigint_to_word64_wrap: Option<Func>,
     bigint_to_word32_wrap: Option<Func>,
-
 ) -> Result<String, Error> {
     let memory = wasmi_ir::index::Memory::from(0);
-    let memory = executor.fetch_memory_bytes(memory, &store.inner);
+    let memory = executor.fetch_memory_bytes(memory, &store.inner).to_vec();
     let loaded_value = load_i32_from_heap(
-        memory, 
+        memory.as_slice(), 
         address, 
         TAG_OFFSET
     )?;
-
-    let ret = match Tagged::from(loaded_value.to_bits()) {
-        Tagged::ArrayVarT  => handle_array_var_t(&memory, address, val_type)?,
-        Tagged::BigInt => handle_bigint(
-            store,
+    println!("loaded_value = {:?}", loaded_value);
+    let ret = match Tagged::from_u64(loaded_value.to_bits())? {
+        Tagged::ArrayVarT  => handle_array_var_t(
+            memory.as_slice(), 
             address, 
             val_type, 
+            executor, 
+            store, 
             bigint_to_float64, 
             bigint_to_word64_wrap,
              bigint_to_word32_wrap)?,
-        _  => format!("HeapAddress: {}, {:?}", address, val_type),
+        Tagged::MutBox => handle_mut_box(&memory, address, val_type)?,
+        Tagged::BigInt => handle_bigint(
+            store, 
+            address, 
+            val_type, 
+            bigint_to_float64, 
+            bigint_to_word64_wrap, 
+            bigint_to_word32_wrap)?,
+        Tagged::Bits64Float => handle_f64(&memory, address, val_type)?,
+        _  => format!(
+            "HeapAddress: {}, tagged: {:?}, {:?}", 
+            address, 
+            Tagged::from_u64(loaded_value.to_bits())?, 
+            val_type),
     };
     Ok(ret)
 }
@@ -136,12 +150,17 @@ pub fn display_local_in_heap(
 fn handle_array_var_t(
     memory: &[u8],
     address: u64, 
-    val_type: wasmi_core::ValType
+    val_type: wasmi_core::ValType,
+    executor: Ref<'_, Executor>,
+    store: &mut Store<WasiCtx>,
+    bigint_to_float64: Option<Func>,
+    bigint_to_word64_wrap: Option<Func>,
+    bigint_to_word32_wrap: Option<Func>,
 ) -> Result<String, Error> {
     let len = UntypedVal::i32_load(
         memory, 
         UntypedVal::from(address), 
-        5
+        TAG_OFFSET + DATA_OFFSET
     ).map_err(|e| Error::msg(format!("{:?}", e)))?;
 
     let mut ret = String::new();
@@ -151,10 +170,24 @@ fn handle_array_var_t(
         let loaded_value = load_from_heap(
             memory, 
             address, 
-            TAG_OFFSET + DATA_OFFSET + i * get_heap_type_size(val_type),
+            TAG_OFFSET + ARRAY_VAR_T_DATA_OFFSET + i * get_heap_type_size(val_type),
             val_type
         )?;
-        ret.push_str(&format!("{}, ", display_wasm_val(loaded_value, val_type)));
+        ret.push_str(
+            &format!(
+                "{}, ", 
+                display_wasm_val(
+                    loaded_value, 
+                    val_type, 
+                    val_type.is_float(),
+                    Ref::<'_, Executor<'_>>::clone(&executor),
+                    store,
+                    bigint_to_float64, 
+                    bigint_to_word64_wrap, 
+                    bigint_to_word32_wrap
+                )?
+            )
+        );
     }
     ret.push_str("]");
     return Ok(ret);
@@ -173,6 +206,7 @@ fn handle_bigint(
 
     match val_type {
         wasmi_core::ValType::F64 => {
+            println!("get f64 111");
             bigint_to_float64
                 .expect("No bigint_to_word64_wrap function")
                 .call(store, &[Val::F64(F64::from_bits(address as _))],&mut ret_val)?;
@@ -193,7 +227,28 @@ fn handle_bigint(
     };
     Ok(format!("{:?}", ret_val[0]))
 }
+
+fn handle_mut_box(
+    memory: &[u8],
+    address: u64, 
+    val_type: wasmi_core::ValType
+) -> Result<String, Error> {
+    let len = UntypedVal::i32_load(
+        memory, 
+        UntypedVal::from(address), 
+        TAG_OFFSET + DATA_OFFSET
+    ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+    Ok(format!("len = {:?}", len))
+}
  
+fn handle_f64(
+    memory: &[u8],
+    address: u64,
+    val_type: wasmi_core::ValType
+) -> Result<String, Error> {
+    let loaded_value = load_f64_from_heap(memory, address, TAG_OFFSET + DATA_OFFSET)?;
+    Ok(format!("{:?}", f64::from_bits(loaded_value.to_bits())))
+}
  
 fn load_from_heap(
     memory: &[u8],
@@ -269,23 +324,44 @@ fn get_heap_type_size(val_type: wasmi_core::ValType) -> u32 {
         wasmi_core::ValType::I32 => 4,
         wasmi_core::ValType::I64 => 8,
         wasmi_core::ValType::F32 => 4,
-        wasmi_core::ValType::F64 => 8,
+        wasmi_core::ValType::F64 => {println!("get f64 333"); 8},
         _ => panic!("Unsupported value type: {:?}", val_type),
     }
 }
 
-fn display_wasm_val(val: UntypedVal, val_type: wasmi_core::ValType) -> String {
-    let val = if val.to_bits() & 1 == 0 {
-         UntypedVal::from(val.to_bits() >> 1)
-    } else {
-        val
-    };
+fn display_wasm_val(
+    val: UntypedVal, 
+    val_type: wasmi_core::ValType, 
+    is_float: bool,
 
-    match val_type {
-        wasmi_core::ValType::I32 => format!("{}", i32::from(val)),
-        wasmi_core::ValType::I64 => format!("{}", i64::from(val)),
-        wasmi_core::ValType::F32 => format!("{}", f32::from(val)),
-        wasmi_core::ValType::F64 => format!("{}", f64::from(val)),
-        _ => panic!("Unsupported value type: {:?}", val_type),
+    executor: Ref<'_, Executor>,
+    store: &mut Store<WasiCtx>,
+    bigint_to_float64: Option<Func>,
+    bigint_to_word64_wrap: Option<Func>,
+    bigint_to_word32_wrap: Option<Func>,
+) -> Result<String, Error> {
+    if val.to_bits() & 1 == 0 && !is_float {
+        println!("display_wasm_val 111");
+        let val = UntypedVal::from(val.to_bits() >> 1);
+        match val_type {
+            wasmi_core::ValType::I32 => Ok(format!("{}", i32::from(val))),
+            wasmi_core::ValType::I64 => Ok(format!("{}", i64::from(val))),
+            wasmi_core::ValType::F32 => Ok(format!("{}", f32::from(val))),
+            wasmi_core::ValType::F64 => Ok(format!("{}", f64::from(val))),
+            _ => panic!("Unsupported value type: {:?}", val_type),
+        }
+    } else {
+        match display_local_in_heap(
+            executor, 
+            store, 
+            val.to_bits(), 
+            val_type, 
+            bigint_to_float64, 
+            bigint_to_word64_wrap, 
+            bigint_to_word32_wrap
+        ) {
+            std::result::Result::Ok(ret) => Ok(ret),
+            Err(_) => Ok(format!("{}", f64::from_bits(val.to_bits()))),
+        }
     }
 }
