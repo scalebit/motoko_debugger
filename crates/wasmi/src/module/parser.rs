@@ -564,7 +564,7 @@ fn collect_nameing<'a>(
 fn collect_indrect_nameing<'a>(
     indrect_nameing: wasmparser::SectionLimited<'a, wasmparser::IndirectNaming<'a>>,  
     results: &mut HashMap<u32, Vec<(u32, String)>>,
-    dep_results: &mut HashMap<u32, Vec<(u32, String)>>,
+    _dep_results: &mut HashMap<u32, Vec<(u32, String)>>,
     header: Option<&ModuleHeader>,
 ) {
     let func_imports = if let Some(header) = header {
@@ -574,17 +574,18 @@ fn collect_indrect_nameing<'a>(
     };
     
     for (func_index,item1) in indrect_nameing.into_iter().enumerate() {
-        let mut name_index = std::collections::HashMap::new();
-        let mut name_count = std::collections::HashMap::new();
         let mut all_vec = Vec::new();
+        let mut pushed_name = Vec::new();
         match item1 {
             std::result::Result::Ok(func_naming) => {
                 for item2 in func_naming.names.into_iter() {
                     match item2 {
                         std::result::Result::Ok(nameing) => {
-                            name_index.insert(nameing.name.to_string(), nameing.index);
-                            *name_count.entry(nameing.name.to_string()).or_insert(0) += 1;
-                            all_vec.push((nameing.index, nameing.name.to_string()));
+                            let name = nameing.name.to_string();
+                            if !pushed_name.contains(&name) && !name.starts_with("$") {
+                                pushed_name.push(name.clone());
+                                all_vec.push((nameing.index, name));
+                            }
                         }
                         _ => {}
                     }
@@ -593,13 +594,48 @@ fn collect_indrect_nameing<'a>(
             _ => {}
         };
         results.insert((func_index + func_imports) as u32, all_vec);
-
-        let mut vec = Vec::new();
-        for (name, count) in &name_count {
-            if count == &1 && !name.starts_with("$") {
-                vec.push((name_index[name], name.to_string()));
-            }
-        }
-        dep_results.insert((func_index + func_imports) as u32, vec);
     }
 }
+
+// fn collect_indrect_nameing<'a>(
+//     indrect_nameing: wasmparser::SectionLimited<'a, wasmparser::IndirectNaming<'a>>,  
+//     results: &mut HashMap<u32, Vec<(u32, String)>>,
+//     dep_results: &mut HashMap<u32, Vec<(u32, String)>>,
+//     header: Option<&ModuleHeader>,
+// ) {
+//     let func_imports = if let Some(header) = header {
+//         header.inner.imports.len_funcs()
+//     } else {
+//         0
+//     };
+    
+//     for (func_index,item1) in indrect_nameing.into_iter().enumerate() {
+//         let mut name_index = std::collections::HashMap::new();
+//         let mut name_count = std::collections::HashMap::new();
+//         let mut all_vec = Vec::new();
+//         match item1 {
+//             std::result::Result::Ok(func_naming) => {
+//                 for item2 in func_naming.names.into_iter() {
+//                     match item2 {
+//                         std::result::Result::Ok(nameing) => {
+//                             name_index.insert(nameing.name.to_string(), nameing.index);
+//                             *name_count.entry(nameing.name.to_string()).or_insert(0) += 1;
+//                             all_vec.push((nameing.index, nameing.name.to_string()));
+//                         }
+//                         _ => {}
+//                     }
+//                 }
+//             }
+//             _ => {}
+//         };
+//         results.insert((func_index + func_imports) as u32, all_vec);
+
+//         let mut vec = Vec::new();
+//         for (name, count) in &name_count {
+//             if count == &1 && !name.starts_with("$") {
+//                 vec.push((name_index[name], name.to_string()));
+//             }
+//         }
+//         dep_results.insert((func_index + func_imports) as u32, vec);
+//     }
+// }

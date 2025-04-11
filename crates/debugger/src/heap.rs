@@ -118,7 +118,7 @@ pub fn display_local_in_heap(
         address, 
         TAG_OFFSET
     )?;
-    println!("loaded_value = {:?}", loaded_value);
+
     let ret = match Tagged::from_u64(loaded_value.to_bits())? {
         Tagged::ArrayVarT  => handle_array_var_t(
             memory.as_slice(), 
@@ -129,7 +129,7 @@ pub fn display_local_in_heap(
             bigint_to_float64, 
             bigint_to_word64_wrap,
              bigint_to_word32_wrap)?,
-        Tagged::MutBox => handle_mut_box(&memory, address, val_type)?,
+        Tagged::MutBox => handle_mut_box(&memory, address)?,
         Tagged::BigInt => handle_bigint(
             store, 
             address, 
@@ -137,7 +137,9 @@ pub fn display_local_in_heap(
             bigint_to_float64, 
             bigint_to_word64_wrap, 
             bigint_to_word32_wrap)?,
-        Tagged::Bits64Float => handle_f64(&memory, address, val_type)?,
+        Tagged::Bits64Float => handle_f64(&memory, address)?,
+        Tagged::Bits32Float => handle_f32(&memory, address)?,
+        Tagged::BlobText => handle_blob_text(&memory, address)?,
         _  => format!(
             "HeapAddress: {}, tagged: {:?}, {:?}", 
             address, 
@@ -231,23 +233,51 @@ fn handle_bigint(
 fn handle_mut_box(
     memory: &[u8],
     address: u64, 
-    val_type: wasmi_core::ValType
 ) -> Result<String, Error> {
     let len = UntypedVal::i32_load(
         memory, 
         UntypedVal::from(address), 
         TAG_OFFSET + DATA_OFFSET
     ).map_err(|e| Error::msg(format!("{:?}", e)))?;
-    Ok(format!("len = {:?}", len))
+    Ok(format!("{:?}", len))
 }
  
 fn handle_f64(
     memory: &[u8],
     address: u64,
-    val_type: wasmi_core::ValType
 ) -> Result<String, Error> {
     let loaded_value = load_f64_from_heap(memory, address, TAG_OFFSET + DATA_OFFSET)?;
     Ok(format!("{:?}", f64::from_bits(loaded_value.to_bits())))
+}
+
+fn handle_f32(
+    memory: &[u8],
+    address: u64,
+) -> Result<String, Error> {
+    let loaded_value = load_f32_from_heap(memory, address, TAG_OFFSET + DATA_OFFSET)?;
+    Ok(format!("{:?}", f32::from_bits(loaded_value.to_bits() as u32)))
+}
+ 
+fn handle_blob_text(
+    memory: &[u8],
+    address: u64,
+) -> Result<String, Error> {
+    let len = UntypedVal::i32_load(
+        memory, 
+        UntypedVal::from(address), 
+        TAG_OFFSET + DATA_OFFSET
+    ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+    let mut ret = String::new();
+
+    for i in 0..len.to_bits() {
+        let loaded_char = UntypedVal::i32_load8_u(
+            memory, 
+            UntypedVal::from(address), 
+            TAG_OFFSET + ARRAY_VAR_T_DATA_OFFSET + i as u32
+        ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+        ret.push(char::from(loaded_char.to_bits() as u8));
+    }
+    Ok(ret)
 }
  
 fn load_from_heap(

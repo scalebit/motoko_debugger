@@ -253,7 +253,7 @@ impl<'engine> MainDebugger<'engine> {
         Ok(())
     }
 
-    pub fn get_params_locals_types(&self, func_idx: u32, types: &mut Vec<wasmi_core::ValType>) -> Result<u32> {
+    pub fn get_params_locals_types(&self, func_idx: u32, types: &mut Vec<wasmi_core::ValType>) -> Result<()> {
         let store = get_store();
         let func = self.instance()
             .ok_or_else(|| anyhow::anyhow!("No instance found"))?
@@ -279,65 +279,64 @@ impl<'engine> MainDebugger<'engine> {
             .for_each(|ty| {
                 types.push(WasmiValueType::from(ty.clone()).into_inner());
             });
-        Ok(func_type.len_params() as u32)
+        Ok(())
     }
 
     pub fn get_display_locals(
         &self, 
         local_names: &Vec<(u32, String)>, 
-        types: &Vec<wasmi_core::ValType>, 
-        len_params: u32,
-        local_dep_names: &Vec<(u32, String)>
+        types: &Vec<wasmi_core::ValType>
     ) -> Result<Vec<(u32, String, wasmi_core::ValType)>> {
-        let mut pushed_locals = Vec::new();
         let mut ret = Vec::new();
-        for i in 0..len_params {
-            let paras = local_names.get(i as usize).expect("locals may not have params");
-            ret.push((paras.0, paras.1.clone(), types[i as usize].clone()));
-            pushed_locals.push(paras.0);
-        }
-
-        for (idx, name) in local_dep_names.iter() {
-            if !pushed_locals.contains(idx) {
-                ret.push((*idx, name.clone(), types[*idx as usize].clone()));
-            }
-        }
-
+        local_names.iter().zip(types.iter()).for_each(|((idx, name), ty)| {
+            ret.push((*idx, name.clone(), ty.clone()));
+        });
         Ok(ret)
     }
 
-    fn display_valtype_with_value(&self, ty: wasmi_core::ValType, value: UntypedVal) -> Result<String> {
-        let typed_val_str = if value.to_bits() & 1 == 0 {
-            let divided_value = UntypedVal::from(value.to_bits() >> 1);
-            let typed_val = match ty {
-                wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
-                wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
-                wasmi_core::ValType::F32 => Val::F32(F32::from(value)),
-                wasmi_core::ValType::F64 => Val::F64(F64::from(value)),
-                _ => return Ok(format!("Unsupported type {:?}", ty))
-            };
-            format!("{:?}", typed_val)
-        } else {
-            // If LSBit is 1, then it is a pointer into the heap
-            match ty {
-                wasmi_core::ValType::F64 
-                | wasmi_core::ValType::I32 
-                | wasmi_core::ValType::I64 
-                | wasmi_core::ValType::F32 
-                => {
-                    display_local_in_heap(
-                        self.executor()?.borrow(), 
-                        &mut get_store(), 
-                        value.to_bits(),
-                       ty,
-                       self.lookup_func_by_name("bigint_to_float64"),
-                       self.lookup_func_by_name("bigint_to_word64_wrap"),
-                       self.lookup_func_by_name("bigint_to_word32_wrap"),
-                    )?
-                }
-                _ => return Ok(format!("Unsupported type {:?}", ty))
-            }
+    fn display_val_in_stack(&self, ty: wasmi_core::ValType, value: UntypedVal, shr: usize) -> String {
+        let divided_value = UntypedVal::from(value.to_bits() >> shr);
+        let typed_val = match ty {
+            wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
+            wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
+            wasmi_core::ValType::F32 => Val::F32(F32::from(value)),
+            wasmi_core::ValType::F64 => Val::F64(F64::from(value)),
+            _ => return format!("Unsupported type {:?}", ty)
         };
+        format!("{:?}", typed_val)
+    }
+
+    fn display_valtype_with_value(&self, ty: wasmi_core::ValType, value: UntypedVal) -> Result<String> {
+        println!("  value: {:?}", value.to_bits());
+        let typed_val_str = 
+            if value.to_bits() & 1 == 0 {
+                // self.display_val_in_stack(ty, value, 1)
+                let divided_value = UntypedVal::from(value.to_bits() >> 1);
+                let typed_val = match ty {
+                    wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
+                    wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
+                    wasmi_core::ValType::F32 => Val::F32(F32::from(value)),
+                    wasmi_core::ValType::F64 => Val::F64(F64::from(value)),
+                    _ => return Ok(format!("Unsupported type {:?}", ty))
+                };
+                format!("{:?}", typed_val)
+            } else if ty.is_num() {
+                // If LSBit is 1, then it is a pointer into the heap
+                match display_local_in_heap(
+                    self.executor()?.borrow(), 
+                    &mut get_store(), 
+                    value.to_bits(),
+                    ty,
+                    self.lookup_func_by_name("bigint_to_float64"),
+                    self.lookup_func_by_name("bigint_to_word64_wrap"),
+                    self.lookup_func_by_name("bigint_to_word32_wrap"),
+                ) {
+                    std::result::Result::Ok(s) =>  {s},
+                    Err(_) => {self.display_val_in_stack(ty, value, 0)}
+                }
+            } else {
+                return Ok(format!("Unsupported type {:?}", ty))
+            };
         Ok(typed_val_str)
     }
 
@@ -432,30 +431,24 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
             .local_names
             .get(func_idx)
             .ok_or_else(|| anyhow::anyhow!("No local names found in func {:?} or index {:?}", func_name, func_idx))?;
-
-        let local_dep_names = self.instance
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No instance found"))?
-            .local_dep_names
-            .get(func_idx)
-            .ok_or_else(|| anyhow::anyhow!("No local dep names found in func {:?} or index {:?}", func_name, func_idx))?;
         
         let mut types = Vec::new();
-        let len_params = self.get_params_locals_types(*func_idx, &mut types)?;
-        let locals = self.get_display_locals(local_names, &types, len_params, local_dep_names)?;
+        self.get_params_locals_types(*func_idx, &mut types)?;
+        let locals = self.get_display_locals(local_names, &types)?;
         
-        let ret_locals = locals
+        let mut ret_locals = locals
             .iter()
             .map(
                 |(index, name, ty)| {
                     let reg = i16::try_from(*index).map(Reg::from)?;
                     let val = executor.get_register(reg);
+                    println!("\n\n----name: {}", name);
                     let typed_val_display = self.display_valtype_with_value(*ty, val)?;
                     Ok((*index, name.clone(), typed_val_display))
                 }
             )
             .collect::<Result<Vec<_>>>()?;
-    
+        ret_locals.sort_by_key(|item| item.0);
         Ok((*func_idx, func_name, ret_locals))
     }
 
