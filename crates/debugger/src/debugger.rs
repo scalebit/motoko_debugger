@@ -310,16 +310,7 @@ impl<'engine> MainDebugger<'engine> {
         println!("  value: {:?}", value.to_bits());
         let typed_val_str = 
             if value.to_bits() & 1 == 0 {
-                // self.display_val_in_stack(ty, value, 1)
-                let divided_value = UntypedVal::from(value.to_bits() >> 1);
-                let typed_val = match ty {
-                    wasmi_core::ValType::I32 => Val::I32(i32::from(divided_value)),
-                    wasmi_core::ValType::I64 => Val::I64(i64::from(divided_value)),
-                    wasmi_core::ValType::F32 => Val::F32(F32::from(value)),
-                    wasmi_core::ValType::F64 => Val::F64(F64::from(value)),
-                    _ => return Ok(format!("Unsupported type {:?}", ty))
-                };
-                format!("{:?}", typed_val)
+                self.display_val_in_stack(ty, value, 1)
             } else if ty.is_num() {
                 // If LSBit is 1, then it is a pointer into the heap
                 match display_local_in_heap(
@@ -329,7 +320,7 @@ impl<'engine> MainDebugger<'engine> {
                     ty,
                     self.lookup_func_by_name("bigint_to_float64"),
                     self.lookup_func_by_name("bigint_to_word64_wrap"),
-                    self.lookup_func_by_name("bigint_to_word32_wrap"),
+                    self.lookup_func_by_name("bigint_to_word32_trap_with"),
                 ) {
                     std::result::Result::Ok(s) =>  {s},
                     Err(_) => {self.display_val_in_stack(ty, value, 0)}

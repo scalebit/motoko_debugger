@@ -1,4 +1,4 @@
-use std::println;
+use std::{println, vec::Vec};
 
 pub use self::call::{dispatch_host_func, ResumableHostError};
 use super::{cache::CachedInstance, InstructionPtr, Stack};
@@ -2251,10 +2251,10 @@ impl<'engine> Executor<'engine> {
             Instr::F64Gt { instr_offset: _, result, lhs, rhs } => self.execute_f64_gt(result, lhs, rhs),
             Instr::F64Ge { instr_offset: _, result, lhs, rhs } => self.execute_f64_ge(result, lhs, rhs),
             Instr::I32Clz { instr_offset: _, result, input } => self.execute_i32_clz(result, input),
-            Instr::I32Ctz { instr_offset: _, result, input } => self.execute_i32_ctz(result, input),
+            Instr::I32Ctz { instr_offset: _, 
+                result, input } => self.execute_i32_ctz(result, input),
             Instr::I32Popcnt { instr_offset: _, result, input } => self.execute_i32_popcnt(result, input),
             Instr::I32Add { instr_offset: _, result, lhs, rhs } => {
-                // println!("result: {:?}, lhs: {:?}, rhs: {:?}", result, lhs, rhs);
                 self.execute_i32_add(result, lhs, rhs)
             },
             Instr::I32AddImm16 { instr_offset: _, result, lhs, rhs } => self.execute_i32_add_imm16(result, lhs, rhs),

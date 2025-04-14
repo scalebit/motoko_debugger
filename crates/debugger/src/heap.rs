@@ -19,12 +19,10 @@
 /// 
 /// More details see: https://github.com/dfinity/motoko/blob/master/src/codegen/compile_classical.ml
 
-
-
 use std::cell::Ref;
 use anyhow::{Error, Ok};
 use wasmi::{engine::executor::instrs::Executor, Func, Store, Val};
-use wasmi_core::{UntypedVal, F64};
+use wasmi_core::{UntypedVal, F32, F64};
 use wasmi_wasi::WasiCtx;
 
 const TAG_OFFSET: u32 = 1;
@@ -111,6 +109,16 @@ pub fn display_local_in_heap(
     bigint_to_word64_wrap: Option<Func>,
     bigint_to_word32_wrap: Option<Func>,
 ) -> Result<String, Error> {
+    if address & 1 == 0 {
+        let typed_val = match val_type {
+            wasmi_core::ValType::I32 => Val::I32(address as i32),
+            wasmi_core::ValType::I64 => Val::I64(address as i64),
+            wasmi_core::ValType::F32 => Val::F32(F32::from(address as f32)),
+            wasmi_core::ValType::F64 => Val::F64(F64::from(address as f64)),
+            _ => return Ok(format!("Unsupported type {:?}", val_type))
+        };
+        return Ok(format!("{:?}", typed_val))
+    }
     let memory = wasmi_ir::index::Memory::from(0);
     let memory = executor.fetch_memory_bytes(memory, &store.inner).to_vec();
     let loaded_value = load_i32_from_heap(
@@ -140,6 +148,16 @@ pub fn display_local_in_heap(
         Tagged::Bits64Float => handle_f64(&memory, address)?,
         Tagged::Bits32Float => handle_f32(&memory, address)?,
         Tagged::BlobText => handle_blob_text(&memory, address)?,
+        Tagged::Concat => handle_concat(&memory, address, executor, store)?,
+        // Tagged::Object => handle_object(
+        //     &memory, 
+        //     address, 
+        //     val_type, 
+        //     executor, 
+        //     store, 
+        //     bigint_to_float64, 
+        //     bigint_to_word64_wrap,
+        //      bigint_to_word32_wrap)?,
         _  => format!(
             "HeapAddress: {}, tagged: {:?}, {:?}", 
             address, 
@@ -208,20 +226,23 @@ fn handle_bigint(
 
     match val_type {
         wasmi_core::ValType::F64 => {
-            println!("get f64 111");
             bigint_to_float64
                 .expect("No bigint_to_word64_wrap function")
                 .call(store, &[Val::F64(F64::from_bits(address as _))],&mut ret_val)?;
         },
         wasmi_core::ValType::I32 => {
-            bigint_to_word32_wrap
+            let a = bigint_to_word32_wrap
                 .expect("No bigint_to_word32_wrap function")
-                .call(store, &[Val::I32(address as i32)],&mut ret_val)?;
+                .call(store, &[Val::I32(address as i32), Val::I32(2097319)],&mut ret_val);
+            println!("bigint_to_word32_wrap: {:?}",a);
+            a?
         },
         wasmi_core::ValType::I64 => {
-            bigint_to_word64_wrap
+            let a = bigint_to_word64_wrap
                 .expect("No bigint_to_word64_wrap function")
-                .call(store, &[Val::I64(address as i64)],&mut ret_val)?;
+                .call(store, &[Val::I64(address as i64)],&mut ret_val);
+            println!("bigint_to_word64_wrap: {:?}",a);
+            a?
         },
         _ => {
             return Err(Error::msg(format!("Unsupported value type: {:?}", val_type)));
@@ -279,7 +300,88 @@ fn handle_blob_text(
     }
     Ok(ret)
 }
- 
+
+fn handle_concat(
+    memory: &[u8],
+    address: u64,
+    executor: Ref<'_, Executor>,
+    store: &mut Store<WasiCtx>,
+) -> Result<String, Error> {
+    let len = UntypedVal::i32_load(
+        memory, 
+        UntypedVal::from(address), 
+        TAG_OFFSET + DATA_OFFSET
+    ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+    println!("len: {:?}", len);
+
+    let text1 = UntypedVal::i32_load(
+        memory, 
+        UntypedVal::from(address), 
+        TAG_OFFSET + ARRAY_VAR_T_DATA_OFFSET
+    ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+
+    let text2 = UntypedVal::i32_load(
+        memory, 
+        UntypedVal::from(address), 
+        TAG_OFFSET + ARRAY_VAR_T_DATA_OFFSET + 4
+    ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+
+    let text1_str = display_local_in_heap(
+        Ref::<'_, Executor<'_>>::clone(&executor), 
+        store, 
+        text1.to_bits(), 
+        wasmi_core::ValType::I32, 
+        None, 
+        None, 
+        None
+    )?;
+
+    let text2_str = display_local_in_heap(
+        Ref::<'_, Executor<'_>>::clone(&executor), 
+        store, 
+        text2.to_bits(), 
+        wasmi_core::ValType::I32, 
+        None, 
+        None, 
+        None
+    )?;
+    Ok(format!("{}{}", text1_str, text2_str))
+}
+
+#[allow(dead_code)]
+fn handle_object(
+    memory: &[u8],
+    address: u64, 
+    val_type: wasmi_core::ValType,
+    executor: Ref<'_, Executor>,
+    store: &mut Store<WasiCtx>,
+    bigint_to_float64: Option<Func>,
+    bigint_to_word64_wrap: Option<Func>,
+    bigint_to_word32_wrap: Option<Func>,
+) -> Result<String, Error> {
+    let len = UntypedVal::i32_load(
+        memory, 
+        UntypedVal::from(address), 
+        TAG_OFFSET + DATA_OFFSET
+    ).map_err(|e| Error::msg(format!("{:?}", e)))?;
+
+
+    for i in 0..len.to_bits() {
+        let s = display_local_in_heap(
+            Ref::<'_, Executor<'_>>::clone(&executor),  
+            store, 
+            address + TAG_OFFSET as u64 + DATA_OFFSET as u64 + 4 as u64 + i * 4 as u64, 
+            val_type,
+            bigint_to_float64,  
+            bigint_to_word64_wrap, 
+            bigint_to_word32_wrap,
+        )?;
+        println!("s: {:?}", s);
+    }
+
+    Ok(format!("handle_object: {:?}", len))
+}
+
 fn load_from_heap(
     memory: &[u8],
     address: u64,
@@ -371,7 +473,7 @@ fn display_wasm_val(
     bigint_to_word32_wrap: Option<Func>,
 ) -> Result<String, Error> {
     if val.to_bits() & 1 == 0 && !is_float {
-        println!("display_wasm_val 111");
+        println!("lsb is 1, {:?}, type {:?}", val, val_type);
         let val = UntypedVal::from(val.to_bits() >> 1);
         match val_type {
             wasmi_core::ValType::I32 => Ok(format!("{}", i32::from(val))),
@@ -381,6 +483,7 @@ fn display_wasm_val(
             _ => panic!("Unsupported value type: {:?}", val_type),
         }
     } else {
+        println!("lsb is 0, {:?}", val);
         match display_local_in_heap(
             executor, 
             store, 
