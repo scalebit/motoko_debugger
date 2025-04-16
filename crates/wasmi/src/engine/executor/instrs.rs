@@ -1,5 +1,3 @@
-use std::{println, vec::Vec};
-
 pub use self::call::{dispatch_host_func, ResumableHostError};
 use super::{cache::CachedInstance, InstructionPtr, Stack};
 use crate::{
@@ -1858,7 +1856,6 @@ impl<'engine> Executor<'engine> {
             }
             Instr::I32LoadAt { instr_offset: _, result, address } => {
                 self.execute_i32_load_at(&store.inner, result, address)?;
-                println!("i32.load at {}: {:?}", address, self.get_register(result));
             }
             Instr::I32LoadOffset16 {
                 instr_offset: _,

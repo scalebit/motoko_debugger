@@ -307,7 +307,6 @@ impl<'engine> MainDebugger<'engine> {
     }
 
     fn display_valtype_with_value(&self, ty: wasmi_core::ValType, value: UntypedVal) -> Result<String> {
-        println!("  value: {:?}", value.to_bits());
         let typed_val_str = 
             if value.to_bits() & 1 == 0 {
                 self.display_val_in_stack(ty, value, 1)
@@ -433,7 +432,6 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
                 |(index, name, ty)| {
                     let reg = i16::try_from(*index).map(Reg::from)?;
                     let val = executor.get_register(reg);
-                    println!("\n\n----name: {}", name);
                     let typed_val_display = self.display_valtype_with_value(*ty, val)?;
                     Ok((*index, name.clone(), typed_val_display))
                 }

@@ -42,6 +42,10 @@ impl<D: Debugger> Process<D> {
         context: &command::CommandContext,
     ) -> Result<Option<CommandResult>> {
         let cmd_name = extract_command_name(line);
+        if cmd_name == "exit" || cmd_name == "quit" {
+            return Ok(Some(CommandResult::Exit));
+        }
+
         let args = shell_words::split(line)?;
         // FIXME
         let args = args.iter().map(AsRef::as_ref).collect();
@@ -90,7 +94,8 @@ impl Interactive {
     }
 
     pub fn new(history_file: &str) -> anyhow::Result<Self> {
-        let interface = Interface::new("MotokoDebugger").with_context(|| "new Interface")?;
+        let interface = 
+            Interface::new("MotokoDebugger").with_context(|| "new Interface")?;
         interface
             .set_prompt("(MotokoDebugger) ")
             .with_context(|| "set prompt")?;
@@ -121,7 +126,7 @@ impl Interactive {
             },
             None => return Ok(None),
         };
-        let result = if !line.trim().is_empty() {
+        let result: Option<CommandResult> = if !line.trim().is_empty() {
             self.interface.add_history_unique(line.clone());
             *last_line = Some(line.clone());
             process.borrow_mut().dispatch_command(&line, context)?
