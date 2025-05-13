@@ -1,5 +1,6 @@
 
 /target/
+/crates/debugger/tests/simple-demo/demo/target/
 **/*.rs.bk
 spec/target
 

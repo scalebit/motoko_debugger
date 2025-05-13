@@ -465,29 +465,15 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
     // }
 
     fn frame(&self) -> Vec<String> {
-        // let executor = if let Some(executor) = self.executor.clone() {
-        //     executor
-        // } else {
-        //     return vec![];
-        // };
-
-        // let frames = &executor.borrow().stack.calls.frames;
-        // let instances = &executor.borrow().stack.calls.instances;
-
-        // if instances.last().is_none() {
-        //     return vec![];
-        // }
-        // let mut frames_string = vec![];
-        // let mut all_instances = instances.rest().iter().collect::<Vec<_>>();
-        // all_instances.push(instances.last().unwrap());
-        // for f in frames.iter() {
-        //     frames_string.push(format!(
-        //         "{:?} - func {}",
-        //         all_instances.last().unwrap(),
-        //         f.func
-        //     ));
-        // }
-        return vec![];
+        let mut res = Vec::new();
+        for idx in self.invoked_func_index.iter() {
+            if let Some(name) = self.get_func_name_by_idx(*idx) {
+                res.push(name);
+            } else {
+                res.push("unknown func".to_string());
+            }
+        }
+        res
     }
 
     // fn memory(&self) -> Result<Vec<u8>> {
