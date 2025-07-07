@@ -13,3 +13,4 @@ spec/target
 .rustup/
 .rust/
 *-history
+tmp
