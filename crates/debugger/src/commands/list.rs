@@ -2,6 +2,7 @@ use super::command::{Command, CommandContext, CommandResult};
 use super::debugger::{Debugger, OutputPrinter};
 use super::sourcemap::{ColumnType, LineInfo, SourceMap};
 use anyhow::Result;
+use crate::internals::INTERNAL_FILES;
 
 pub struct ListCommand {}
 
@@ -47,11 +48,14 @@ pub fn next_line_info<D: Debugger>(debugger: &D, sourcemap: &dyn SourceMap) -> R
 pub fn display_source(line_info: LineInfo, printer: &dyn OutputPrinter) -> Result<()> {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
-    let file = if let Ok(file_entry)  = File::open(&line_info.filepath) {
-        file_entry
+    let file: Box<dyn std::io::Read> = if let Ok(file_entry) = File::open(&line_info.filepath) {
+        Box::new(file_entry)
+    } else if let Some(content) = INTERNAL_FILES.get(line_info.filepath.as_str()) {
+        Box::new(std::io::Cursor::new(*content))
     } else {
         return Err(anyhow::anyhow!("File not found: {:?}", line_info.filepath));
     };
+    
     let source = BufReader::new(file);
     // In case compiler can't determine source code location. Page 151.
     if line_info.line.is_none() || line_info.line == None {

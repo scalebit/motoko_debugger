@@ -4,6 +4,7 @@ mod dwarf;
 mod process;
 mod heap;
 mod breakpoint;
+mod internals;
 
 use std::{cell::RefCell, rc::Rc};
 

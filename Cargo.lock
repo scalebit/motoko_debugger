@@ -1781,6 +1781,7 @@ dependencies = [
  "clap 2.34.0",
  "env_logger",
  "gimli",
+ "lazy_static",
  "linefeed",
  "log",
  "num-bigint",
