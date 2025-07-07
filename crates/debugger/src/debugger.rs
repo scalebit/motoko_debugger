@@ -501,8 +501,14 @@ impl<'engine> debugger::Debugger for MainDebugger<'engine> {
         use debugger::StepStyle::*;
         match style {
             InstIn => {
-                executor.borrow_mut().execute_step(store, self)?;
-                Ok(RunResult::Next)
+                let last_signal = executor.borrow_mut().execute_step(store, self)?;
+                if let Signal::Breakpoint = last_signal {
+                    return Ok(RunResult::Breakpoint);
+                } else if let Signal::End = last_signal {
+                    let results = self.get_finish_result()?;
+                    return Ok(RunResult::Finish(results));
+                }
+                return Ok(RunResult::Next);
             },
             InstOver => {
                 let initial_frame_depth = frame_depth(&executor.borrow());
